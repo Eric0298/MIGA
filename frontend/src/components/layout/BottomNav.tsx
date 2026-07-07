@@ -32,9 +32,7 @@ function BottomNav() {
               className={({ isActive }) =>
                 clsx(
                   'flex min-h-14 flex-col items-center justify-center gap-1 px-1 pt-2 pb-2 text-xs font-medium transition-colors',
-                  isActive
-                    ? 'text-apricot'
-                    : 'text-[color:var(--color-text-muted)]'
+                  isActive ? 'text-apricot' : 'text-[color:var(--color-text-muted)]',
                 )
               }
             >

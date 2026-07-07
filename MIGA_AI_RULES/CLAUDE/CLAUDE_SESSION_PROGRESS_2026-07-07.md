@@ -43,12 +43,12 @@ It will **not** be published initially to App Store or Google Play because those
 
 ### Store strategy
 
-| Platform | Current decision |
-|---|---|
-| App Store | Out of MVP |
-| Google Play | Out of MVP |
-| PWA installability | Required |
-| Cost target | 0 € initial cost |
+| Platform           | Current decision |
+| ------------------ | ---------------- |
+| App Store          | Out of MVP       |
+| Google Play        | Out of MVP       |
+| PWA installability | Required         |
+| Cost target        | 0 € initial cost |
 
 MIGA should be installable from the browser as a PWA and should feel like a mobile app.
 
@@ -60,22 +60,22 @@ The user provided a brand board image for MIGA.
 
 ### Brand elements
 
-| Element | Value |
-|---|---|
-| Name | Miga / MIGA |
-| Claim | Small actions. Big progress. |
-| Main feeling | warm, clean, rounded, calm, mobile-first |
-| Personality | small accumulated actions, steady progress, human productivity |
+| Element      | Value                                                          |
+| ------------ | -------------------------------------------------------------- |
+| Name         | Miga / MIGA                                                    |
+| Claim        | Small actions. Big progress.                                   |
+| Main feeling | warm, clean, rounded, calm, mobile-first                       |
+| Personality  | small accumulated actions, steady progress, human productivity |
 
 ### Colors
 
-| Color | Hex | Intended use |
-|---|---:|---|
-| Apricot | `#FF8A4C` | primary actions, brand icon, emphasis |
-| Peach | `#FFDCC2` | soft surfaces, secondary cards |
-| Cream | `#FFF7EC` | main background |
-| Charcoal | `#1F1F1F` | text, contrast, logo |
-| Pistachio | `#A7CDA3` | positive state, progress, success |
+| Color     |       Hex | Intended use                          |
+| --------- | --------: | ------------------------------------- |
+| Apricot   | `#FF8A4C` | primary actions, brand icon, emphasis |
+| Peach     | `#FFDCC2` | soft surfaces, secondary cards        |
+| Cream     | `#FFF7EC` | main background                       |
+| Charcoal  | `#1F1F1F` | text, contrast, logo                  |
+| Pistachio | `#A7CDA3` | positive state, progress, success     |
 
 ### Typography
 
@@ -497,11 +497,11 @@ services:
       POSTGRES_USER: miga_user
       POSTGRES_PASSWORD: miga_password_dev
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - miga_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U miga_user -d miga_dev"]
+      test: ['CMD-SHELL', 'pg_isready -U miga_user -d miga_dev']
       interval: 10s
       timeout: 5s
       retries: 5

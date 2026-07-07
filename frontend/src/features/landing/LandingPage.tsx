@@ -19,9 +19,8 @@ function LandingPage() {
           Big progress.
         </h1>
         <p className="mt-4 text-base leading-relaxed text-[color:var(--color-text-muted)]">
-          Miga te ayuda a convertir pequeñas acciones diarias en progreso real.
-          Nada de listas infinitas, ni presión artificial. Solo tiempo bien
-          usado y avance visible.
+          Miga te ayuda a convertir pequeñas acciones diarias en progreso real. Nada de listas
+          infinitas, ni presión artificial. Solo tiempo bien usado y avance visible.
         </p>
 
         <div className="mt-8 flex flex-col gap-3">
@@ -52,12 +51,10 @@ function LandingPage() {
                 <Clock size={18} aria-hidden="true" />
               </span>
               <div>
-                <h3 className="text-base font-semibold text-charcoal">
-                  Tiempo real, no promesas
-                </h3>
+                <h3 className="text-base font-semibold text-charcoal">Tiempo real, no promesas</h3>
                 <p className="mt-1 text-sm leading-relaxed text-[color:var(--color-text-muted)]">
-                  El temporizador se basa en marcas de tiempo. Sobrevive a
-                  recargas y bloqueos de pantalla.
+                  El temporizador se basa en marcas de tiempo. Sobrevive a recargas y bloqueos de
+                  pantalla.
                 </p>
               </div>
             </div>
@@ -69,12 +66,9 @@ function LandingPage() {
                 <Target size={18} aria-hidden="true" />
               </span>
               <div>
-                <h3 className="text-base font-semibold text-charcoal">
-                  Metas honestas
-                </h3>
+                <h3 className="text-base font-semibold text-charcoal">Metas honestas</h3>
                 <p className="mt-1 text-sm leading-relaxed text-[color:var(--color-text-muted)]">
-                  Fija objetivos por tiempo semanal. Miga te dice si vas al día
-                  sin dramatizar.
+                  Fija objetivos por tiempo semanal. Miga te dice si vas al día sin dramatizar.
                 </p>
               </div>
             </div>
@@ -86,9 +80,7 @@ function LandingPage() {
                 <TrendingUp size={18} aria-hidden="true" />
               </span>
               <div>
-                <h3 className="text-base font-semibold text-charcoal">
-                  Progreso visible
-                </h3>
+                <h3 className="text-base font-semibold text-charcoal">Progreso visible</h3>
                 <p className="mt-1 text-sm leading-relaxed text-[color:var(--color-text-muted)]">
                   Cada sesión suma. Verás avance real, no rachas vacías.
                 </p>

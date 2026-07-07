@@ -146,11 +146,11 @@ Do not use `--force` or `--legacy-peer-deps` unless explicitly instructed.
 Brand colors:
 
 ```css
---miga-apricot: #FF8A4C;
---miga-peach: #FFDCC2;
---miga-cream: #FFF7EC;
---miga-charcoal: #1F1F1F;
---miga-pistachio: #A7CDA3;
+--miga-apricot: #ff8a4c;
+--miga-peach: #ffdcc2;
+--miga-cream: #fff7ec;
+--miga-charcoal: #1f1f1f;
+--miga-pistachio: #a7cda3;
 ```
 
 Typography fallback installed:
@@ -281,11 +281,11 @@ services:
       POSTGRES_USER: miga_user
       POSTGRES_PASSWORD: miga_password_dev
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - miga_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U miga_user -d miga_dev"]
+      test: ['CMD-SHELL', 'pg_isready -U miga_user -d miga_dev']
       interval: 10s
       timeout: 5s
       retries: 5

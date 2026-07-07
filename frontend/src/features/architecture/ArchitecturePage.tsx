@@ -5,10 +5,7 @@ function ArchitecturePage() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pt-8 pb-16">
       <header className="flex items-center">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm font-medium text-charcoal"
-        >
+        <Link to="/" className="inline-flex items-center gap-2 text-sm font-medium text-charcoal">
           <ArrowLeft size={18} aria-hidden="true" />
           Volver
         </Link>
@@ -17,8 +14,8 @@ function ArchitecturePage() {
       <section className="mt-10">
         <h1 className="text-3xl font-extrabold text-charcoal">Arquitectura</h1>
         <p className="mt-3 text-base leading-relaxed text-[color:var(--color-text-muted)]">
-          Miga es una PWA mobile-first con modo invitado local. Sin login
-          obligatorio, sin IA, sin nube forzada.
+          Miga es una PWA mobile-first con modo invitado local. Sin login obligatorio, sin IA, sin
+          nube forzada.
         </p>
       </section>
 

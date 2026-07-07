@@ -175,16 +175,16 @@ Requisitos:
 
 MVP futuro de archivos:
 
-| Tipo | MIME |
-|---|---|
-| PDF | `application/pdf` |
-| PNG | `image/png` |
-| JPEG | `image/jpeg` |
-| WebP | `image/webp` |
-| TXT | `text/plain` |
+| Tipo | MIME                                                                      |
+| ---- | ------------------------------------------------------------------------- |
+| PDF  | `application/pdf`                                                         |
+| PNG  | `image/png`                                                               |
+| JPEG | `image/jpeg`                                                              |
+| WebP | `image/webp`                                                              |
+| TXT  | `text/plain`                                                              |
 | DOCX | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` |
-| MP4 | `video/mp4` |
-| WebM | `video/webm` |
+| MP4  | `video/mp4`                                                               |
+| WebM | `video/webm`                                                              |
 
 ## 13. Contraseñas
 

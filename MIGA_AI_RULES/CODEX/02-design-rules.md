@@ -21,13 +21,13 @@ Small actions. Big progress.
 
 ## 2. Paleta oficial
 
-| Color | Hex | Uso recomendado |
-|---|---:|---|
-| Apricot | `#FF8A4C` | Acción primaria, icono, botones principales |
-| Peach | `#FFDCC2` | Fondos secundarios, superficies suaves |
-| Cream | `#FFF7EC` | Fondo principal |
-| Charcoal | `#1F1F1F` | Texto principal, contraste, logo |
-| Pistachio | `#A7CDA3` | Progreso positivo, éxito, estado al día |
+| Color     |       Hex | Uso recomendado                             |
+| --------- | --------: | ------------------------------------------- |
+| Apricot   | `#FF8A4C` | Acción primaria, icono, botones principales |
+| Peach     | `#FFDCC2` | Fondos secundarios, superficies suaves      |
+| Cream     | `#FFF7EC` | Fondo principal                             |
+| Charcoal  | `#1F1F1F` | Texto principal, contraste, logo            |
+| Pistachio | `#A7CDA3` | Progreso positivo, éxito, estado al día     |
 
 ## 3. Variables recomendadas
 
@@ -35,14 +35,14 @@ Usar tokens claros desde el principio.
 
 ```css
 :root {
-  --color-apricot: #FF8A4C;
-  --color-peach: #FFDCC2;
-  --color-cream: #FFF7EC;
-  --color-charcoal: #1F1F1F;
-  --color-pistachio: #A7CDA3;
+  --color-apricot: #ff8a4c;
+  --color-peach: #ffdcc2;
+  --color-cream: #fff7ec;
+  --color-charcoal: #1f1f1f;
+  --color-pistachio: #a7cda3;
 
   --color-background: var(--color-cream);
-  --color-surface: #FFFFFF;
+  --color-surface: #ffffff;
   --color-surface-soft: var(--color-peach);
   --color-text: var(--color-charcoal);
   --color-primary: var(--color-apricot);
@@ -68,9 +68,9 @@ background: linear-gradient(...);
 Preferir:
 
 ```css
-background: #FFF7EC;
-background: #FFDCC2;
-background: #FF8A4C;
+background: #fff7ec;
+background: #ffdcc2;
+background: #ff8a4c;
 ```
 
 ## 5. Regla anti-tags decorativos
@@ -233,13 +233,13 @@ Ejemplo conceptual:
 
 ## 14. Estados de progreso
 
-| Estado | Tratamiento visual |
-|---|---|
-| Adelantado | Pistachio, tono positivo |
-| Al día | Pistachio o charcoal suave |
-| Leve retraso | Apricot suave |
-| Retraso importante | Apricot más marcado |
-| Riesgo crítico | Mensaje claro, sin dramatizar |
+| Estado             | Tratamiento visual            |
+| ------------------ | ----------------------------- |
+| Adelantado         | Pistachio, tono positivo      |
+| Al día             | Pistachio o charcoal suave    |
+| Leve retraso       | Apricot suave                 |
+| Retraso importante | Apricot más marcado           |
+| Riesgo crítico     | Mensaje claro, sin dramatizar |
 
 Evitar rojos agresivos al principio. MIGA debe corregir sin castigar visualmente.
 
