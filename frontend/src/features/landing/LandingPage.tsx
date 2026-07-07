@@ -1,4 +1,5 @@
 import { Clock, Target, TrendingUp } from 'lucide-react'
+import { Link } from 'react-router'
 
 function LandingPage() {
   return (
@@ -24,18 +25,18 @@ function LandingPage() {
         </p>
 
         <div className="mt-8 flex flex-col gap-3">
-          <button
-            type="button"
-            className="w-full rounded-2xl bg-apricot px-5 py-3.5 text-base font-semibold text-white transition active:scale-[0.98]"
+          <Link
+            to="/app"
+            className="w-full rounded-2xl bg-apricot px-5 py-3.5 text-center text-base font-semibold text-white transition active:scale-[0.98]"
           >
             Probar como invitado
-          </button>
-          <button
-            type="button"
-            className="w-full rounded-2xl bg-surface px-5 py-3.5 text-base font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] transition active:scale-[0.98]"
+          </Link>
+          <Link
+            to="/arquitectura"
+            className="w-full rounded-2xl bg-surface px-5 py-3.5 text-center text-base font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] transition active:scale-[0.98]"
           >
             Ver arquitectura
-          </button>
+          </Link>
         </div>
       </section>
 
