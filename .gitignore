@@ -1,0 +1,195 @@
+# =========================================================
+# MIGA - Root .gitignore
+# Monorepo: React/Vite frontend + ASP.NET Core backend
+# =========================================================
+
+
+# =========================================================
+# Node / npm
+# =========================================================
+
+node_modules/
+**/node_modules/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+.npm/
+.pnpm-store/
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+
+# Vite
+.vite/
+**/.vite/
+
+# Frontend cache
+.cache/
+**/.cache/
+
+
+# =========================================================
+# TypeScript / JavaScript
+# =========================================================
+
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+**/coverage/
+.nyc_output/
+
+
+# =========================================================
+# Environment variables / secrets
+# =========================================================
+
+.env
+.env.*
+!.env.example
+!.env.local.example
+!.env.development.example
+!.env.production.example
+
+
+# =========================================================
+# .NET / ASP.NET Core
+# =========================================================
+
+bin/
+obj/
+**/bin/
+**/obj/
+
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / ReSharper
+.idea/
+_ReSharper*/
+*.DotSettings.user
+
+# Visual Studio
+.vs/
+
+
+# =========================================================
+# ASP.NET local development
+# =========================================================
+
+appsettings.Local.json
+appsettings.*.Local.json
+
+# Do not ignore normal appsettings files.
+# appsettings.json and appsettings.Development.json can be committed
+# if they do not contain secrets.
+
+
+# =========================================================
+# Logs
+# =========================================================
+
+logs/
+**/logs/
+*.log
+
+
+# =========================================================
+# Docker / local volumes
+# =========================================================
+
+.docker/
+docker-data/
+postgres-data/
+pgdata/
+
+# Keep docker-compose files tracked.
+!docker-compose.yml
+!docker-compose.*.yml
+
+
+# =========================================================
+# IDEs / editors
+# =========================================================
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# JetBrains
+.idea/
+
+
+# =========================================================
+# OS generated files
+# =========================================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+
+# =========================================================
+# Temporary files
+# =========================================================
+
+tmp/
+temp/
+.tmp/
+*.tmp
+*.temp
+
+
+# =========================================================
+# PWA generated files
+# =========================================================
+
+dev-dist/
+**/dev-dist/
+sw.js
+workbox-*.js
+
+# Note:
+# If later we generate service workers intentionally into public/,
+# we will review this section.
+
+
+# =========================================================
+# Test artifacts
+# =========================================================
+
+TestResults/
+**/TestResults/
+
+
+# =========================================================
+# Local database files
+# =========================================================
+
+*.db
+*.sqlite
+*.sqlite3
+
+
+# =========================================================
+# Package manager alternatives
+# =========================================================
+
+yarn.lock
+pnpm-lock.yaml
+
+# MIGA currently uses npm, so package-lock.json must be committed.
+!package-lock.json
+!**/package-lock.json
