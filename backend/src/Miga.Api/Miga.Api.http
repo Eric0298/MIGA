@@ -2,3 +2,8 @@
 
 GET {{MigaApi_HostAddress}}/api/health
 Accept: application/json
+
+###
+
+GET {{MigaApi_HostAddress}}/api/health/db
+Accept: application/json
