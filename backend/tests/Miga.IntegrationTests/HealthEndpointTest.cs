@@ -1,14 +1,14 @@
 using System.Net;
-using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Shouldly;
 
 namespace Miga.IntegrationTests;
 
-public sealed class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class HealthEndpointTest : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly HttpClient _client;
 
-    public HealthEndpointTests(WebApplicationFactory<Program> factory)
+    public HealthEndpointTest(WebApplicationFactory<Program> factory)
     {
         _client = factory.CreateClient();
     }
@@ -18,11 +18,11 @@ public sealed class HealthEndpointTests : IClassFixture<WebApplicationFactory<Pr
     {
         var response = await _client.GetAsync("/api/health");
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var content = await response.Content.ReadAsStringAsync();
 
-        content.Should().Contain("healthy");
-        content.Should().Contain("Miga.Api");
+        content.ShouldContain("healthy");
+        content.ShouldContain("Miga.Api");
     }
 }

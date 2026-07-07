@@ -1,12 +1,12 @@
-using FluentAssertions;
+using Shouldly;
 
 namespace Miga.UnitTests;
 
-public sealed class BackendSetupTests
+public sealed class BackendSetUpTests
 {
     [Fact]
     public void UnitTestProject_ShouldRun()
     {
-        true.Should().BeTrue();
+        true.ShouldBeTrue();
     }
 }
