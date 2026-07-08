@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
+import { I18nProvider } from '@/i18n/i18n-context'
 import BottomNav from './BottomNav'
 
 function renderNav(initialPath = '/app') {
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
-      <BottomNav />
-    </MemoryRouter>,
+    <I18nProvider initialLang="es">
+      <MemoryRouter initialEntries={[initialPath]}>
+        <BottomNav />
+      </MemoryRouter>
+    </I18nProvider>,
   )
 }
 

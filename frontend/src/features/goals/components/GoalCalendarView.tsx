@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useT } from '@/i18n/i18n-context'
+import { tpl } from '@/i18n/tpl'
 import {
   DAY_LABELS,
   formatMonthLabel,
@@ -19,9 +21,11 @@ type GoalCalendarViewProps = {
 }
 
 function GoalCalendarView({ scheduledDays, workedDays, initialMonth }: GoalCalendarViewProps) {
+  const { t, locale } = useT()
   const [visibleMonth, setVisibleMonth] = useState(() => initialMonth ?? new Date())
   const matrix = useMemo(() => getMonthMatrix(visibleMonth), [visibleMonth])
   const today = todayIso()
+  const monthLabel = formatMonthLabel(visibleMonth, locale)
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl bg-surface p-4">
@@ -29,18 +33,16 @@ function GoalCalendarView({ scheduledDays, workedDays, initialMonth }: GoalCalen
         <button
           type="button"
           onClick={() => setVisibleMonth(previousMonth(visibleMonth))}
-          aria-label="Mes anterior"
+          aria-label={t.calendar.previousMonth}
           className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-charcoal transition-colors hover:bg-cream"
         >
           <ChevronLeft size={18} aria-hidden="true" />
         </button>
-        <span className="text-sm font-semibold text-charcoal">
-          {formatMonthLabel(visibleMonth)}
-        </span>
+        <span className="text-sm font-semibold text-charcoal">{monthLabel}</span>
         <button
           type="button"
           onClick={() => setVisibleMonth(nextMonth(visibleMonth))}
-          aria-label="Mes siguiente"
+          aria-label={t.calendar.nextMonth}
           className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-charcoal transition-colors hover:bg-cream"
         >
           <ChevronRight size={18} aria-hidden="true" />
@@ -50,7 +52,7 @@ function GoalCalendarView({ scheduledDays, workedDays, initialMonth }: GoalCalen
       <div
         className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-[color:var(--color-text-muted)]"
         role="grid"
-        aria-label={`Calendario de ${formatMonthLabel(visibleMonth)}`}
+        aria-label={tpl(t.calendar.monthAria, { month: monthLabel })}
       >
         {DAY_LABELS.map((label) => (
           <span key={label} className="py-1">
@@ -64,6 +66,14 @@ function GoalCalendarView({ scheduledDays, workedDays, initialMonth }: GoalCalen
           const planned = scheduledDays.has(iso)
           const worked = workedDays.has(iso)
           const isToday = iso === today
+          const ariaTemplate =
+            planned && worked
+              ? t.calendar.dayAriaPlannedWorked
+              : planned
+                ? t.calendar.dayAriaPlanned
+                : worked
+                  ? t.calendar.dayAriaWorked
+                  : t.calendar.dayAria
           return (
             <div
               key={iso}
@@ -79,13 +89,7 @@ function GoalCalendarView({ scheduledDays, workedDays, initialMonth }: GoalCalen
                 !inMonth && 'opacity-40',
                 isToday && !planned && !worked && 'ring-1 ring-apricot',
               )}
-              aria-label={
-                planned || worked
-                  ? `Día ${day.getDate()}${planned ? ', planificado' : ''}${
-                      worked ? ', con sesión' : ''
-                    }`
-                  : `Día ${day.getDate()}`
-              }
+              aria-label={tpl(ariaTemplate, { day: day.getDate() })}
             >
               <span>{day.getDate()}</span>
             </div>
@@ -96,15 +100,15 @@ function GoalCalendarView({ scheduledDays, workedDays, initialMonth }: GoalCalen
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[color:var(--color-text-muted)]">
         <li className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-3 rounded bg-peach" aria-hidden="true" />
-          Planificado
+          {t.calendar.legendPlanned}
         </li>
         <li className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-3 rounded bg-pistachio" aria-hidden="true" />
-          Con sesión
+          {t.calendar.legendWorked}
         </li>
         <li className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-3 rounded ring-1 ring-apricot" aria-hidden="true" />
-          Hoy
+          {t.calendar.legendToday}
         </li>
       </ul>
     </div>

@@ -1,4 +1,4 @@
-import { format } from 'date-fns'
+import { format, type Locale } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { Goal, Session } from '@/lib/db/schema'
 import { fromIso } from '@/features/goals/utils'
@@ -15,6 +15,7 @@ export function buildProgressSeries(
   goal: Goal,
   sessions: Session[],
   todayIso: string,
+  locale: Locale = es,
 ): ProgressPoint[] {
   const total = goal.scheduledDays.length
   if (total === 0) return []
@@ -45,7 +46,7 @@ export function buildProgressSeries(
 
     points.push({
       day,
-      label: format(fromIso(day), 'd LLL', { locale: es }),
+      label: format(fromIso(day), 'd LLL', { locale }),
       plan,
       real: cumulativeReal,
     })

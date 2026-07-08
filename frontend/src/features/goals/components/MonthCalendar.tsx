@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useT } from '@/i18n/i18n-context'
+import { tpl } from '@/i18n/tpl'
 import {
   DAY_LABELS,
   formatMonthLabel,
@@ -18,8 +20,10 @@ type MonthCalendarProps = {
 }
 
 function MonthCalendar({ selectedDays, onToggleDay, onToggleWeek }: MonthCalendarProps) {
+  const { t, locale } = useT()
   const [visibleMonth, setVisibleMonth] = useState(() => new Date())
   const matrix = useMemo(() => getMonthMatrix(visibleMonth), [visibleMonth])
+  const monthLabel = formatMonthLabel(visibleMonth, locale)
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl bg-surface p-4">
@@ -27,18 +31,16 @@ function MonthCalendar({ selectedDays, onToggleDay, onToggleWeek }: MonthCalenda
         <button
           type="button"
           onClick={() => setVisibleMonth(previousMonth(visibleMonth))}
-          aria-label="Mes anterior"
+          aria-label={t.calendar.previousMonth}
           className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-charcoal transition-colors hover:bg-cream"
         >
           <ChevronLeft size={18} aria-hidden="true" />
         </button>
-        <span className="text-sm font-semibold text-charcoal">
-          {formatMonthLabel(visibleMonth)}
-        </span>
+        <span className="text-sm font-semibold text-charcoal">{monthLabel}</span>
         <button
           type="button"
           onClick={() => setVisibleMonth(nextMonth(visibleMonth))}
-          aria-label="Mes siguiente"
+          aria-label={t.calendar.nextMonth}
           className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-charcoal transition-colors hover:bg-cream"
         >
           <ChevronRight size={18} aria-hidden="true" />
@@ -48,7 +50,7 @@ function MonthCalendar({ selectedDays, onToggleDay, onToggleWeek }: MonthCalenda
       <div
         className="grid grid-cols-[auto_repeat(7,minmax(0,1fr))] gap-1 text-center text-xs font-medium text-[color:var(--color-text-muted)]"
         role="grid"
-        aria-label={`Calendario de ${formatMonthLabel(visibleMonth)}`}
+        aria-label={tpl(t.calendar.monthAria, { month: monthLabel })}
       >
         <span aria-hidden="true" />
         {DAY_LABELS.map((label) => (
@@ -70,6 +72,10 @@ function MonthCalendar({ selectedDays, onToggleDay, onToggleWeek }: MonthCalenda
               allSelected={allSelected}
               onToggleDay={onToggleDay}
               onToggleWeek={onToggleWeek}
+              weekLabel={t.calendar.week}
+              selectWeekLabel={t.calendar.selectWeek}
+              unselectWeekLabel={t.calendar.unselectWeek}
+              dayAriaTemplate={t.calendar.dayAria}
             />
           )
         })}
@@ -86,6 +92,10 @@ type RowProps = {
   allSelected: boolean
   onToggleDay: (iso: string) => void
   onToggleWeek: (weekIsoDays: string[]) => void
+  weekLabel: string
+  selectWeekLabel: string
+  unselectWeekLabel: string
+  dayAriaTemplate: string
 }
 
 function FragmentRow({
@@ -96,13 +106,17 @@ function FragmentRow({
   allSelected,
   onToggleDay,
   onToggleWeek,
+  weekLabel,
+  selectWeekLabel,
+  unselectWeekLabel,
+  dayAriaTemplate,
 }: RowProps) {
   return (
     <>
       <button
         type="button"
         onClick={() => onToggleWeek(isoDays)}
-        aria-label={allSelected ? 'Deseleccionar semana' : 'Seleccionar toda la semana'}
+        aria-label={allSelected ? unselectWeekLabel : selectWeekLabel}
         aria-pressed={allSelected}
         className={clsx(
           'flex h-10 items-center justify-center rounded-xl text-[10px] font-semibold transition-colors',
@@ -111,7 +125,7 @@ function FragmentRow({
             : 'bg-cream text-[color:var(--color-text-muted)] hover:bg-peach hover:text-charcoal',
         )}
       >
-        Sem
+        {weekLabel}
       </button>
       {week.map((day, dayIndex) => {
         const iso = isoDays[dayIndex]
@@ -123,7 +137,7 @@ function FragmentRow({
             type="button"
             onClick={() => onToggleDay(iso)}
             aria-pressed={selected}
-            aria-label={`Día ${day.getDate()}`}
+            aria-label={tpl(dayAriaTemplate, { day: day.getDate() })}
             className={clsx(
               'flex h-10 items-center justify-center rounded-xl text-sm font-medium transition-colors',
               selected

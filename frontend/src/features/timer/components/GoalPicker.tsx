@@ -1,5 +1,6 @@
 import { clsx } from 'clsx'
 import { useLiveGoals } from '@/features/goals/hooks/use-goals'
+import { useT } from '@/i18n/i18n-context'
 
 type GoalPickerProps = {
   value: string | null
@@ -7,6 +8,7 @@ type GoalPickerProps = {
 }
 
 function GoalPicker({ value, onChange }: GoalPickerProps) {
+  const { t } = useT()
   const goals = useLiveGoals()
 
   return (
@@ -21,7 +23,7 @@ function GoalPicker({ value, onChange }: GoalPickerProps) {
             : 'bg-cream text-charcoal ring-1 ring-[color:var(--color-border)]',
         )}
       >
-        Sesión libre
+        {t.common.freeSession}
       </button>
       {goals?.map((g) => (
         <button

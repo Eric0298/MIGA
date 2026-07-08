@@ -1,7 +1,9 @@
 import { Clock, Target, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router'
+import { useT } from '@/i18n/i18n-context'
 
 function LandingPage() {
+  const { t } = useT()
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pt-8 pb-16">
       <header className="flex items-center">
@@ -14,13 +16,12 @@ function LandingPage() {
 
       <section className="mt-12">
         <h1 className="text-4xl leading-tight font-extrabold text-charcoal">
-          Small actions.
+          {t.landing.tagline1}
           <br />
-          Big progress.
+          {t.landing.tagline2}
         </h1>
         <p className="mt-4 text-base leading-relaxed text-[color:var(--color-text-muted)]">
-          Miga te ayuda a convertir pequeñas acciones diarias en progreso real. Nada de listas
-          infinitas, ni presión artificial. Solo tiempo bien usado y avance visible.
+          {t.landing.description}
         </p>
 
         <div className="mt-8 flex flex-col gap-3">
@@ -28,20 +29,20 @@ function LandingPage() {
             to="/app"
             className="w-full rounded-2xl bg-apricot px-5 py-3.5 text-center text-base font-semibold text-white transition active:scale-[0.98]"
           >
-            Probar como invitado
+            {t.landing.tryGuest}
           </Link>
           <Link
             to="/arquitectura"
             className="w-full rounded-2xl bg-surface px-5 py-3.5 text-center text-base font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] transition active:scale-[0.98]"
           >
-            Ver arquitectura
+            {t.landing.seeArchitecture}
           </Link>
         </div>
       </section>
 
       <section aria-labelledby="value" className="mt-14">
         <h2 id="value" className="text-lg font-semibold text-charcoal">
-          Por qué Miga
+          {t.landing.whyMiga}
         </h2>
 
         <ul className="mt-4 flex flex-col gap-3">
@@ -51,10 +52,9 @@ function LandingPage() {
                 <Clock size={18} aria-hidden="true" />
               </span>
               <div>
-                <h3 className="text-base font-semibold text-charcoal">Tiempo real, no promesas</h3>
+                <h3 className="text-base font-semibold text-charcoal">{t.landing.feature1Title}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-[color:var(--color-text-muted)]">
-                  El temporizador se basa en marcas de tiempo. Sobrevive a recargas y bloqueos de
-                  pantalla.
+                  {t.landing.feature1Description}
                 </p>
               </div>
             </div>
@@ -66,9 +66,9 @@ function LandingPage() {
                 <Target size={18} aria-hidden="true" />
               </span>
               <div>
-                <h3 className="text-base font-semibold text-charcoal">Metas honestas</h3>
+                <h3 className="text-base font-semibold text-charcoal">{t.landing.feature2Title}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-[color:var(--color-text-muted)]">
-                  Fija objetivos por tiempo semanal. Miga te dice si vas al día sin dramatizar.
+                  {t.landing.feature2Description}
                 </p>
               </div>
             </div>
@@ -80,9 +80,9 @@ function LandingPage() {
                 <TrendingUp size={18} aria-hidden="true" />
               </span>
               <div>
-                <h3 className="text-base font-semibold text-charcoal">Progreso visible</h3>
+                <h3 className="text-base font-semibold text-charcoal">{t.landing.feature3Title}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-[color:var(--color-text-muted)]">
-                  Cada sesión suma. Verás avance real, no rachas vacías.
+                  {t.landing.feature3Description}
                 </p>
               </div>
             </div>
@@ -91,7 +91,7 @@ function LandingPage() {
       </section>
 
       <footer className="mt-14 text-center text-xs text-[color:var(--color-text-muted)]">
-        Modo invitado local. Sin cuenta obligatoria.
+        {t.landing.footer}
       </footer>
     </main>
   )

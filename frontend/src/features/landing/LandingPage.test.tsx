@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
+import { I18nProvider } from '@/i18n/i18n-context'
 import LandingPage from './LandingPage'
 
 function renderLanding() {
   return render(
-    <MemoryRouter>
-      <LandingPage />
-    </MemoryRouter>,
+    <I18nProvider initialLang="es">
+      <MemoryRouter>
+        <LandingPage />
+      </MemoryRouter>
+    </I18nProvider>,
   )
 }
 

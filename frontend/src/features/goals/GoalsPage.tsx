@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { Plus, Target } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
 import { useCompletedSessions } from '@/features/sessions/hooks/use-completed-sessions'
+import { useT } from '@/i18n/i18n-context'
 import { useLiveGoals } from './hooks/use-goals'
 import GoalForm from './components/GoalForm'
 import GoalCard from './components/GoalCard'
 
 function GoalsPage() {
+  const { t } = useT()
   const [showForm, setShowForm] = useState(false)
   const goals = useLiveGoals()
   const sessions = useCompletedSessions()
@@ -17,7 +19,7 @@ function GoalsPage() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-charcoal">Metas</h1>
+        <h1 className="text-2xl font-bold text-charcoal">{t.goals.title}</h1>
         {!showForm && (
           <button
             type="button"
@@ -25,7 +27,7 @@ function GoalsPage() {
             className="inline-flex items-center gap-1.5 rounded-2xl bg-apricot px-4 py-2 text-sm font-semibold text-white transition active:scale-[0.98]"
           >
             <Plus size={16} aria-hidden="true" />
-            Nueva meta
+            {t.goals.newGoal}
           </button>
         )}
       </header>
@@ -34,13 +36,15 @@ function GoalsPage() {
         <GoalForm onCreated={() => setShowForm(false)} onCancel={() => setShowForm(false)} />
       )}
 
-      {isLoading && <p className="text-sm text-[color:var(--color-text-muted)]">Cargando…</p>}
+      {isLoading && (
+        <p className="text-sm text-[color:var(--color-text-muted)]">{t.common.loading}</p>
+      )}
 
       {isEmpty && !showForm && (
         <EmptyState
           icon={<Target size={20} aria-hidden="true" />}
-          title="Aún no hay metas"
-          description="Crea tu primera meta eligiendo los días o semanas en los que quieres avanzar."
+          title={t.goals.emptyTitle}
+          description={t.goals.emptyDescription}
         />
       )}
 

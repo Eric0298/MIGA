@@ -9,6 +9,7 @@ import {
 } from 'recharts'
 import type { Goal, Session } from '@/lib/db/schema'
 import { buildProgressSeries } from '@/lib/stats/progress-series'
+import { useT } from '@/i18n/i18n-context'
 import { formatMinutes } from '../utils'
 
 type GoalProgressChartProps = {
@@ -18,12 +19,13 @@ type GoalProgressChartProps = {
 }
 
 function GoalProgressChart({ goal, sessions, todayIso }: GoalProgressChartProps) {
-  const data = buildProgressSeries(goal, sessions, todayIso)
+  const { t, locale } = useT()
+  const data = buildProgressSeries(goal, sessions, todayIso, locale)
 
   if (data.length === 0) {
     return (
       <p className="rounded-2xl bg-surface p-5 text-sm text-[color:var(--color-text-muted)]">
-        Aún no hay datos para dibujar el progreso.
+        {t.goalDetail.noChartData}
       </p>
     )
   }
@@ -74,7 +76,7 @@ function GoalProgressChart({ goal, sessions, todayIso }: GoalProgressChartProps)
             }}
             formatter={(value, name) => [
               formatMinutes(Number(value)),
-              name === 'plan' ? 'Plan' : 'Real',
+              name === 'plan' ? t.goalDetail.plan : t.goalDetail.real,
             ]}
             labelFormatter={(label) => String(label ?? '')}
           />
@@ -103,15 +105,15 @@ function GoalProgressChart({ goal, sessions, todayIso }: GoalProgressChartProps)
       <ul className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-[color:var(--color-text-muted)]">
         <li className="flex items-center gap-1.5">
           <span className="inline-block h-2 w-4 rounded-full bg-peach" aria-hidden="true" />
-          Plan
+          {t.goalDetail.plan}
         </li>
         <li className="flex items-center gap-1.5">
           <span className="inline-block h-2 w-4 rounded-full bg-apricot" aria-hidden="true" />
-          Real
+          {t.goalDetail.real}
         </li>
       </ul>
       <p className="mt-1 text-center text-[10px] text-[color:var(--color-text-muted)]">
-        Toca la línea para ver los minutos exactos
+        {t.goalDetail.touchHint}
       </p>
     </div>
   )

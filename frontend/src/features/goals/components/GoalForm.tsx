@@ -2,6 +2,9 @@ import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { createGoal } from '@/lib/db/goals.repository'
 import { goalInputSchema } from '@/lib/db/schema'
+import { useT } from '@/i18n/i18n-context'
+import { tpl } from '@/i18n/tpl'
+import type { Messages } from '@/i18n/messages/es'
 import { combineHoursMinutes, formatMinutes, splitHoursMinutes } from '../utils'
 import MonthCalendar from './MonthCalendar'
 
@@ -12,7 +15,13 @@ type GoalFormProps = {
 
 const DEFAULT_HOURS = 10
 
+function translateError(key: string, errors: Messages['form']['errors']): string {
+  if (key in errors) return errors[key as keyof Messages['form']['errors']]
+  return key
+}
+
 function GoalForm({ onCreated, onCancel }: GoalFormProps) {
+  const { t } = useT()
   const [name, setName] = useState('')
   const [targetMinutes, setTargetMinutes] = useState(DEFAULT_HOURS * 60)
   const [selection, setSelection] = useState<Set<string>>(new Set())
@@ -72,9 +81,10 @@ function GoalForm({ onCreated, onCancel }: GoalFormProps) {
     const parsed = goalInputSchema.safeParse({ name, targetMinutes, scheduledDays })
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
-        if (issue.path[0] === 'name') setNameError(issue.message)
-        if (issue.path[0] === 'targetMinutes') setTargetError(issue.message)
-        if (issue.path[0] === 'scheduledDays') setSelectionError(issue.message)
+        const message = translateError(issue.message, t.form.errors)
+        if (issue.path[0] === 'name') setNameError(message)
+        if (issue.path[0] === 'targetMinutes') setTargetError(message)
+        if (issue.path[0] === 'scheduledDays') setSelectionError(message)
       }
       return
     }
@@ -82,20 +92,25 @@ function GoalForm({ onCreated, onCancel }: GoalFormProps) {
     try {
       setSubmitting(true)
       await createGoal(parsed.data)
-      toast.success('Meta creada')
+      toast.success(t.goals.goalCreated)
       onCreated?.()
     } catch {
-      toast.error('No se pudo crear la meta')
+      toast.error(t.goals.cannotCreate)
     } finally {
       setSubmitting(false)
     }
   }
 
+  const daysPlanned =
+    dayCount === 1
+      ? tpl(t.goals.dayPlannedOne, { count: dayCount })
+      : tpl(t.goals.dayPlannedOther, { count: dayCount })
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
       <div className="flex flex-col gap-3 rounded-2xl bg-surface p-5">
         <label htmlFor="goal-name" className="text-sm font-medium text-charcoal">
-          Nombre
+          {t.goals.name}
         </label>
         <input
           id="goal-name"
@@ -104,21 +119,23 @@ function GoalForm({ onCreated, onCancel }: GoalFormProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="rounded-xl bg-cream px-4 py-3 text-base text-charcoal ring-1 ring-[color:var(--color-border)] focus:ring-2 focus:ring-apricot focus:outline-none"
-          placeholder="Preparar oposición"
+          placeholder={t.goals.namePlaceholder}
         />
         {nameError && <p className="text-xs text-apricot">{nameError}</p>}
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl bg-surface p-5">
         <div>
-          <p className="text-sm font-medium text-charcoal">Objetivo total</p>
+          <p className="text-sm font-medium text-charcoal">{t.goals.totalTarget}</p>
           <p className="mt-0.5 text-xs text-[color:var(--color-text-muted)]">
-            Cuántas horas quieres dedicarle en total a esta meta.
+            {t.goals.totalTargetHint}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-[color:var(--color-text-muted)]">Horas</span>
+            <span className="text-xs font-medium text-[color:var(--color-text-muted)]">
+              {t.goals.hours}
+            </span>
             <input
               type="number"
               min={0}
@@ -132,7 +149,7 @@ function GoalForm({ onCreated, onCancel }: GoalFormProps) {
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-[color:var(--color-text-muted)]">
-              Minutos
+              {t.goals.minutes}
             </span>
             <input
               type="number"
@@ -152,17 +169,16 @@ function GoalForm({ onCreated, onCancel }: GoalFormProps) {
       <div className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between">
           <div>
-            <p className="text-sm font-medium text-charcoal">Cuándo lo repartes</p>
+            <p className="text-sm font-medium text-charcoal">{t.goals.schedule}</p>
             <p className="mt-0.5 text-xs text-[color:var(--color-text-muted)]">
-              Elige días sueltos o semanas enteras. La selección se guarda al cambiar de mes.
+              {t.goals.scheduleHint}
             </p>
           </div>
         </div>
         <MonthCalendar selectedDays={selection} onToggleDay={toggleDay} onToggleWeek={toggleWeek} />
         {dayCount > 0 && (
           <p className="text-xs text-[color:var(--color-text-muted)]">
-            {dayCount} {dayCount === 1 ? 'día planificado' : 'días planificados'} ·{' '}
-            {formatMinutes(perDayAverage)} de media al día
+            {daysPlanned} · {tpl(t.goals.dailyAverage, { time: formatMinutes(perDayAverage) })}
           </p>
         )}
         {selectionError && <p className="text-xs text-apricot">{selectionError}</p>}
@@ -174,7 +190,7 @@ function GoalForm({ onCreated, onCancel }: GoalFormProps) {
           disabled={submitting}
           className="flex-1 rounded-2xl bg-apricot px-5 py-3 text-base font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
         >
-          Crear meta
+          {t.goals.createGoal}
         </button>
         {onCancel && (
           <button
@@ -182,7 +198,7 @@ function GoalForm({ onCreated, onCancel }: GoalFormProps) {
             onClick={onCancel}
             className="flex-1 rounded-2xl bg-surface px-5 py-3 text-base font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] transition active:scale-[0.98]"
           >
-            Cancelar
+            {t.common.cancel}
           </button>
         )}
       </div>

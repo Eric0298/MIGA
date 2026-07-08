@@ -1,4 +1,6 @@
 import { clsx } from 'clsx'
+import { useT } from '@/i18n/i18n-context'
+import { tpl } from '@/i18n/tpl'
 import { formatMinutes } from '../utils'
 
 type GoalProgressProps = {
@@ -7,6 +9,7 @@ type GoalProgressProps = {
 }
 
 function GoalProgress({ currentMs, targetMinutes }: GoalProgressProps) {
+  const { t } = useT()
   const currentMinutes = Math.floor(currentMs / 60_000)
   const rawPercent = targetMinutes === 0 ? 0 : (currentMinutes / targetMinutes) * 100
   const percent = Math.min(100, Math.round(rawPercent))
@@ -18,7 +21,7 @@ function GoalProgress({ currentMs, targetMinutes }: GoalProgressProps) {
         <p className="text-xs font-medium text-charcoal">
           {formatMinutes(currentMinutes)}{' '}
           <span className="text-[color:var(--color-text-muted)]">
-            de {formatMinutes(targetMinutes)}
+            {tpl(t.goals.ofTotal, { total: formatMinutes(targetMinutes) })}
           </span>
         </p>
         <p className="text-xs font-semibold text-charcoal tabular-nums">{percent}%</p>

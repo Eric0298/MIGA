@@ -9,6 +9,7 @@ import {
   startOfMonth,
   startOfWeek,
   subMonths,
+  type Locale,
 } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -52,25 +53,34 @@ export function isSameMonth(reference: Date, day: Date): boolean {
   return reference.getMonth() === day.getMonth() && reference.getFullYear() === day.getFullYear()
 }
 
-export function formatMonthLabel(reference: Date): string {
-  const label = format(reference, 'LLLL yyyy', { locale: es })
+export function formatMonthLabel(reference: Date, locale: Locale = es): string {
+  const label = format(reference, 'LLLL yyyy', { locale })
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-export function formatDayLabel(iso: string): string {
+export function formatDayLabel(iso: string, locale: Locale = es): string {
   const date = fromIso(iso)
-  const label = format(date, "EEE d 'de' LLL", { locale: es })
+  const label = format(date, "EEE d 'de' LLL", { locale })
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-export function formatDayRelative(iso: string, todayIsoRef: string): string {
+export function formatDayRelative(
+  iso: string,
+  todayIsoRef: string,
+  locale: Locale = es,
+  labels: { today: string; tomorrow: string; yesterday: string } = {
+    today: 'Hoy',
+    tomorrow: 'Mañana',
+    yesterday: 'Ayer',
+  },
+): string {
   const target = fromIso(iso)
   const today = fromIso(todayIsoRef)
   const diff = differenceInCalendarDays(target, today)
-  if (diff === 0) return 'Hoy'
-  if (diff === 1) return 'Mañana'
-  if (diff === -1) return 'Ayer'
-  return formatDayLabel(iso)
+  if (diff === 0) return labels.today
+  if (diff === 1) return labels.tomorrow
+  if (diff === -1) return labels.yesterday
+  return formatDayLabel(iso, locale)
 }
 
 export function formatMinutes(minutes: number): string {
