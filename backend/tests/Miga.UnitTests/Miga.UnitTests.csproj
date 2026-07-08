@@ -22,6 +22,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Miga.Domain\Miga.Domain.csproj" />
     <ProjectReference Include="..\..\src\Miga.Application\Miga.Application.csproj" />
+    <ProjectReference Include="..\..\src\Miga.Contracts\Miga.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Miga.Infrastructure\Miga.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

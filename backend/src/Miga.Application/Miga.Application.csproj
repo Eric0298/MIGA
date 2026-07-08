@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\Miga.Contracts\Miga.Contracts.csproj" />
     <ProjectReference Include="..\Miga.Domain\Miga.Domain.csproj" />
   </ItemGroup>
 
