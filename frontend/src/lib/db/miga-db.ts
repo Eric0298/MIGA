@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { Goal, Session } from './schema'
+import type { Goal, Material, MaterialGoalLink, Session } from './schema'
 
 type LegacyDayTarget = { day: string; targetMinutes: number }
 type LegacyGoal = {
@@ -13,6 +13,8 @@ type LegacyGoal = {
 class MigaDatabase extends Dexie {
   goals!: Table<Goal, string>
   sessions!: Table<Session, string>
+  materials!: Table<Material, string>
+  materialGoalLinks!: Table<MaterialGoalLink, string>
 
   constructor() {
     super('miga')
@@ -44,6 +46,13 @@ class MigaDatabase extends Dexie {
     this.version(3).stores({
       goals: '&id, createdAt, updatedAt',
       sessions: '&id, goalId, status, startedAt, endedAt',
+    })
+
+    this.version(4).stores({
+      goals: '&id, createdAt, updatedAt',
+      sessions: '&id, goalId, status, startedAt, endedAt',
+      materials: '&id, kind, createdAt, updatedAt',
+      materialGoalLinks: '&id, materialId, goalId, [materialId+goalId], createdAt',
     })
   }
 }

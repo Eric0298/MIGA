@@ -19,5 +19,8 @@ export function listGoals(): Promise<Goal[]> {
 }
 
 export async function deleteGoal(id: string): Promise<void> {
-  await db.goals.delete(id)
+  await db.transaction('rw', db.goals, db.materialGoalLinks, async () => {
+    await db.materialGoalLinks.where('goalId').equals(id).delete()
+    await db.goals.delete(id)
+  })
 }

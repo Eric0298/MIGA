@@ -20,6 +20,10 @@ import GoalProgress from './components/GoalProgress'
 import GoalCalendarView from './components/GoalCalendarView'
 import EmptyState from '@/components/ui/EmptyState'
 import Loading from '@/components/ui/Loading'
+import { Plus } from 'lucide-react'
+import { useMaterialsByGoal } from '@/features/materials/hooks/use-materials-by-goal'
+import MaterialForm from '@/features/materials/components/MaterialForm'
+import MaterialCard from '@/features/materials/components/MaterialCard'
 
 const GoalProgressChart = lazy(() => import('./components/GoalProgressChart'))
 
@@ -30,7 +34,9 @@ function GoalDetailPage() {
   const { id } = useParams<{ id: string }>()
   const goal = useLiveGoal(id)
   const sessions = useCompletedSessions()
+  const materials = useMaterialsByGoal(goal?.id)
   const [view, setView] = useState<View>('calendar')
+  const [showMaterialForm, setShowMaterialForm] = useState(false)
   const todayIsoStr = toLocalIsoDay(Date.now())
 
   const isLoading = goal === undefined || sessions === undefined
@@ -186,6 +192,42 @@ function GoalDetailPage() {
                     </li>
                   )
                 })}
+              </ul>
+            )}
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-medium text-charcoal">{t.materials.sectionTitle}</h2>
+              {!showMaterialForm && (
+                <button
+                  type="button"
+                  onClick={() => setShowMaterialForm(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-apricot px-3 py-1.5 text-xs font-semibold text-white transition active:scale-[0.98]"
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  {t.materials.add}
+                </button>
+              )}
+            </div>
+            {showMaterialForm && (
+              <MaterialForm
+                goalId={goal.id}
+                onCreated={() => setShowMaterialForm(false)}
+                onCancel={() => setShowMaterialForm(false)}
+              />
+            )}
+            {!showMaterialForm && (materials?.length ?? 0) === 0 && (
+              <EmptyState
+                title={t.materials.emptyTitle}
+                description={t.materials.emptyDescription}
+              />
+            )}
+            {(materials?.length ?? 0) > 0 && (
+              <ul className="flex flex-col gap-2">
+                {materials?.map((m) => (
+                  <MaterialCard key={m.id} material={m} goalId={goal.id} />
+                ))}
               </ul>
             )}
           </section>

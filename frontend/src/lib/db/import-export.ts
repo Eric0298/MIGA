@@ -1,6 +1,14 @@
 import { z } from 'zod'
 import { db } from './miga-db'
-import { sessionStatus, type Goal, type Session } from './schema'
+import {
+  materialKind,
+  materialMetadataSchema,
+  sessionStatus,
+  type Goal,
+  type Material,
+  type MaterialGoalLink,
+  type Session,
+} from './schema'
 
 const goalRecordSchema = z.object({
   id: z.string(),
@@ -23,35 +31,85 @@ const sessionRecordSchema = z.object({
   updatedAt: z.number(),
 })
 
-export const EXPORT_VERSION = 1
+const materialRecordSchema = z.object({
+  id: z.string(),
+  kind: materialKind,
+  title: z.string(),
+  url: z.string().optional(),
+  notes: z.string().optional(),
+  fileBlobKey: z.string().optional(),
+  metadata: materialMetadataSchema,
+  createdAt: z.number(),
+  updatedAt: z.number(),
+})
 
-export const exportPayloadSchema = z.object({
-  version: z.literal(EXPORT_VERSION),
+const materialGoalLinkRecordSchema = z.object({
+  id: z.string(),
+  materialId: z.string(),
+  goalId: z.string(),
+  createdAt: z.number(),
+})
+
+export const CURRENT_EXPORT_VERSION = 2
+
+const payloadV1Schema = z.object({
+  version: z.literal(1),
   exportedAt: z.number(),
   goals: z.array(goalRecordSchema),
   sessions: z.array(sessionRecordSchema),
 })
 
-export type ExportPayload = z.infer<typeof exportPayloadSchema>
+const payloadV2Schema = z.object({
+  version: z.literal(2),
+  exportedAt: z.number(),
+  goals: z.array(goalRecordSchema),
+  sessions: z.array(sessionRecordSchema),
+  materials: z.array(materialRecordSchema),
+  materialGoalLinks: z.array(materialGoalLinkRecordSchema),
+})
+
+export const exportPayloadSchema = z.union([payloadV1Schema, payloadV2Schema])
+
+export type ExportPayload = z.infer<typeof payloadV2Schema>
 
 export type ImportResult = {
   goalsCount: number
   sessionsCount: number
+  materialsCount: number
+  linksCount: number
   normalizedActiveSessions: number
 }
 
 export async function buildExportPayload(): Promise<ExportPayload> {
-  const [goals, sessions] = await Promise.all([db.goals.toArray(), db.sessions.toArray()])
+  const [goals, sessions, materials, materialGoalLinks] = await Promise.all([
+    db.goals.toArray(),
+    db.sessions.toArray(),
+    db.materials.toArray(),
+    db.materialGoalLinks.toArray(),
+  ])
   return {
-    version: EXPORT_VERSION,
+    version: CURRENT_EXPORT_VERSION,
     exportedAt: Date.now(),
     goals,
     sessions,
+    materials,
+    materialGoalLinks,
   }
 }
 
 export function parseImportPayload(raw: unknown): ExportPayload {
-  return exportPayloadSchema.parse(raw)
+  const parsed = exportPayloadSchema.parse(raw)
+  if (parsed.version === 1) {
+    return {
+      version: 2,
+      exportedAt: parsed.exportedAt,
+      goals: parsed.goals,
+      sessions: parsed.sessions,
+      materials: [],
+      materialGoalLinks: [],
+    }
+  }
+  return parsed
 }
 
 export async function importAllData(payload: ExportPayload): Promise<ImportResult> {
@@ -72,22 +130,44 @@ export async function importAllData(payload: ExportPayload): Promise<ImportResul
   })
 
   const goals: Goal[] = payload.goals
+  const materials: Material[] = payload.materials
+  const materialGoalLinks: MaterialGoalLink[] = payload.materialGoalLinks
 
-  await db.transaction('rw', db.goals, db.sessions, async () => {
-    await db.goals.bulkPut(goals)
-    await db.sessions.bulkPut(sessions)
-  })
+  await db.transaction(
+    'rw',
+    db.goals,
+    db.sessions,
+    db.materials,
+    db.materialGoalLinks,
+    async () => {
+      await db.goals.bulkPut(goals)
+      await db.sessions.bulkPut(sessions)
+      await db.materials.bulkPut(materials)
+      await db.materialGoalLinks.bulkPut(materialGoalLinks)
+    },
+  )
 
   return {
     goalsCount: goals.length,
     sessionsCount: sessions.length,
+    materialsCount: materials.length,
+    linksCount: materialGoalLinks.length,
     normalizedActiveSessions,
   }
 }
 
 export async function clearAllData(): Promise<void> {
-  await db.transaction('rw', db.goals, db.sessions, async () => {
-    await db.goals.clear()
-    await db.sessions.clear()
-  })
+  await db.transaction(
+    'rw',
+    db.goals,
+    db.sessions,
+    db.materials,
+    db.materialGoalLinks,
+    async () => {
+      await db.goals.clear()
+      await db.sessions.clear()
+      await db.materials.clear()
+      await db.materialGoalLinks.clear()
+    },
+  )
 }
