@@ -1,5 +1,6 @@
 import {
   addMonths,
+  differenceInCalendarDays,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
@@ -60,6 +61,16 @@ export function formatDayLabel(iso: string): string {
   const date = fromIso(iso)
   const label = format(date, "EEE d 'de' LLL", { locale: es })
   return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+export function formatDayRelative(iso: string, todayIsoRef: string): string {
+  const target = fromIso(iso)
+  const today = fromIso(todayIsoRef)
+  const diff = differenceInCalendarDays(target, today)
+  if (diff === 0) return 'Hoy'
+  if (diff === 1) return 'Mañana'
+  if (diff === -1) return 'Ayer'
+  return formatDayLabel(iso)
 }
 
 export function formatMinutes(minutes: number): string {

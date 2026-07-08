@@ -15,13 +15,21 @@ import {
 import { formatShortDuration, getElapsedMs } from '@/features/timer/utils'
 import GoalProgress from './components/GoalProgress'
 import GoalCalendarView from './components/GoalCalendarView'
+import GoalProgressChart from './components/GoalProgressChart'
 import EmptyState from '@/components/ui/EmptyState'
-import { Clock } from 'lucide-react'
+import { BarChart3, CalendarDays, Clock } from 'lucide-react'
+import { toLocalIsoDay } from '@/lib/stats/sessions-stats'
+import { useState } from 'react'
+import { clsx } from 'clsx'
+
+type View = 'calendar' | 'chart'
 
 function GoalDetailPage() {
   const { id } = useParams<{ id: string }>()
   const goal = useLiveGoal(id)
   const sessions = useCompletedSessions()
+  const [view, setView] = useState<View>('calendar')
+  const todayIso = toLocalIsoDay(Date.now())
 
   const isLoading = goal === undefined || sessions === undefined
   const goalSessions = useMemo(
@@ -84,8 +92,50 @@ function GoalDetailPage() {
           </section>
 
           <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-medium text-charcoal">Calendario</h2>
-            <GoalCalendarView scheduledDays={scheduledDays} workedDays={workedDays} />
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-medium text-charcoal">Progreso</h2>
+              <div
+                role="tablist"
+                aria-label="Vista de progreso"
+                className="inline-flex rounded-xl bg-cream p-1"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={view === 'calendar'}
+                  onClick={() => setView('calendar')}
+                  className={clsx(
+                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                    view === 'calendar'
+                      ? 'bg-surface text-charcoal'
+                      : 'text-[color:var(--color-text-muted)]',
+                  )}
+                >
+                  <CalendarDays size={14} aria-hidden="true" />
+                  Calendario
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={view === 'chart'}
+                  onClick={() => setView('chart')}
+                  className={clsx(
+                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                    view === 'chart'
+                      ? 'bg-surface text-charcoal'
+                      : 'text-[color:var(--color-text-muted)]',
+                  )}
+                >
+                  <BarChart3 size={14} aria-hidden="true" />
+                  Gráfico
+                </button>
+              </div>
+            </div>
+            {view === 'calendar' ? (
+              <GoalCalendarView scheduledDays={scheduledDays} workedDays={workedDays} />
+            ) : (
+              <GoalProgressChart goal={goal} sessions={sessions ?? []} todayIso={todayIso} />
+            )}
           </section>
 
           <section className="flex flex-col gap-3">

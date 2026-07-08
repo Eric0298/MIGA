@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   combineHoursMinutes,
+  formatDayRelative,
   formatMinutes,
   fromIso,
   getMonthMatrix,
@@ -35,6 +36,13 @@ describe('utils · dates', () => {
     const iso = '2026-07-15'
     const parsed = fromIso(iso)
     expect(toIso(parsed)).toBe(iso)
+  })
+
+  it('formats day relative to today', () => {
+    expect(formatDayRelative('2026-07-10', '2026-07-10')).toBe('Hoy')
+    expect(formatDayRelative('2026-07-11', '2026-07-10')).toBe('Mañana')
+    expect(formatDayRelative('2026-07-09', '2026-07-10')).toBe('Ayer')
+    expect(formatDayRelative('2026-07-15', '2026-07-10')).toMatch(/^Mié /)
   })
 
   it('produces a month matrix with weeks of 7 days starting on Monday', () => {
