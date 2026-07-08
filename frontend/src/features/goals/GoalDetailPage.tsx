@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ArrowLeft, BarChart3, CalendarDays, Clock, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -18,8 +18,10 @@ import { useT } from '@/i18n/i18n-context'
 import { tpl } from '@/i18n/tpl'
 import GoalProgress from './components/GoalProgress'
 import GoalCalendarView from './components/GoalCalendarView'
-import GoalProgressChart from './components/GoalProgressChart'
 import EmptyState from '@/components/ui/EmptyState'
+import Loading from '@/components/ui/Loading'
+
+const GoalProgressChart = lazy(() => import('./components/GoalProgressChart'))
 
 type View = 'calendar' | 'chart'
 
@@ -142,7 +144,9 @@ function GoalDetailPage() {
             {view === 'calendar' ? (
               <GoalCalendarView scheduledDays={scheduledDays} workedDays={workedDays} />
             ) : (
-              <GoalProgressChart goal={goal} sessions={sessions ?? []} todayIso={todayIsoStr} />
+              <Suspense fallback={<Loading />}>
+                <GoalProgressChart goal={goal} sessions={sessions ?? []} todayIso={todayIsoStr} />
+              </Suspense>
             )}
           </section>
 

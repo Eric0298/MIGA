@@ -40,6 +40,12 @@ export default defineConfig({
             type: 'image/png',
             purpose: 'any',
           },
+          {
+            src: '/brand/miga_app_icon_512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
         ],
       },
       devOptions: {
