@@ -1,4 +1,5 @@
 import { Trash2 } from 'lucide-react'
+import { Link } from 'react-router'
 import { toast } from 'sonner'
 import type { Goal, Session } from '@/lib/db/schema'
 import { deleteGoal } from '@/lib/db/goals.repository'
@@ -27,12 +28,12 @@ function GoalCard({ goal, sessions }: GoalCardProps) {
   return (
     <li className="flex flex-col gap-4 rounded-2xl bg-surface p-5">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
+        <Link to={`/app/metas/${goal.id}`} className="flex-1">
           <h3 className="text-base font-semibold text-charcoal">{goal.name}</h3>
           <p className="mt-1 text-xs text-[color:var(--color-text-muted)]">
             {dayCount} {dayCount === 1 ? 'día planificado' : 'días planificados'}
           </p>
-        </div>
+        </Link>
         <button
           type="button"
           onClick={handleDelete}

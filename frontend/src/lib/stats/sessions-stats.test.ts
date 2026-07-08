@@ -3,6 +3,7 @@ import type { Session } from '@/lib/db/schema'
 import {
   filterCompletedByDay,
   filterCompletedByGoal,
+  groupCompletedMsByDay,
   sumElapsedMs,
   toLocalIsoDay,
 } from './sessions-stats'
@@ -59,6 +60,21 @@ describe('sessions-stats', () => {
       completed({ goalId: 'goal-a' }),
     ]
     expect(filterCompletedByGoal(sessions, 'goal-a')).toHaveLength(2)
+  })
+
+  it('groups completed sessions ms by local day', () => {
+    const dayA = new Date(2026, 6, 15, 10, 0, 0).getTime()
+    const dayB = new Date(2026, 6, 16, 10, 0, 0).getTime()
+    const sessions: Session[] = [
+      completed({ startedAt: dayA, endedAt: dayA + 60_000, totalPausedMs: 10_000 }),
+      completed({ startedAt: dayA, endedAt: dayA + 120_000, totalPausedMs: 20_000 }),
+      completed({ startedAt: dayB, endedAt: dayB + 30_000, totalPausedMs: 0 }),
+      { ...completed({ endedAt: dayA + 5_000 }), status: 'discarded' },
+    ]
+    const grouped = groupCompletedMsByDay(sessions)
+    expect(grouped.get('2026-07-15')).toBe(50_000 + 100_000)
+    expect(grouped.get('2026-07-16')).toBe(30_000)
+    expect(grouped.size).toBe(2)
   })
 
   it('sums elapsed ms discounting total paused ms', () => {

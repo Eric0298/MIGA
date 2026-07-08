@@ -23,3 +23,14 @@ export function filterCompletedByGoal(sessions: Session[], goalId: string): Sess
 export function sumElapsedMs(sessions: Session[]): number {
   return sessions.reduce((sum, s) => sum + getElapsedMs(s), 0)
 }
+
+export function groupCompletedMsByDay(sessions: Session[]): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const s of sessions) {
+    if (s.status !== 'completed' || s.endedAt === null) continue
+    const day = toLocalIsoDay(s.endedAt)
+    const current = map.get(day) ?? 0
+    map.set(day, current + getElapsedMs(s))
+  }
+  return map
+}
