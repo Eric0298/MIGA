@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import { Link } from 'react-router'
-import { Download, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Download, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '@/lib/db/miga-db'
 import {
   buildExportPayload,
   clearAllData,
@@ -13,14 +15,15 @@ import { getActiveSession } from '@/lib/db/sessions.repository'
 
 function MorePage() {
   const fileRef = useRef<HTMLInputElement>(null)
-  const [confirmingClear, setConfirmingClear] = useState(false)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [busy, setBusy] = useState<'export' | 'import' | 'clear' | null>(null)
-
-  useEffect(() => {
-    if (!confirmingClear) return
-    const t = setTimeout(() => setConfirmingClear(false), 4000)
-    return () => clearTimeout(t)
-  }, [confirmingClear])
+  const totals = useLiveQuery(
+    async () => ({
+      goals: await db.goals.count(),
+      sessions: await db.sessions.count(),
+    }),
+    [],
+  )
 
   const handleExport = async () => {
     try {
@@ -78,11 +81,16 @@ function MorePage() {
     }
   }
 
-  const handleClearClick = async () => {
-    if (!confirmingClear) {
-      setConfirmingClear(true)
+  const handleClearRequest = async () => {
+    const active = await getActiveSession()
+    if (active) {
+      toast.error('Detén la sesión activa antes de borrar')
       return
     }
+    setShowClearConfirm(true)
+  }
+
+  const handleClearConfirm = async () => {
     try {
       setBusy('clear')
       const active = await getActiveSession()
@@ -96,7 +104,7 @@ function MorePage() {
       toast.error('No se pudo borrar')
     } finally {
       setBusy(null)
-      setConfirmingClear(false)
+      setShowClearConfirm(false)
     }
   }
 
@@ -157,19 +165,64 @@ function MorePage() {
 
         <button
           type="button"
-          onClick={handleClearClick}
-          disabled={busy !== null}
+          onClick={handleClearRequest}
+          disabled={busy !== null || showClearConfirm}
           className="inline-flex items-center justify-between gap-3 rounded-2xl bg-surface px-5 py-4 text-base font-semibold text-charcoal ring-1 ring-apricot transition active:scale-[0.98] disabled:opacity-60"
         >
           <span className="flex items-center gap-3">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-peach text-apricot">
               <Trash2 size={18} aria-hidden="true" />
             </span>
-            {confirmingClear ? '¿Confirmar? Toca de nuevo' : 'Borrar todos los datos'}
+            Borrar todos los datos
           </span>
           <span className="text-xs font-normal text-[color:var(--color-text-muted)]">Local</span>
         </button>
       </section>
+
+      {showClearConfirm && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="clear-confirm-title"
+          className="flex flex-col gap-4 rounded-2xl bg-apricot p-5 text-white"
+        >
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20">
+              <AlertTriangle size={20} aria-hidden="true" />
+            </span>
+            <div>
+              <p id="clear-confirm-title" className="text-base font-semibold">
+                ¿Borrar todos los datos locales?
+              </p>
+              <p className="mt-1 text-sm opacity-90">
+                Se eliminarán {totals?.goals ?? 0}{' '}
+                {totals?.goals === 1 ? 'meta' : 'metas'} y {totals?.sessions ?? 0}{' '}
+                {totals?.sessions === 1 ? 'sesión' : 'sesiones'} de este dispositivo.
+                Esta acción no se puede deshacer.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row-reverse">
+            <button
+              type="button"
+              onClick={handleClearConfirm}
+              disabled={busy === 'clear'}
+              className="flex-1 rounded-2xl bg-white px-5 py-3 text-base font-semibold text-apricot transition active:scale-[0.98] disabled:opacity-70"
+            >
+              Sí, borrar todo
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowClearConfirm(false)}
+              disabled={busy === 'clear'}
+              className="flex-1 rounded-2xl bg-white/15 px-5 py-3 text-base font-semibold text-white ring-1 ring-white/40 transition active:scale-[0.98] disabled:opacity-70"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-charcoal">Información</h2>
