@@ -34,7 +34,7 @@ type YTNamespace = {
   Player: new (
     element: HTMLElement | string,
     options: {
-      videoId: string
+      videoId?: string
       host?: string
       playerVars?: Record<string, unknown>
       events?: {
@@ -99,26 +99,41 @@ export function loadYouTubeIframeApi(): Promise<YTNamespace> {
 }
 
 /**
- * Creates a Player instance bound to the given container element.
- * The container is replaced by the YouTube iframe managed by YT.Player.
+ * Builds the embed URL for youtube-nocookie.com with our default player options
+ * and the JS API bridge enabled. Consumers can drop this into a hand-rolled
+ * <iframe src=""> and later hand that iframe to bindYouTubePlayer.
  */
-export function createYouTubePlayer(
-  container: HTMLElement,
-  videoId: string,
+export function buildYouTubeEmbedUrl(videoId: string): string {
+  const origin =
+    typeof window !== 'undefined' && window.location ? window.location.origin : ''
+  const params = new URLSearchParams({
+    enablejsapi: '1',
+    rel: '0',
+    modestbranding: '1',
+    fs: '1',
+    playsinline: '1',
+  })
+  if (origin) {
+    params.set('origin', origin)
+    params.set('widget_referrer', origin)
+  }
+  return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?${params.toString()}`
+}
+
+/**
+ * Binds YT.Player to an existing iframe. The iframe must already point at the
+ * embed URL with enablejsapi=1 (use buildYouTubeEmbedUrl). Because we own the
+ * iframe element, we keep control of sandbox / referrerpolicy / positioning
+ * and avoid the layout/parpadeo issues of the default YT.Player(div) mode.
+ */
+export function bindYouTubePlayer(
+  iframe: HTMLIFrameElement,
   events: YouTubePlayerEvents,
 ): Promise<YouTubePlayerInstance> {
   return loadYouTubeIframeApi().then((YT) => {
     return new Promise<YouTubePlayerInstance>((resolve, reject) => {
       try {
-        const player = new YT.Player(container, {
-          videoId,
-          host: 'https://www.youtube-nocookie.com',
-          playerVars: {
-            rel: 0,
-            modestbranding: 1,
-            fs: 1,
-            playsinline: 1,
-          },
+        new YT.Player(iframe, {
           events: {
             onReady: (event) => {
               events.onReady?.(event.target)
@@ -132,7 +147,6 @@ export function createYouTubePlayer(
             },
           },
         })
-        void player
       } catch (cause) {
         reject(cause instanceof Error ? cause : new Error('Unknown player error'))
       }

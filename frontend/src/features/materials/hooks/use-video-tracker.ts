@@ -16,71 +16,66 @@ export type VideoTrackerSnapshot = {
 /**
  * Tracks real watched time on a YouTube player instance.
  *
- * Every TICK_MS while the player is PLAYING it samples getCurrentTime() and
- * accumulates seen ranges. Big forward/backward jumps between ticks are
- * treated as seeks: the current active range is closed and a new one starts.
+ * A single always-on interval samples getPlayerState() and getCurrentTime()
+ * every TICK_MS. When the player is PLAYING, it extends the active range
+ * and increments the watched total. When it isn't, it closes the range.
  *
- * Consumers get a `snapshot()` helper that returns the current running
- * totals (with the active range merged in), safe to call at any time.
+ * Polling instead of relying on onStateChange keeps us robust to slow /
+ * missed events (common when YT.Player is bound to a pre-existing iframe).
  */
 export function useVideoTracker(playerRef: { current: YouTubePlayerInstance | null }) {
   const activeRangeRef = useRef<VideoRange | null>(null)
   const closedRangesRef = useRef<VideoRange[]>([])
   const totalWatchedMsRef = useRef(0)
   const startedAtRef = useRef<number | null>(null)
-  const timerIdRef = useRef<number | null>(null)
 
-  const stopTicker = useCallback(() => {
-    if (timerIdRef.current !== null) {
-      clearInterval(timerIdRef.current)
-      timerIdRef.current = null
-    }
-    if (activeRangeRef.current) {
-      closedRangesRef.current.push(activeRangeRef.current)
-      activeRangeRef.current = null
-    }
-  }, [])
-
-  const startTicker = useCallback(() => {
-    if (timerIdRef.current !== null) return
-    startedAtRef.current ??= Date.now()
-
-    timerIdRef.current = window.setInterval(() => {
+  useEffect(() => {
+    const id = window.setInterval(() => {
       const player = playerRef.current
       if (!player) return
+
+      let state: number
+      let current: number
       try {
-        const current = player.getCurrentTime()
-        if (!Number.isFinite(current)) return
-        const active = activeRangeRef.current
-        if (active === null) {
-          activeRangeRef.current = [current, current]
-          return
-        }
-        const delta = current - active[1]
-        if (delta >= 0 && delta <= SEEK_THRESHOLD_SECONDS) {
-          active[1] = current
-          totalWatchedMsRef.current += TICK_MS
-        } else {
-          closedRangesRef.current.push(active)
-          activeRangeRef.current = [current, current]
-        }
+        state = player.getPlayerState()
+        current = player.getCurrentTime()
       } catch {
-        // Player was destroyed underneath us; stop trying.
-        stopTicker()
+        return
+      }
+
+      if (state !== YT_PLAYER_STATE.PLAYING) {
+        if (activeRangeRef.current) {
+          closedRangesRef.current.push(activeRangeRef.current)
+          activeRangeRef.current = null
+        }
+        return
+      }
+
+      if (!Number.isFinite(current)) return
+      startedAtRef.current ??= Date.now()
+
+      const active = activeRangeRef.current
+      if (active === null) {
+        activeRangeRef.current = [current, current]
+        return
+      }
+      const delta = current - active[1]
+      if (delta >= 0 && delta <= SEEK_THRESHOLD_SECONDS) {
+        active[1] = current
+        totalWatchedMsRef.current += TICK_MS
+      } else {
+        closedRangesRef.current.push(active)
+        activeRangeRef.current = [current, current]
       }
     }, TICK_MS)
-  }, [playerRef, stopTicker])
 
-  const handleStateChange = useCallback(
-    (state: number) => {
-      if (state === YT_PLAYER_STATE.PLAYING) {
-        startTicker()
-      } else {
-        stopTicker()
-      }
-    },
-    [startTicker, stopTicker],
-  )
+    return () => window.clearInterval(id)
+  }, [playerRef])
+
+  // Kept for API compatibility (TimerVideoSession forwards state changes
+  // through this for the timer/video sync). Tracking no longer depends on
+  // it firing.
+  const handleStateChange = useCallback((_state: number) => {}, [])
 
   const snapshot = useCallback((): VideoTrackerSnapshot => {
     const closed = closedRangesRef.current.slice()
@@ -96,17 +91,11 @@ export function useVideoTracker(playerRef: { current: YouTubePlayerInstance | nu
   }, [])
 
   const reset = useCallback(() => {
-    stopTicker()
+    activeRangeRef.current = null
     closedRangesRef.current = []
     totalWatchedMsRef.current = 0
     startedAtRef.current = null
-  }, [stopTicker])
-
-  useEffect(() => {
-    return () => {
-      stopTicker()
-    }
-  }, [stopTicker])
+  }, [])
 
   return { handleStateChange, snapshot, reset }
 }

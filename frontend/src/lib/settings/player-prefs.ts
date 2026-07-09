@@ -4,19 +4,18 @@ export const SYNC_TIMER_VIDEO_KEY = 'miga.syncTimerVideo'
 
 export function readSyncTimerVideo(): boolean {
   try {
-    return localStorage.getItem(SYNC_TIMER_VIDEO_KEY) === 'true'
+    const raw = localStorage.getItem(SYNC_TIMER_VIDEO_KEY)
+    // Default true: video play/pause drives the session timer unless the
+    // user has explicitly opted out (raw === 'false').
+    return raw === null ? true : raw !== 'false'
   } catch {
-    return false
+    return true
   }
 }
 
 export function writeSyncTimerVideo(value: boolean): void {
   try {
-    if (value) {
-      localStorage.setItem(SYNC_TIMER_VIDEO_KEY, 'true')
-    } else {
-      localStorage.removeItem(SYNC_TIMER_VIDEO_KEY)
-    }
+    localStorage.setItem(SYNC_TIMER_VIDEO_KEY, value ? 'true' : 'false')
     window.dispatchEvent(
       new CustomEvent('miga:player-prefs-changed', { detail: { syncTimerVideo: value } }),
     )

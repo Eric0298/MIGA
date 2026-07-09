@@ -66,15 +66,10 @@ function TimerVideoSession({ session }: TimerVideoSessionProps) {
         startedAt: snap.startedAt,
         endedAt: snap.endedAt,
       })
-      if (snap.totalWatchedMs > 0) {
-        toast.success(
-          tpl(t.timer.watchedAdded, { time: formatShortDuration(snap.totalWatchedMs) }),
-        )
-      }
     } catch {
       // silent — the session has already been stopped
     }
-  }, [session.id, session.materialId, session.goalId, material, t.timer.watchedAdded])
+  }, [session.id, session.materialId, session.goalId, material])
 
   const handlePlayerReady = useCallback((player: YouTubePlayerInstance) => {
     playerRef.current = player
@@ -114,10 +109,22 @@ function TimerVideoSession({ session }: TimerVideoSessionProps) {
 
   const handleStop = async () => {
     try {
+      const snap = trackerSnapshotRef.current()
+      const watchedMs = snap.totalWatchedMs
+      const notesMs = Math.max(0, elapsed - watchedMs)
       await persistProgress()
       if (syncEnabled) playerRef.current?.pauseVideo()
       await stopSession(session.id)
-      toast.success(t.timer.sessionSaved)
+      if (watchedMs > 0) {
+        toast.success(
+          tpl(t.timer.sessionSavedBreakdown, {
+            video: formatShortDuration(watchedMs),
+            notes: formatShortDuration(notesMs),
+          }),
+        )
+      } else {
+        toast.success(t.timer.sessionSaved)
+      }
     } catch {
       toast.error(t.timer.cannotStop)
     }

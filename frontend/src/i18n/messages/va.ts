@@ -108,6 +108,7 @@ export const va: Messages = {
     videoFullscreen: 'Pantalla completa',
     watchedAdded: '{time} afegits al material',
     startWithMaterial: 'Iniciar sessió amb esta meta',
+    sessionSavedBreakdown: '{video} de vídeo · {notes} d’altres',
   },
   goals: {
     title: 'Metes',

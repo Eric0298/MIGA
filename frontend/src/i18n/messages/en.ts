@@ -107,6 +107,7 @@ export const en: Messages = {
     videoFullscreen: 'Fullscreen',
     watchedAdded: '{time} added to the material',
     startWithMaterial: 'Start session with this goal',
+    sessionSavedBreakdown: '{video} of video · {notes} of other',
   },
   goals: {
     title: 'Goals',

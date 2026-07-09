@@ -106,6 +106,7 @@ export const es = {
     videoFullscreen: 'Pantalla completa',
     watchedAdded: '{time} añadidos al material',
     startWithMaterial: 'Iniciar sesión con esta meta',
+    sessionSavedBreakdown: '{video} de vídeo · {notes} de otros',
   },
   goals: {
     title: 'Metas',

@@ -1,7 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Maximize2 } from 'lucide-react'
 import {
-  createYouTubePlayer,
+  bindYouTubePlayer,
+  buildYouTubeEmbedUrl,
   YT_PLAYER_STATE,
   type YouTubePlayerInstance,
   type YouTubePlayerState,
@@ -27,12 +28,11 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
     ref,
   ) {
     const wrapperRef = useRef<HTMLDivElement>(null)
-    const targetRef = useRef<HTMLDivElement>(null)
+    const iframeRef = useRef<HTMLIFrameElement>(null)
     const playerRef = useRef<YouTubePlayerInstance | null>(null)
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
-    // Keep callbacks in refs so parent re-renders (e.g. timer tick) don't
-    // recreate the iframe. The effect below only depends on videoId.
+    // Callbacks in refs so a parent re-render never triggers a player rebuild.
     const onReadyRef = useRef(onReady)
     const onStateChangeRef = useRef(onStateChange)
     const onErrorRef = useRef(onError)
@@ -53,48 +53,40 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
     )
 
     useEffect(() => {
-      let cancelled = false
-      const target = targetRef.current
-      if (!target) return
+      const guard = { cancelled: false }
+      const iframe = iframeRef.current
+      if (!iframe) return
 
       setStatus('loading')
 
-      createYouTubePlayer(target, videoId, {
+      bindYouTubePlayer(iframe, {
         onReady: (player) => {
-          if (cancelled) {
-            player.destroy()
-            return
-          }
+          if (guard.cancelled) return
           playerRef.current = player
-          const wrapper = wrapperRef.current
-          const iframe = wrapper?.querySelector('iframe')
-          if (iframe) {
-            iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin')
-            iframe.setAttribute('allow', 'fullscreen; encrypted-media; picture-in-picture')
-          }
           setStatus('ready')
           onReadyRef.current?.(player)
         },
         onStateChange: (state) => {
-          if (cancelled) return
+          if (guard.cancelled) return
           onStateChangeRef.current?.(state)
         },
         onError: (code) => {
-          if (cancelled) return
+          if (guard.cancelled) return
           setStatus('error')
           onErrorRef.current?.(code)
         },
       }).catch(() => {
-        if (!cancelled) setStatus('error')
+        if (!guard.cancelled) setStatus('error')
       })
 
+      // NOTE: intentionally do NOT call playerRef.current?.destroy() here.
+      // YT.Player.destroy() removes the iframe from the DOM, which conflicts
+      // with React reconciliation. In StrictMode's dev double-mount this
+      // eats the iframe before the second bind can attach → black player.
+      // When the component truly unmounts, React removes the iframe itself
+      // and the YT.Player instance becomes unreachable / GC-eligible.
       return () => {
-        cancelled = true
-        try {
-          playerRef.current?.destroy()
-        } catch {
-          // ignore
-        }
+        guard.cancelled = true
         playerRef.current = null
       }
     }, [videoId])
@@ -114,7 +106,17 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
         ref={wrapperRef}
         className="relative aspect-video w-full overflow-hidden rounded-2xl bg-charcoal"
       >
-        <div ref={targetRef} className="absolute inset-0 h-full w-full" />
+        <iframe
+          key={videoId}
+          ref={iframeRef}
+          id={`yt-${videoId}`}
+          src={buildYouTubeEmbedUrl(videoId)}
+          title="YouTube video"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allow="fullscreen; encrypted-media; picture-in-picture; autoplay"
+          allowFullScreen
+          className="absolute inset-0 h-full w-full border-0"
+        />
         <button
           type="button"
           onClick={handleFullscreen}
@@ -125,7 +127,7 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
           <Maximize2 size={16} aria-hidden="true" />
         </button>
         {status === 'error' && (
-          <div className="absolute inset-0 z-0 flex items-center justify-center bg-charcoal text-center text-xs text-white/80">
+          <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center bg-charcoal text-center text-xs text-white/80">
             <span>Player unavailable</span>
           </div>
         )}
