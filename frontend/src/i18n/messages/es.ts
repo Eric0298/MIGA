@@ -337,6 +337,28 @@ export const es = {
       invalidDayFormat: 'Formato de fecha inválido',
     },
   },
+  notes: {
+    sectionTitle: 'Apuntes',
+    new: 'Nuevo apunte',
+    empty: 'Todavía no has tomado apuntes en esta meta.',
+    titlePlaceholder: 'Título del apunte',
+    textPlaceholder: 'Escribe aquí lo que quieras recordar…',
+    save: 'Guardar',
+    delete: 'Eliminar apunte',
+    deleted: 'Apunte eliminado',
+    saved: 'Apunte guardado',
+    cannotSave: 'No se pudo guardar el apunte',
+    cannotDelete: 'No se pudo eliminar el apunte',
+    confirmDeleteTitle: '¿Eliminar este apunte?',
+    confirmDeleteYes: 'Sí, eliminar',
+    notEditableYet: 'Este tipo de apunte todavía no se puede editar.',
+    errors: {
+      titleRequired: 'El título es obligatorio',
+      titleMax: 'Máximo 80 caracteres',
+      textRequired: 'Escribe algo antes de guardar',
+      textMax: 'El texto es demasiado largo',
+    },
+  },
 }
 
 export type Messages = typeof es

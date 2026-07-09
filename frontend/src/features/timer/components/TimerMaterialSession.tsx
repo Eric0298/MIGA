@@ -30,6 +30,7 @@ import { useSyncTimerVideo } from '@/lib/settings/player-prefs'
 import { formatDuration, getElapsedMs } from '../utils'
 import { useElapsedTick } from '../hooks/use-elapsed-tick'
 import TimerActiveMaterial, { type TimerActiveMaterialHandle } from './TimerActiveMaterial'
+import NotesPanel from '@/features/notes/components/NotesPanel'
 import { MEDIA_PLAYER_STATE, type MediaPlayerState } from '@/lib/api/media-player'
 
 type TimerMaterialSessionProps = {
@@ -279,6 +280,10 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
           material={activeMaterial}
           onPlayerStateChange={handlePlayerStateChange}
         />
+      )}
+
+      {session.goalId && (
+        <NotesPanel goalId={session.goalId} sourceSessionId={session.id} />
       )}
     </div>
   )
