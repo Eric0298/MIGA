@@ -1,5 +1,6 @@
 import { db } from './miga-db'
 import { goalInputSchema, type Goal, type GoalInput } from './schema'
+import { deleteNotesByGoal } from './notes.repository'
 
 export async function createGoal(input: GoalInput): Promise<Goal> {
   const parsed = goalInputSchema.parse(input)
@@ -19,6 +20,7 @@ export function listGoals(): Promise<Goal[]> {
 }
 
 export async function deleteGoal(id: string): Promise<void> {
+  await deleteNotesByGoal(id)
   await db.transaction('rw', db.goals, db.materialGoalLinks, async () => {
     await db.materialGoalLinks.where('goalId').equals(id).delete()
     await db.goals.delete(id)

@@ -3,11 +3,14 @@ import { db } from './miga-db'
 import {
   materialKind,
   materialMetadataSchema,
+  noteKind,
+  noteMetadataSchema,
   sessionStatus,
   type Goal,
   type Material,
   type MaterialGoalLink,
   type MaterialProgress,
+  type Note,
   type Session,
 } from './schema'
 
@@ -75,7 +78,20 @@ const materialProgressRecordSchema = z.object({
   updatedAt: z.number(),
 })
 
-export const CURRENT_EXPORT_VERSION = 4
+const noteRecordSchema = z.object({
+  id: z.string(),
+  goalId: z.string(),
+  kind: noteKind,
+  title: z.string(),
+  text: z.string().optional(),
+  fileBlobKey: z.string().optional(),
+  metadata: noteMetadataSchema,
+  sourceSessionId: z.string().nullable(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+})
+
+export const CURRENT_EXPORT_VERSION = 5
 
 const payloadV1Schema = z.object({
   version: z.literal(1),
@@ -113,14 +129,26 @@ const payloadV4Schema = z.object({
   materialProgress: z.array(materialProgressRecordSchema),
 })
 
+const payloadV5Schema = z.object({
+  version: z.literal(5),
+  exportedAt: z.number(),
+  goals: z.array(goalRecordSchema),
+  sessions: z.array(sessionRecordSchema),
+  materials: z.array(materialRecordSchema),
+  materialGoalLinks: z.array(materialGoalLinkRecordSchema),
+  materialProgress: z.array(materialProgressRecordSchema),
+  notes: z.array(noteRecordSchema),
+})
+
 export const exportPayloadSchema = z.union([
   payloadV1Schema,
   payloadV2Schema,
   payloadV3Schema,
   payloadV4Schema,
+  payloadV5Schema,
 ])
 
-export type ExportPayload = z.infer<typeof payloadV4Schema>
+export type ExportPayload = z.infer<typeof payloadV5Schema>
 
 export type ImportResult = {
   goalsCount: number
@@ -128,19 +156,24 @@ export type ImportResult = {
   materialsCount: number
   linksCount: number
   progressCount: number
+  notesCount: number
   normalizedActiveSessions: number
 }
 
 export async function buildExportPayload(): Promise<ExportPayload> {
-  const [goals, sessions, materials, materialGoalLinks, materialProgress] = await Promise.all(
-    [
+  const [goals, sessions, materials, materialGoalLinks, materialProgress, notes] =
+    await Promise.all([
       db.goals.toArray(),
       db.sessions.toArray(),
       db.materials.toArray(),
       db.materialGoalLinks.toArray(),
       db.materialProgress.toArray(),
-    ],
-  )
+      db.notes.toArray(),
+    ])
+  // Note blobs (voice recordings, uploaded documents) are intentionally NOT
+  // included in the backup: they can be very heavy and the JSON is meant to
+  // be lightweight and portable. Restoring on another device loses the raw
+  // files but keeps every note's metadata and text.
   return {
     version: CURRENT_EXPORT_VERSION,
     exportedAt: Date.now(),
@@ -149,6 +182,7 @@ export async function buildExportPayload(): Promise<ExportPayload> {
     materials,
     materialGoalLinks,
     materialProgress,
+    notes,
   }
 }
 
@@ -156,29 +190,31 @@ export function parseImportPayload(raw: unknown): ExportPayload {
   const parsed = exportPayloadSchema.parse(raw)
   if (parsed.version === 1) {
     return {
-      version: 4,
+      version: 5,
       exportedAt: parsed.exportedAt,
       goals: parsed.goals,
       sessions: parsed.sessions.map((s) => ({ ...s, materialIds: [] })),
       materials: [],
       materialGoalLinks: [],
       materialProgress: [],
+      notes: [],
     }
   }
   if (parsed.version === 2) {
     return {
-      version: 4,
+      version: 5,
       exportedAt: parsed.exportedAt,
       goals: parsed.goals,
       sessions: parsed.sessions.map((s) => ({ ...s, materialIds: [] })),
       materials: parsed.materials,
       materialGoalLinks: parsed.materialGoalLinks,
       materialProgress: [],
+      notes: [],
     }
   }
   if (parsed.version === 3) {
     return {
-      version: 4,
+      version: 5,
       exportedAt: parsed.exportedAt,
       goals: parsed.goals,
       sessions: parsed.sessions.map((s) => {
@@ -188,7 +224,11 @@ export function parseImportPayload(raw: unknown): ExportPayload {
       materials: parsed.materials,
       materialGoalLinks: parsed.materialGoalLinks,
       materialProgress: parsed.materialProgress,
+      notes: [],
     }
+  }
+  if (parsed.version === 4) {
+    return { ...parsed, version: 5, notes: [] }
   }
   return parsed
 }
@@ -218,20 +258,25 @@ export async function importAllData(payload: ExportPayload): Promise<ImportResul
   const materials: Material[] = payload.materials
   const materialGoalLinks: MaterialGoalLink[] = payload.materialGoalLinks
   const materialProgress: MaterialProgress[] = payload.materialProgress
+  const notes: Note[] = payload.notes
 
   await db.transaction(
     'rw',
-    db.goals,
-    db.sessions,
-    db.materials,
-    db.materialGoalLinks,
-    db.materialProgress,
+    [
+      db.goals,
+      db.sessions,
+      db.materials,
+      db.materialGoalLinks,
+      db.materialProgress,
+      db.notes,
+    ],
     async () => {
       await db.goals.bulkPut(goals)
       await db.sessions.bulkPut(sessions)
       await db.materials.bulkPut(materials)
       await db.materialGoalLinks.bulkPut(materialGoalLinks)
       await db.materialProgress.bulkPut(materialProgress)
+      await db.notes.bulkPut(notes)
     },
   )
 
@@ -241,6 +286,7 @@ export async function importAllData(payload: ExportPayload): Promise<ImportResul
     materialsCount: materials.length,
     linksCount: materialGoalLinks.length,
     progressCount: materialProgress.length,
+    notesCount: notes.length,
     normalizedActiveSessions,
   }
 }
@@ -255,6 +301,8 @@ export async function clearAllData(): Promise<void> {
       db.materialGoalLinks,
       db.materialProgress,
       db.materialBlobs,
+      db.notes,
+      db.noteBlobs,
     ],
     async () => {
       await db.goals.clear()
@@ -263,6 +311,8 @@ export async function clearAllData(): Promise<void> {
       await db.materialGoalLinks.clear()
       await db.materialProgress.clear()
       await db.materialBlobs.clear()
+      await db.notes.clear()
+      await db.noteBlobs.clear()
     },
   )
 }

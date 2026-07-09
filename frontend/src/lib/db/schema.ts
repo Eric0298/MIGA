@@ -191,3 +191,115 @@ export type MaterialProgress = {
   createdAt: number
   updatedAt: number
 }
+
+// -------- Notes ("apuntes") --------
+// A Note is a user-authored artifact attached to a goal. It is intentionally
+// separate from Material (which represents external study content).
+
+export const noteKind = z.enum(['text', 'voice', 'document'])
+export type NoteKind = z.infer<typeof noteKind>
+
+/**
+ * Upload limits and quality settings for user-recorded voice notes.
+ * Kept in schema so both the recorder UI and the input validation share them.
+ */
+export const NOTE_LIMITS = {
+  voice: {
+    maxBytes: 25 * 1024 * 1024,
+    maxDurationSeconds: 15 * 60,
+    mimeTypePrefix: 'audio/',
+  },
+  document: {
+    maxBytes: 25 * 1024 * 1024,
+    // Only these are accepted right now; anything else is rejected.
+    mimeTypes: [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ] as const,
+  },
+  text: {
+    maxChars: 50_000,
+  },
+} as const
+
+export const noteMetadataSchema = z.object({
+  mimeType: z.string().optional(),
+  fileSizeBytes: z.number().int().nonnegative().optional(),
+  durationSeconds: z.number().nonnegative().optional(),
+  originalFilename: z.string().optional(),
+})
+
+export type NoteMetadata = z.infer<typeof noteMetadataSchema>
+
+export const noteInputSchema = z
+  .object({
+    goalId: z.uuid(),
+    kind: noteKind,
+    title: z.string().trim().min(1, 'titleRequired').max(80, 'titleMax'),
+    text: z.string().max(NOTE_LIMITS.text.maxChars, 'textMax').optional(),
+    fileBlobKey: z.string().optional(),
+    metadata: noteMetadataSchema.optional(),
+    sourceSessionId: z.uuid().nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.kind === 'text') {
+      if (!data.text || data.text.trim().length === 0) {
+        ctx.addIssue({ code: 'custom', message: 'textRequired', path: ['text'] })
+      }
+    }
+    if (data.kind === 'voice' || data.kind === 'document') {
+      if (!data.fileBlobKey) {
+        ctx.addIssue({ code: 'custom', message: 'fileRequired', path: ['fileBlobKey'] })
+      }
+    }
+    if (data.kind === 'voice' && data.metadata) {
+      const size = data.metadata.fileSizeBytes
+      const mime = data.metadata.mimeType
+      if (mime !== undefined && !mime.startsWith(NOTE_LIMITS.voice.mimeTypePrefix)) {
+        ctx.addIssue({ code: 'custom', message: 'fileInvalidType', path: ['fileBlobKey'] })
+      }
+      if (size !== undefined && size > NOTE_LIMITS.voice.maxBytes) {
+        ctx.addIssue({ code: 'custom', message: 'fileTooLarge', path: ['fileBlobKey'] })
+      }
+    }
+    if (data.kind === 'document' && data.metadata) {
+      const size = data.metadata.fileSizeBytes
+      const mime = data.metadata.mimeType
+      if (
+        mime !== undefined &&
+        !NOTE_LIMITS.document.mimeTypes.includes(
+          mime as (typeof NOTE_LIMITS.document.mimeTypes)[number],
+        )
+      ) {
+        ctx.addIssue({ code: 'custom', message: 'fileInvalidType', path: ['fileBlobKey'] })
+      }
+      if (size !== undefined && size > NOTE_LIMITS.document.maxBytes) {
+        ctx.addIssue({ code: 'custom', message: 'fileTooLarge', path: ['fileBlobKey'] })
+      }
+    }
+  })
+
+export type NoteInput = z.infer<typeof noteInputSchema>
+
+export type Note = {
+  id: string
+  goalId: string
+  kind: NoteKind
+  title: string
+  text?: string
+  fileBlobKey?: string
+  metadata: NoteMetadata
+  sourceSessionId: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+export type NoteBlob = {
+  id: string
+  noteId: string | null
+  mimeType: string
+  size: number
+  blob: Blob
+  createdAt: number
+}

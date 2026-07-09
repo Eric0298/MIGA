@@ -5,6 +5,8 @@ import type {
   MaterialBlob,
   MaterialGoalLink,
   MaterialProgress,
+  Note,
+  NoteBlob,
   Session,
 } from './schema'
 
@@ -24,6 +26,8 @@ class MigaDatabase extends Dexie {
   materialGoalLinks!: Table<MaterialGoalLink, string>
   materialProgress!: Table<MaterialProgress, string>
   materialBlobs!: Table<MaterialBlob, string>
+  notes!: Table<Note, string>
+  noteBlobs!: Table<NoteBlob, string>
 
   constructor() {
     super('miga')
@@ -113,6 +117,18 @@ class MigaDatabase extends Dexie {
             delete session.materialId
           })
       })
+
+    // v8 — user-authored notes ("apuntes") attached to goals.
+    this.version(8).stores({
+      goals: '&id, createdAt, updatedAt',
+      sessions: '&id, goalId, status, startedAt, endedAt',
+      materials: '&id, kind, createdAt, updatedAt',
+      materialGoalLinks: '&id, materialId, goalId, [materialId+goalId], createdAt',
+      materialProgress: '&id, materialId, goalId, sessionId, createdAt, endedAt',
+      materialBlobs: '&id, materialId, createdAt',
+      notes: '&id, goalId, kind, sourceSessionId, createdAt, updatedAt',
+      noteBlobs: '&id, noteId, createdAt',
+    })
   }
 }
 
