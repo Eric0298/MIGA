@@ -40,10 +40,12 @@ export function listNotesByGoal(goalId: string): Promise<Note[]> {
 export async function updateNote(id: string, patch: UpdateNotePatch): Promise<void> {
   const existing = await db.notes.get(id)
   if (!existing) throw new Error('Apunte no encontrado')
-  if (existing.kind === 'voice' && (patch.text !== undefined || patch.fileBlobKey !== undefined)) {
-    // Voice notes are immutable content-wise; only title updates are allowed.
-    // The recording itself cannot be edited (per product decision).
-    throw new Error('Las notas de voz no se pueden editar, solo el título')
+  // Voice recordings and photos are immutable content-wise; only the title
+  // can be renamed. To change the file the user must delete and create a new
+  // note. Text and (later) document notes can update everything.
+  const immutable = existing.kind === 'voice' || existing.kind === 'image'
+  if (immutable && (patch.text !== undefined || patch.fileBlobKey !== undefined)) {
+    throw new Error('Este tipo de apunte solo permite editar el título')
   }
   const next: Partial<Note> = { updatedAt: Date.now() }
   if (patch.title !== undefined) next.title = patch.title

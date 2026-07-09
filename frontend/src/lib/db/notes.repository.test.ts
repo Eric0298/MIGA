@@ -146,6 +146,46 @@ describe('notes repository', () => {
     expect(updated?.title).toBe('Voz renombrada')
   })
 
+  it('rejects updating the file of an image note but allows renaming', async () => {
+    const blob = await putNoteBlob({ blob: new Blob(['x'], { type: 'image/png' }) })
+    const note = await createNote({
+      goalId: GOAL_A,
+      kind: 'image',
+      title: 'Foto',
+      fileBlobKey: blob.id,
+      metadata: { mimeType: 'image/png', fileSizeBytes: 1 },
+    })
+    await expect(updateNote(note.id, { fileBlobKey: 'other' })).rejects.toThrow()
+    await updateNote(note.id, { title: 'Foto renombrada' })
+    const updated = await getNote(note.id)
+    expect(updated?.title).toBe('Foto renombrada')
+  })
+
+  it('accepts image files of allowed mime types', async () => {
+    for (const mime of ['image/png', 'image/jpeg', 'image/webp', 'image/gif']) {
+      const note = await createNote({
+        goalId: GOAL_A,
+        kind: 'image',
+        title: 'Foto',
+        fileBlobKey: 'blob-x',
+        metadata: { mimeType: mime, fileSizeBytes: 1 },
+      })
+      expect(note.metadata.mimeType).toBe(mime)
+    }
+  })
+
+  it('rejects an image note with an unsupported mime type', async () => {
+    await expect(
+      createNote({
+        goalId: GOAL_A,
+        kind: 'image',
+        title: 'Foto',
+        fileBlobKey: 'blob-x',
+        metadata: { mimeType: 'application/pdf', fileSizeBytes: 1 },
+      }),
+    ).rejects.toThrow()
+  })
+
   it('deletes a note and cascades its blob', async () => {
     const blob = await putNoteBlob({ blob: new Blob(['x'], { type: 'audio/webm' }) })
     const note = await createNote({

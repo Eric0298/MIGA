@@ -196,7 +196,7 @@ export type MaterialProgress = {
 // A Note is a user-authored artifact attached to a goal. It is intentionally
 // separate from Material (which represents external study content).
 
-export const noteKind = z.enum(['text', 'voice', 'document'])
+export const noteKind = z.enum(['text', 'voice', 'document', 'image'])
 export type NoteKind = z.infer<typeof noteKind>
 
 /**
@@ -217,6 +217,10 @@ export const NOTE_LIMITS = {
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ] as const,
+  },
+  image: {
+    maxBytes: 10 * 1024 * 1024,
+    mimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const,
   },
   text: {
     maxChars: 50_000,
@@ -248,7 +252,7 @@ export const noteInputSchema = z
         ctx.addIssue({ code: 'custom', message: 'textRequired', path: ['text'] })
       }
     }
-    if (data.kind === 'voice' || data.kind === 'document') {
+    if (data.kind === 'voice' || data.kind === 'document' || data.kind === 'image') {
       if (!data.fileBlobKey) {
         ctx.addIssue({ code: 'custom', message: 'fileRequired', path: ['fileBlobKey'] })
       }
@@ -275,6 +279,21 @@ export const noteInputSchema = z
         ctx.addIssue({ code: 'custom', message: 'fileInvalidType', path: ['fileBlobKey'] })
       }
       if (size !== undefined && size > NOTE_LIMITS.document.maxBytes) {
+        ctx.addIssue({ code: 'custom', message: 'fileTooLarge', path: ['fileBlobKey'] })
+      }
+    }
+    if (data.kind === 'image' && data.metadata) {
+      const size = data.metadata.fileSizeBytes
+      const mime = data.metadata.mimeType
+      if (
+        mime !== undefined &&
+        !NOTE_LIMITS.image.mimeTypes.includes(
+          mime as (typeof NOTE_LIMITS.image.mimeTypes)[number],
+        )
+      ) {
+        ctx.addIssue({ code: 'custom', message: 'fileInvalidType', path: ['fileBlobKey'] })
+      }
+      if (size !== undefined && size > NOTE_LIMITS.image.maxBytes) {
         ctx.addIssue({ code: 'custom', message: 'fileTooLarge', path: ['fileBlobKey'] })
       }
     }

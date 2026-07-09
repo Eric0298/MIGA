@@ -1,4 +1,4 @@
-import { FileText, Mic, StickyNote } from 'lucide-react'
+import { FileText, ImageIcon, Mic, StickyNote } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Note, NoteKind } from '@/lib/db/schema'
 
@@ -15,7 +15,9 @@ function NoteCard({ note, onClick }: NoteCardProps) {
         ? note.metadata?.durationSeconds
           ? `${Math.round(note.metadata.durationSeconds)} s`
           : ''
-        : note.metadata?.originalFilename ?? ''
+        : note.kind === 'image'
+          ? note.metadata?.originalFilename ?? ''
+          : note.metadata?.originalFilename ?? ''
 
   const timestamp = format(new Date(note.updatedAt), 'd LLL')
 
@@ -51,6 +53,8 @@ function kindIcon(kind: NoteKind) {
       return <Mic size={16} aria-hidden="true" />
     case 'document':
       return <FileText size={16} aria-hidden="true" />
+    case 'image':
+      return <ImageIcon size={16} aria-hidden="true" />
     case 'text':
     default:
       return <StickyNote size={16} aria-hidden="true" />
