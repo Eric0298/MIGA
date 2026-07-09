@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type {
+  ExamAttempt,
   Goal,
   Material,
   MaterialBlob,
@@ -7,6 +8,8 @@ import type {
   MaterialProgress,
   Note,
   NoteBlob,
+  Question,
+  QuestionBlob,
   Session,
 } from './schema'
 
@@ -28,6 +31,9 @@ class MigaDatabase extends Dexie {
   materialBlobs!: Table<MaterialBlob, string>
   notes!: Table<Note, string>
   noteBlobs!: Table<NoteBlob, string>
+  questions!: Table<Question, string>
+  questionBlobs!: Table<QuestionBlob, string>
+  examAttempts!: Table<ExamAttempt, string>
 
   constructor() {
     super('miga')
@@ -128,6 +134,22 @@ class MigaDatabase extends Dexie {
       materialBlobs: '&id, materialId, createdAt',
       notes: '&id, goalId, kind, sourceSessionId, createdAt, updatedAt',
       noteBlobs: '&id, noteId, createdAt',
+    })
+
+    // v9 — question bank per goal (for spaced repetition) and exam attempts
+    // (both PDF simulacros and self-graded question-based exams).
+    this.version(9).stores({
+      goals: '&id, createdAt, updatedAt',
+      sessions: '&id, goalId, status, startedAt, endedAt',
+      materials: '&id, kind, createdAt, updatedAt',
+      materialGoalLinks: '&id, materialId, goalId, [materialId+goalId], createdAt',
+      materialProgress: '&id, materialId, goalId, sessionId, createdAt, endedAt',
+      materialBlobs: '&id, materialId, createdAt',
+      notes: '&id, goalId, kind, sourceSessionId, createdAt, updatedAt',
+      noteBlobs: '&id, noteId, createdAt',
+      questions: '&id, goalId, createdAt, updatedAt',
+      questionBlobs: '&id, questionId, createdAt',
+      examAttempts: '&id, goalId, kind, status, startedAt, endedAt',
     })
   }
 }

@@ -4,6 +4,12 @@ import { createGoal, deleteGoal } from './goals.repository'
 import { startSession, stopSession } from './sessions.repository'
 import { attachMaterialToGoal, createMaterial, listMaterialsByGoal } from './materials.repository'
 import { createNote, listNotesByGoal } from './notes.repository'
+import { createQuestion, listQuestionsByGoal } from './questions.repository'
+import {
+  finishQuestionsExamAttempt,
+  listExamAttemptsByGoal,
+  startQuestionsExamAttempt,
+} from './exam-attempts.repository'
 import {
   buildExportPayload,
   clearAllData,
@@ -19,9 +25,11 @@ afterEach(async () => {
   await db.materialGoalLinks.clear()
   await db.materialProgress.clear()
   await db.notes.clear()
+  await db.questions.clear()
+  await db.examAttempts.clear()
 })
 
-describe('import-export v5', () => {
+describe('import-export v6', () => {
   it('builds an export payload with current goals, sessions, materials and links', async () => {
     const goal = await createGoal({
       name: 'Estudiar',
@@ -72,11 +80,13 @@ describe('import-export v5', () => {
       ],
       sessions: [],
     })
-    expect(parsed.version).toBe(5)
+    expect(parsed.version).toBe(6)
     expect(parsed.materials).toEqual([])
     expect(parsed.materialGoalLinks).toEqual([])
     expect(parsed.materialProgress).toEqual([])
     expect(parsed.notes).toEqual([])
+    expect(parsed.questions).toEqual([])
+    expect(parsed.examAttempts).toEqual([])
     for (const s of parsed.sessions) expect(Array.isArray(s.materialIds)).toBe(true)
 
     const result = await importAllData(parsed)
@@ -85,9 +95,11 @@ describe('import-export v5', () => {
     expect(result.linksCount).toBe(0)
     expect(result.progressCount).toBe(0)
     expect(result.notesCount).toBe(0)
+    expect(result.questionsCount).toBe(0)
+    expect(result.examAttemptsCount).toBe(0)
   })
 
-  it('migrates a v4 payload adding an empty notes array', async () => {
+  it('migrates a v4 payload adding empty notes, questions and examAttempts', async () => {
     const now = Date.now()
     const parsed = parseImportPayload({
       version: 4,
@@ -98,8 +110,27 @@ describe('import-export v5', () => {
       materialGoalLinks: [],
       materialProgress: [],
     })
-    expect(parsed.version).toBe(5)
+    expect(parsed.version).toBe(6)
     expect(parsed.notes).toEqual([])
+    expect(parsed.questions).toEqual([])
+    expect(parsed.examAttempts).toEqual([])
+  })
+
+  it('migrates a v5 payload adding empty questions and examAttempts', async () => {
+    const now = Date.now()
+    const parsed = parseImportPayload({
+      version: 5,
+      exportedAt: now,
+      goals: [],
+      sessions: [],
+      materials: [],
+      materialGoalLinks: [],
+      materialProgress: [],
+      notes: [],
+    })
+    expect(parsed.version).toBe(6)
+    expect(parsed.questions).toEqual([])
+    expect(parsed.examAttempts).toEqual([])
   })
 
   it('migrates a v3 payload wrapping materialId in materialIds', async () => {
@@ -126,10 +157,12 @@ describe('import-export v5', () => {
       materialGoalLinks: [],
       materialProgress: [],
     })
-    expect(parsed.version).toBe(5)
+    expect(parsed.version).toBe(6)
     expect(parsed.sessions).toHaveLength(1)
     expect(parsed.sessions[0].materialIds).toEqual(['mat-abc'])
     expect(parsed.notes).toEqual([])
+    expect(parsed.questions).toEqual([])
+    expect(parsed.examAttempts).toEqual([])
   })
 
   it('completes a v2 round trip including materials', async () => {
@@ -208,6 +241,56 @@ describe('import-export v5', () => {
     expect(await db.sessions.count()).toBe(0)
     expect(await db.materials.count()).toBe(0)
     expect(await db.materialGoalLinks.count()).toBe(0)
+  })
+
+  it('round-trips questions and exam attempts of a goal', async () => {
+    const goal = await createGoal({
+      name: 'Meta con preguntas',
+      targetMinutes: 60,
+      scheduledDays: ['2026-07-10'],
+    })
+    const q = await createQuestion({
+      goalId: goal.id,
+      prompt: '¿Cuál?',
+      answers: [
+        { text: 'A', isCorrect: true },
+        { text: 'B', isCorrect: false },
+      ],
+    })
+    const attempt = await startQuestionsExamAttempt({
+      goalId: goal.id,
+      title: 'test',
+      questionIds: [q.id],
+    })
+    await finishQuestionsExamAttempt(attempt.id, {
+      responses: [
+        {
+          questionId: q.id,
+          chosenAnswerIds: [q.answers[0].id],
+          isCorrect: true,
+          answeredAt: Date.now(),
+        },
+      ],
+    })
+
+    const payload = await buildExportPayload()
+    expect(payload.questions).toHaveLength(1)
+    expect(payload.examAttempts).toHaveLength(1)
+
+    await clearAllData()
+    expect(await db.questions.count()).toBe(0)
+    expect(await db.examAttempts.count()).toBe(0)
+
+    const result = await importAllData(payload)
+    expect(result.questionsCount).toBe(1)
+    expect(result.examAttemptsCount).toBe(1)
+    const restoredQs = await listQuestionsByGoal(goal.id)
+    expect(restoredQs).toHaveLength(1)
+    expect(restoredQs[0].answers[0].text).toBe('A')
+    const restoredExams = await listExamAttemptsByGoal(goal.id)
+    expect(restoredExams).toHaveLength(1)
+    expect(restoredExams[0].status).toBe('completed')
+    expect(restoredExams[0].score).toBe(1)
   })
 
   it('round-trips notes attached to a goal', async () => {

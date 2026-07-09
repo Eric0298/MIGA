@@ -322,3 +322,174 @@ export type NoteBlob = {
   blob: Blob
   createdAt: number
 }
+
+// -------- Questions ("preguntas") --------
+// A goal-scoped question bank used for both spaced-repetition review and
+// self-graded exam attempts.
+
+export const QUESTION_LIMITS = {
+  prompt: { maxChars: 1000 },
+  answer: { maxChars: 300, minCount: 2, maxCount: 10 },
+  image: {
+    maxBytes: 10 * 1024 * 1024,
+    mimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const,
+  },
+  audio: {
+    maxBytes: 25 * 1024 * 1024,
+    mimeTypePrefix: 'audio/',
+  },
+} as const
+
+export const questionAnswerInputSchema = z.object({
+  id: z.string().optional(),
+  text: z.string().trim().min(1, 'answerRequired').max(QUESTION_LIMITS.answer.maxChars, 'answerMax'),
+  isCorrect: z.boolean(),
+})
+
+export type QuestionAnswerInput = z.infer<typeof questionAnswerInputSchema>
+
+export type QuestionAnswer = {
+  id: string
+  text: string
+  isCorrect: boolean
+}
+
+export type QuestionReviewState = {
+  timesSeen: number
+  timesCorrect: number
+  timesIncorrect: number
+  lastSeenAt: number | null
+  weight: number
+}
+
+export const questionInputSchema = z
+  .object({
+    goalId: z.uuid(),
+    prompt: z
+      .string()
+      .trim()
+      .min(1, 'promptRequired')
+      .max(QUESTION_LIMITS.prompt.maxChars, 'promptMax'),
+    imageBlobKey: z.string().optional(),
+    audioBlobKey: z.string().optional(),
+    answers: z
+      .array(questionAnswerInputSchema)
+      .min(QUESTION_LIMITS.answer.minCount, 'minAnswers')
+      .max(QUESTION_LIMITS.answer.maxCount, 'maxAnswers'),
+  })
+  .superRefine((data, ctx) => {
+    const correctCount = data.answers.filter((a) => a.isCorrect).length
+    if (correctCount < 1) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'needAtLeastOneCorrect',
+        path: ['answers'],
+      })
+    }
+  })
+
+export type QuestionInput = z.infer<typeof questionInputSchema>
+
+export type Question = {
+  id: string
+  goalId: string
+  prompt: string
+  imageBlobKey?: string
+  audioBlobKey?: string
+  answers: QuestionAnswer[]
+  reviewState: QuestionReviewState
+  createdAt: number
+  updatedAt: number
+}
+
+export type QuestionBlob = {
+  id: string
+  questionId: string | null
+  kind: 'image' | 'audio'
+  mimeType: string
+  size: number
+  blob: Blob
+  createdAt: number
+}
+
+// -------- Exam attempts ("simulacros" y "examen con propias preguntas") --------
+// Discriminated by kind. PDF attempts wrap an external material/note and let
+// the user grade after the fact. Question attempts snapshot a set of the
+// user's own questions and auto-grade at the end.
+
+export const examKind = z.enum(['pdf', 'questions'])
+export type ExamKind = z.infer<typeof examKind>
+
+export const examStatus = z.enum([
+  'in-progress',
+  'paused',
+  'pending-grade', // pdf only
+  'graded', // pdf only
+  'completed', // questions only
+  'discarded',
+])
+export type ExamStatus = z.infer<typeof examStatus>
+
+export type ExamResponse = {
+  questionId: string
+  chosenAnswerIds: string[]
+  isCorrect: boolean
+  answeredAt: number
+}
+
+/** Input to start a PDF simulacro. Requires a source PDF referenced by a
+ *  material or a note. */
+export const pdfExamInputSchema = z
+  .object({
+    goalId: z.uuid(),
+    title: z.string().trim().min(1, 'titleRequired').max(80, 'titleMax'),
+    pdfMaterialId: z.string().optional(),
+    pdfNoteId: z.string().optional(),
+    timeLimitMs: z.number().int().positive().nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.pdfMaterialId && !data.pdfNoteId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'pdfSourceRequired',
+        path: ['pdfMaterialId'],
+      })
+    }
+  })
+
+export type PdfExamInput = z.infer<typeof pdfExamInputSchema>
+
+/** Input to start a questions exam. `questionIds` is the snapshot of the
+ *  pool to use (already ordered / shuffled by the caller). */
+export const questionsExamInputSchema = z.object({
+  goalId: z.uuid(),
+  title: z.string().trim().min(1, 'titleRequired').max(80, 'titleMax'),
+  questionIds: z.array(z.string()).min(1, 'questionsRequired'),
+  timeLimitMs: z.number().int().positive().nullable().optional(),
+})
+
+export type QuestionsExamInput = z.infer<typeof questionsExamInputSchema>
+
+export type ExamAttempt = {
+  id: string
+  goalId: string
+  kind: ExamKind
+  title: string
+  startedAt: number
+  pausedAt: number | null
+  endedAt: number | null
+  totalPausedMs: number
+  status: ExamStatus
+  timeLimitMs: number | null
+  score: number | null
+  maxScore: number | null
+  notes: string
+  // PDF-only fields
+  pdfMaterialId?: string
+  pdfNoteId?: string
+  // Questions-only fields
+  questionIds?: string[]
+  responses?: ExamResponse[]
+  createdAt: number
+  updatedAt: number
+}
