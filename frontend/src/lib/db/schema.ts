@@ -45,6 +45,21 @@ export type Session = {
 export const materialKind = z.enum(['link', 'note', 'video-youtube', 'video-upload', 'pdf'])
 export type MaterialKind = z.infer<typeof materialKind>
 
+/**
+ * Upload limits for locally-stored materials. Enforced in materialInputSchema
+ * and also re-checked in MaterialForm for early user feedback.
+ */
+export const MATERIAL_LIMITS = {
+  pdf: {
+    maxBytes: 100 * 1024 * 1024,
+    mimeTypes: ['application/pdf'] as const,
+  },
+  videoUpload: {
+    maxBytes: 500 * 1024 * 1024,
+    mimeTypePrefix: 'video/',
+  },
+} as const
+
 const httpUrl = z.string().refine(
   (raw) => {
     try {
@@ -105,6 +120,26 @@ export const materialInputSchema = z
           message: 'fileRequired',
           path: ['fileBlobKey'],
         })
+      }
+    }
+    if (data.kind === 'pdf' && data.metadata) {
+      const mime = data.metadata.mimeType
+      const size = data.metadata.fileSizeBytes
+      if (mime !== undefined && !MATERIAL_LIMITS.pdf.mimeTypes.includes(mime as 'application/pdf')) {
+        ctx.addIssue({ code: 'custom', message: 'fileInvalidType', path: ['fileBlobKey'] })
+      }
+      if (size !== undefined && size > MATERIAL_LIMITS.pdf.maxBytes) {
+        ctx.addIssue({ code: 'custom', message: 'fileTooLarge', path: ['fileBlobKey'] })
+      }
+    }
+    if (data.kind === 'video-upload' && data.metadata) {
+      const mime = data.metadata.mimeType
+      const size = data.metadata.fileSizeBytes
+      if (mime !== undefined && !mime.startsWith(MATERIAL_LIMITS.videoUpload.mimeTypePrefix)) {
+        ctx.addIssue({ code: 'custom', message: 'fileInvalidType', path: ['fileBlobKey'] })
+      }
+      if (size !== undefined && size > MATERIAL_LIMITS.videoUpload.maxBytes) {
+        ctx.addIssue({ code: 'custom', message: 'fileTooLarge', path: ['fileBlobKey'] })
       }
     }
   })

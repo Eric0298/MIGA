@@ -1,12 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { clsx } from 'clsx'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Paperclip } from 'lucide-react'
 import { toast } from 'sonner'
 import { createMaterial } from '@/lib/db/materials.repository'
-import { materialInputSchema, type MaterialKind } from '@/lib/db/schema'
+import {
+  deleteBlob,
+  putBlob,
+  setBlobMaterial,
+} from '@/lib/db/blobs.repository'
+import {
+  MATERIAL_LIMITS,
+  materialInputSchema,
+  type MaterialKind,
+} from '@/lib/db/schema'
 import { useT } from '@/i18n/i18n-context'
 import type { Messages } from '@/i18n/messages/es'
+import { tpl } from '@/i18n/tpl'
 import { formatShortDuration } from '@/features/timer/utils'
+import { formatBytes } from '@/lib/format-bytes'
 import { isProbablyYouTubeUrl } from '@/lib/api/youtube-metadata'
 import { useYouTubeMetadata } from '../hooks/use-youtube-metadata'
 
@@ -16,7 +27,7 @@ type MaterialFormProps = {
   onCancel?: () => void
 }
 
-type FormKind = 'link' | 'note' | 'video-youtube'
+type FormKind = 'link' | 'note' | 'video-youtube' | 'video-upload' | 'pdf'
 
 function translateSchemaError(key: string, errors: Messages['materials']['errors']): string {
   if (key in errors) return errors[key as keyof Messages['materials']['errors']]
@@ -47,6 +58,30 @@ function translateMetadataError(
   }
 }
 
+function accepts(kind: FormKind): string | undefined {
+  if (kind === 'pdf') return 'application/pdf'
+  if (kind === 'video-upload') return 'video/*'
+  return undefined
+}
+
+function validateFile(kind: FormKind, file: File): string | null {
+  if (kind === 'pdf') {
+    if (!MATERIAL_LIMITS.pdf.mimeTypes.includes(file.type as 'application/pdf')) {
+      return 'fileInvalidType'
+    }
+    if (file.size > MATERIAL_LIMITS.pdf.maxBytes) return 'fileTooLarge'
+    return null
+  }
+  if (kind === 'video-upload') {
+    if (!file.type.startsWith(MATERIAL_LIMITS.videoUpload.mimeTypePrefix)) {
+      return 'fileInvalidType'
+    }
+    if (file.size > MATERIAL_LIMITS.videoUpload.maxBytes) return 'fileTooLarge'
+    return null
+  }
+  return null
+}
+
 function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
   const { t } = useT()
   const [kind, setKind] = useState<FormKind>('link')
@@ -54,10 +89,13 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
   const [titleTouched, setTitleTouched] = useState(false)
   const [url, setUrl] = useState('')
   const [notes, setNotes] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const isYouTube = kind === 'video-youtube'
+  const needsFile = kind === 'pdf' || kind === 'video-upload'
   const metadata = useYouTubeMetadata(url, { enabled: isYouTube })
 
   useEffect(() => {
@@ -70,10 +108,37 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
 
   useEffect(() => {
     setErrors({})
-  }, [kind])
+    if (!needsFile) {
+      setFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }, [kind, needsFile])
 
   const handleKindChange = (next: FormKind) => {
     setKind(next)
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = e.target.files?.[0] ?? null
+    if (!picked) {
+      setFile(null)
+      return
+    }
+    const error = validateFile(kind, picked)
+    if (error) {
+      setFile(null)
+      setErrors((prev) => ({ ...prev, fileBlobKey: t.materials.errors[error as 'fileInvalidType'] }))
+      e.target.value = ''
+      return
+    }
+    setErrors((prev) => {
+      const { fileBlobKey: _drop, ...rest } = prev
+      return rest
+    })
+    setFile(picked)
+    if (!titleTouched && title.trim().length === 0) {
+      setTitle(picked.name.replace(/\.[^.]+$/, '').slice(0, 80))
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,6 +154,7 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
       title,
       url: kind === 'link' || kind === 'video-youtube' ? trimmedUrl : undefined,
       notes: kind === 'note' ? notes : undefined,
+      fileBlobKey: needsFile && file ? 'pending' : undefined,
       metadata:
         kind === 'video-youtube' && detected
           ? {
@@ -98,7 +164,13 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
               author: detected.author,
               durationSeconds: detected.durationSeconds,
             }
-          : {},
+          : needsFile && file
+            ? {
+                provider: kind === 'pdf' ? ('pdf' as const) : ('upload' as const),
+                mimeType: file.type,
+                fileSizeBytes: file.size,
+              }
+            : {},
     }
 
     const parsed = materialInputSchema.safeParse(payload)
@@ -112,12 +184,30 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
       return
     }
 
+    let blobId: string | null = null
     try {
       setSubmitting(true)
-      await createMaterial(parsed.data, [goalId])
+      if (needsFile && file) {
+        const record = await putBlob({ blob: file, mimeType: file.type })
+        blobId = record.id
+      }
+      const material = await createMaterial(
+        { ...parsed.data, fileBlobKey: blobId ?? undefined },
+        [goalId],
+      )
+      if (blobId) {
+        await setBlobMaterial(blobId, material.id)
+      }
       toast.success(t.materials.created)
       onCreated?.()
     } catch {
+      if (blobId) {
+        try {
+          await deleteBlob(blobId)
+        } catch {
+          // best-effort cleanup
+        }
+      }
       toast.error(t.materials.cannotCreate)
     } finally {
       setSubmitting(false)
@@ -132,6 +222,15 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
   const detected = metadata.status === 'success' ? metadata.data : null
   const urlLooksLikeYouTube = isProbablyYouTubeUrl(url)
 
+  const fileHint =
+    kind === 'pdf'
+      ? tpl(t.materials.fileHintPdf, { max: formatBytes(MATERIAL_LIMITS.pdf.maxBytes) })
+      : kind === 'video-upload'
+        ? tpl(t.materials.fileHintVideo, {
+            max: formatBytes(MATERIAL_LIMITS.videoUpload.maxBytes),
+          })
+        : ''
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -140,7 +239,11 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
     >
       <div>
         <p className="text-sm font-medium text-charcoal">{t.materials.kindLabel}</p>
-        <div role="tablist" aria-label={t.materials.kindLabel} className="mt-2 flex gap-2">
+        <div
+          role="tablist"
+          aria-label={t.materials.kindLabel}
+          className="mt-2 grid grid-cols-3 gap-2"
+        >
           <KindTab
             active={kind === 'link'}
             label={t.materials.kindLink}
@@ -155,6 +258,16 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
             active={kind === 'video-youtube'}
             label={t.materials.kindVideo}
             onClick={() => handleKindChange('video-youtube')}
+          />
+          <KindTab
+            active={kind === 'video-upload'}
+            label={t.materials.kindVideoUpload}
+            onClick={() => handleKindChange('video-upload')}
+          />
+          <KindTab
+            active={kind === 'pdf'}
+            label={t.materials.kindPdf}
+            onClick={() => handleKindChange('pdf')}
           />
         </div>
       </div>
@@ -218,6 +331,33 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
               )}
             </p>
           </div>
+        </div>
+      )}
+
+      {needsFile && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="material-file" className="text-sm font-medium text-charcoal">
+            {t.materials.fileLabel}
+          </label>
+          <label
+            htmlFor="material-file"
+            className="inline-flex items-center gap-2 rounded-xl bg-cream px-4 py-3 text-sm font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] cursor-pointer transition active:scale-[0.98]"
+          >
+            <Paperclip size={16} aria-hidden="true" />
+            {file ? tpl(t.materials.fileSelected, { name: file.name, size: formatBytes(file.size) }) : t.materials.filePick}
+          </label>
+          <input
+            ref={fileInputRef}
+            id="material-file"
+            type="file"
+            accept={accepts(kind)}
+            className="sr-only"
+            onChange={handleFileChange}
+          />
+          <p className="text-xs text-[color:var(--color-text-muted)]">{fileHint}</p>
+          {errors.fileBlobKey && (
+            <p className="text-xs text-apricot">{errors.fileBlobKey}</p>
+          )}
         </div>
       )}
 
@@ -293,7 +433,7 @@ function KindTab({ active, label, onClick }: KindTabProps) {
       aria-selected={active}
       onClick={onClick}
       className={clsx(
-        'flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-colors',
+        'rounded-xl px-3 py-2 text-sm font-semibold transition-colors',
         active
           ? 'bg-charcoal text-white'
           : 'bg-cream text-charcoal ring-1 ring-[color:var(--color-border)]',
