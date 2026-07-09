@@ -32,6 +32,7 @@ type PdfViewerProps = {
   markReadLabel?: string
   timesReadLabel?: (times: number) => string
   pagesReadLabel?: (read: number, total: number) => string
+  initialPagesReadCounts?: Record<number, number>
 }
 
 function PdfViewer({
@@ -45,6 +46,7 @@ function PdfViewer({
   markReadLabel = 'Mark as read',
   timesReadLabel = (n) => `${n}×`,
   pagesReadLabel = (read, total) => `${read} / ${total} read`,
+  initialPagesReadCounts,
 }: PdfViewerProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const pagesScrollRef = useRef<HTMLDivElement>(null)
@@ -59,7 +61,9 @@ function PdfViewer({
   const [isMobile, setIsMobile] = useState(false)
   const [visiblePage, setVisiblePage] = useState(1)
   const [selectedPage, setSelectedPage] = useState(1)
-  const [pagesReadCounts, setPagesReadCounts] = useState<Record<number, number>>({})
+  const [pagesReadCounts, setPagesReadCounts] = useState<Record<number, number>>(
+    () => ({ ...(initialPagesReadCounts ?? {}) }),
+  )
 
   const onPageReadRef = useRef(onPageRead)
   const onDocumentReadyRef = useRef(onDocumentReady)
@@ -110,7 +114,6 @@ function PdfViewer({
         }
         docRef.current = pdf
         setTotalPages(pdf.numPages)
-        setPagesReadCounts({})
         setVisiblePage(1)
         setSelectedPage(1)
         try {

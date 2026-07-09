@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   FileText,
   Film,
@@ -29,7 +29,7 @@ import { useT } from '@/i18n/i18n-context'
 import { useSyncTimerVideo } from '@/lib/settings/player-prefs'
 import { formatDuration, getElapsedMs } from '../utils'
 import { useElapsedTick } from '../hooks/use-elapsed-tick'
-import TimerActiveMaterial from './TimerActiveMaterial'
+import TimerActiveMaterial, { type TimerActiveMaterialHandle } from './TimerActiveMaterial'
 import { MEDIA_PLAYER_STATE, type MediaPlayerState } from '@/lib/api/media-player'
 
 type TimerMaterialSessionProps = {
@@ -48,6 +48,7 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
   const [activeMaterialId, setActiveMaterialId] = useState<string | null>(
     session.materialIds[0] ?? null,
   )
+  const activeMaterialRef = useRef<TimerActiveMaterialHandle>(null)
 
   const attachedMaterials = useMaterialsByIds(session.materialIds)
   const goalMaterials = useMaterialsByGoal(session.goalId ?? undefined) ?? []
@@ -96,6 +97,10 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
 
   const handleStop = async () => {
     try {
+      // Flush the active material's progress into Dexie BEFORE we mark the
+      // session completed, so the next session sees the up-to-date aggregate
+      // instead of racing with an in-flight write.
+      await activeMaterialRef.current?.flush().catch(() => undefined)
       await stopSession(session.id)
       toast.success(t.timer.sessionSaved)
     } catch {
@@ -112,8 +117,15 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
     }
   }
 
+  const handleSelectMaterial = async (materialId: string) => {
+    if (materialId === activeMaterialId) return
+    await activeMaterialRef.current?.flush().catch(() => undefined)
+    setActiveMaterialId(materialId)
+  }
+
   const handleAttach = async (materialId: string) => {
     try {
+      await activeMaterialRef.current?.flush().catch(() => undefined)
       await attachMaterialToSession(session.id, materialId)
       setActiveMaterialId(materialId)
       setShowAdd(false)
@@ -187,7 +199,7 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
           <button
             key={m.id}
             type="button"
-            onClick={() => setActiveMaterialId(m.id)}
+            onClick={() => void handleSelectMaterial(m.id)}
             aria-pressed={activeMaterialId === m.id}
             className={clsx(
               'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors',
@@ -261,6 +273,7 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
 
       {activeMaterial && (
         <TimerActiveMaterial
+          ref={activeMaterialRef}
           key={activeMaterial.id}
           session={session}
           material={activeMaterial}

@@ -1,4 +1,12 @@
-import { lazy, Suspense, useCallback, useEffect, useRef } from 'react'
+import {
+  forwardRef,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from 'react'
 import { ExternalLink } from 'lucide-react'
 import type { Material, Session } from '@/lib/db/schema'
 import { createMaterialProgress } from '@/lib/db/material-progress.repository'
@@ -7,11 +15,19 @@ import { tpl } from '@/i18n/tpl'
 import YouTubePlayer from '@/features/materials/components/YouTubePlayer'
 import LocalVideoPlayer from '@/features/materials/components/LocalVideoPlayer'
 import { useVideoTracker } from '@/features/materials/hooks/use-video-tracker'
+import { useMaterialAggregatedProgress } from '@/features/materials/hooks/use-material-aggregated-progress'
 import { type MediaPlayer, type MediaPlayerState } from '@/lib/api/media-player'
 import Loading from '@/components/ui/Loading'
 import { getElapsedMs } from '../utils'
 
 const PdfViewer = lazy(() => import('@/features/materials/components/PdfViewer'))
+
+export type TimerActiveMaterialHandle = {
+  /** Await this before the parent tears down or replaces the component,
+   *  so the MaterialProgress row is committed to Dexie and the next mount
+   *  sees the up-to-date aggregate. */
+  flush: () => Promise<void>
+}
 
 type TimerActiveMaterialProps = {
   session: Session
@@ -19,8 +35,15 @@ type TimerActiveMaterialProps = {
   onPlayerStateChange?: (state: MediaPlayerState) => void
 }
 
-function TimerActiveMaterial({ session, material, onPlayerStateChange }: TimerActiveMaterialProps) {
+const TimerActiveMaterial = forwardRef<TimerActiveMaterialHandle, TimerActiveMaterialProps>(
+function TimerActiveMaterial({ session, material, onPlayerStateChange }, ref) {
   const { t } = useT()
+  const needsResume =
+    material.kind === 'video-youtube' ||
+    material.kind === 'video-upload' ||
+    material.kind === 'pdf'
+  const aggregate = useMaterialAggregatedProgress(needsResume ? material.id : null)
+  const waitingForAggregate = needsResume && aggregate === undefined
   const playerRef = useRef<MediaPlayer | null>(null)
   const tracker = useVideoTracker(playerRef)
   const trackerSnapshotRef = useRef(tracker.snapshot)
@@ -48,9 +71,11 @@ function TimerActiveMaterial({ session, material, onPlayerStateChange }: TimerAc
 
   const persistProgress = useCallback(async () => {
     if (persistedRef.current) return
-    persistedRef.current = true
     const currentSession = sessionRef.current
-    if (currentSession.status === 'discarded') return
+    if (currentSession.status === 'discarded') {
+      persistedRef.current = true
+      return
+    }
 
     const isVideo = material.kind === 'video-youtube' || material.kind === 'video-upload'
     const isPdf = material.kind === 'pdf'
@@ -75,13 +100,21 @@ function TimerActiveMaterial({ session, material, onPlayerStateChange }: TimerAc
     const startedAt = isVideo ? snap.startedAt : now - activeElapsed
     const endedAt = isVideo ? snap.endedAt : now
 
-    if (
-      totalWatchedMs <= 0 &&
-      (!videoRanges || videoRanges.length === 0) &&
-      (!pagesRead || pagesRead.length === 0)
-    ) {
+    // Only persist when there is meaningful work to record. This matters
+    // because React.StrictMode fires the useEffect cleanup once right after
+    // mount for detection purposes, and we do NOT want that cleanup to write
+    // a phantom row that then flips persistedRef, blocking the real write.
+    const hasVideoWork = isVideo && (snap.totalWatchedMs > 0 || snap.ranges.length > 0)
+    const hasPdfWork = isPdf && !!pagesRead && pagesRead.length > 0
+    const hasPlainWork = !isVideo && !isPdf && activeElapsed >= 2_000
+    if (!hasVideoWork && !hasPdfWork && !hasPlainWork) {
       return
     }
+
+    // Only mark as persisted AFTER we've decided we actually have something
+    // to save. Otherwise a spurious empty cleanup would block the later real
+    // save on Detener / flush.
+    persistedRef.current = true
 
     try {
       await createMaterialProgress({
@@ -118,6 +151,20 @@ function TimerActiveMaterial({ session, material, onPlayerStateChange }: TimerAc
       void persistProgress()
     }
   }, [persistProgress])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      flush: async () => {
+        await persistProgress()
+      },
+    }),
+    [persistProgress],
+  )
+
+  if (waitingForAggregate) {
+    return <Loading />
+  }
 
   if (material.kind === 'video-youtube') {
     const videoId = material.metadata?.youtubeVideoId
@@ -201,12 +248,13 @@ function TimerActiveMaterial({ session, material, onPlayerStateChange }: TimerAc
           pagesReadLabel={(read, total) =>
             tpl(t.timer.pdfPagesRead, { read, total })
           }
+          initialPagesReadCounts={aggregate?.pagesReadCounts}
         />
       </Suspense>
     )
   }
 
   return null
-}
+})
 
 export default TimerActiveMaterial
