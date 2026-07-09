@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { YT_PLAYER_STATE, type YouTubePlayerInstance } from '@/lib/api/youtube-iframe-api'
+import { MEDIA_PLAYER_STATE, type MediaPlayer } from '@/lib/api/media-player'
 import type { VideoRange } from '@/lib/db/schema'
 import { mergeRanges } from '../utils/merge-ranges'
 
@@ -23,7 +23,7 @@ export type VideoTrackerSnapshot = {
  * Polling instead of relying on onStateChange keeps us robust to slow /
  * missed events (common when YT.Player is bound to a pre-existing iframe).
  */
-export function useVideoTracker(playerRef: { current: YouTubePlayerInstance | null }) {
+export function useVideoTracker(playerRef: { current: MediaPlayer | null }) {
   const activeRangeRef = useRef<VideoRange | null>(null)
   const closedRangesRef = useRef<VideoRange[]>([])
   const totalWatchedMsRef = useRef(0)
@@ -43,7 +43,7 @@ export function useVideoTracker(playerRef: { current: YouTubePlayerInstance | nu
         return
       }
 
-      if (state !== YT_PLAYER_STATE.PLAYING) {
+      if (state !== MEDIA_PLAYER_STATE.PLAYING) {
         if (activeRangeRef.current) {
           closedRangesRef.current.push(activeRangeRef.current)
           activeRangeRef.current = null

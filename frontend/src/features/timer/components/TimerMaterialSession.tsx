@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { Pause, Play, Square, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Session } from '@/lib/db/schema'
@@ -16,18 +16,16 @@ import { tpl } from '@/i18n/tpl'
 import { useSyncTimerVideo } from '@/lib/settings/player-prefs'
 import { formatDuration, formatShortDuration, getElapsedMs } from '../utils'
 import { useElapsedTick } from '../hooks/use-elapsed-tick'
-import YouTubePlayer, {
-  YT_PLAYER_STATE,
-  type YouTubePlayerState,
-} from '@/features/materials/components/YouTubePlayer'
+import YouTubePlayer from '@/features/materials/components/YouTubePlayer'
+import LocalVideoPlayer from '@/features/materials/components/LocalVideoPlayer'
 import { useVideoTracker } from '@/features/materials/hooks/use-video-tracker'
-import type { YouTubePlayerInstance } from '@/lib/api/youtube-iframe-api'
+import { MEDIA_PLAYER_STATE, type MediaPlayer, type MediaPlayerState } from '@/lib/api/media-player'
 
-type TimerVideoSessionProps = {
+type TimerMaterialSessionProps = {
   session: Session
 }
 
-function TimerVideoSession({ session }: TimerVideoSessionProps) {
+function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
   const { t } = useT()
   const goals = useLiveGoals()
   const material = useMaterial(session.materialId)
@@ -37,7 +35,7 @@ function TimerVideoSession({ session }: TimerVideoSessionProps) {
   const isPaused = session.status === 'paused'
   const [syncEnabled] = useSyncTimerVideo()
 
-  const playerRef = useRef<YouTubePlayerInstance | null>(null)
+  const playerRef = useRef<MediaPlayer | null>(null)
   const tracker = useVideoTracker(playerRef)
   const trackerSnapshotRef = useRef(tracker.snapshot)
   const persistedRef = useRef(false)
@@ -71,18 +69,18 @@ function TimerVideoSession({ session }: TimerVideoSessionProps) {
     }
   }, [session.id, session.materialId, session.goalId, material])
 
-  const handlePlayerReady = useCallback((player: YouTubePlayerInstance) => {
+  const handlePlayerReady = useCallback((player: MediaPlayer) => {
     playerRef.current = player
   }, [])
 
   const handlePlayerStateChange = useCallback(
-    (state: YouTubePlayerState) => {
+    (state: MediaPlayerState) => {
       tracker.handleStateChange(state)
       if (!syncEnabled) return
       // Asymmetric sync: play resumes the timer, but pausing the video does
       // NOT pause the timer (pausing may just mean the user is taking notes,
       // which is still study time).
-      if (state === YT_PLAYER_STATE.PLAYING && session.status === 'paused') {
+      if (state === MEDIA_PLAYER_STATE.PLAYING && session.status === 'paused') {
         resumeSession(session.id).catch(() => undefined)
       }
     },
@@ -147,7 +145,46 @@ function TimerVideoSession({ session }: TimerVideoSessionProps) {
     }
   }, [persistProgress])
 
-  const videoId = useMemo(() => material?.metadata?.youtubeVideoId, [material])
+  const renderPlayer = () => {
+    if (!material) return null
+    if (material.kind === 'video-youtube') {
+      const videoId = material.metadata?.youtubeVideoId
+      if (!videoId) {
+        return (
+          <p className="rounded-2xl bg-surface p-5 text-sm text-[color:var(--color-text-muted)]">
+            {t.materials.errors.metadataInvalidUrl}
+          </p>
+        )
+      }
+      return (
+        <YouTubePlayer
+          videoId={videoId}
+          onReady={handlePlayerReady}
+          onStateChange={handlePlayerStateChange}
+          fullscreenLabel={t.timer.videoFullscreen}
+        />
+      )
+    }
+    if (material.kind === 'video-upload') {
+      const blobId = material.fileBlobKey
+      if (!blobId) {
+        return (
+          <p className="rounded-2xl bg-surface p-5 text-sm text-[color:var(--color-text-muted)]">
+            {t.materials.errors.fileRequired}
+          </p>
+        )
+      }
+      return (
+        <LocalVideoPlayer
+          blobId={blobId}
+          onReady={handlePlayerReady}
+          onStateChange={handlePlayerStateChange}
+          fullscreenLabel={t.timer.videoFullscreen}
+        />
+      )
+    }
+    return null
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -210,20 +247,9 @@ function TimerVideoSession({ session }: TimerVideoSessionProps) {
         </button>
       </div>
 
-      {videoId ? (
-        <YouTubePlayer
-          videoId={videoId}
-          onReady={handlePlayerReady}
-          onStateChange={handlePlayerStateChange}
-          fullscreenLabel={t.timer.videoFullscreen}
-        />
-      ) : (
-        <p className="rounded-2xl bg-surface p-5 text-sm text-[color:var(--color-text-muted)]">
-          {t.materials.errors.metadataInvalidUrl}
-        </p>
-      )}
+      {renderPlayer()}
     </div>
   )
 }
 
-export default TimerVideoSession
+export default TimerMaterialSession

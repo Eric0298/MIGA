@@ -7,7 +7,7 @@ import { useActiveSession } from './hooks/use-active-session'
 import { useMaterial } from '@/features/materials/hooks/use-material'
 import StartSessionPanel from './components/StartSessionPanel'
 import TimerDisplay from './components/TimerDisplay'
-import TimerVideoSession from './components/TimerVideoSession'
+import TimerMaterialSession from './components/TimerMaterialSession'
 
 type TimerLocationState = {
   goalId?: string
@@ -22,11 +22,11 @@ function TimerPage() {
   const active = useActiveSession()
   const activeMaterial = useMaterial(active?.materialId ?? null)
   const isLoading = active === undefined
-  const hasVideoMaterial =
+  const hasMaterialSession =
     active !== null &&
     active !== undefined &&
     active.materialId !== null &&
-    activeMaterial?.kind === 'video-youtube'
+    (activeMaterial?.kind === 'video-youtube' || activeMaterial?.kind === 'video-upload')
 
   return (
     <div className="flex flex-col gap-6">
@@ -38,8 +38,8 @@ function TimerPage() {
         <p className="text-sm text-[color:var(--color-text-muted)]">{t.common.loading}</p>
       )}
 
-      {!isLoading && active && hasVideoMaterial && <TimerVideoSession session={active} />}
-      {!isLoading && active && !hasVideoMaterial && <TimerDisplay session={active} />}
+      {!isLoading && active && hasMaterialSession && <TimerMaterialSession session={active} />}
+      {!isLoading && active && !hasMaterialSession && <TimerDisplay session={active} />}
 
       {!isLoading && !active && showStart && (
         <StartSessionPanel
