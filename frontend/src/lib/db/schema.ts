@@ -25,12 +25,14 @@ export type SessionStatus = z.infer<typeof sessionStatus>
 
 export const startSessionInputSchema = z.object({
   goalId: z.uuid().nullable(),
+  materialId: z.uuid().nullable().optional(),
 })
 export type StartSessionInput = z.infer<typeof startSessionInputSchema>
 
 export type Session = {
   id: string
   goalId: string | null
+  materialId: string | null
   startedAt: number
   pausedAt: number | null
   endedAt: number | null
@@ -126,4 +128,21 @@ export type MaterialGoalLink = {
   materialId: string
   goalId: string
   createdAt: number
+}
+
+export type VideoRange = [startSeconds: number, endSeconds: number]
+
+export type MaterialProgress = {
+  id: string
+  materialId: string
+  goalId: string | null
+  sessionId: string | null
+  kind: MaterialKind
+  totalWatchedMs: number
+  videoRanges?: VideoRange[]
+  pagesRead?: number[]
+  startedAt: number
+  endedAt: number
+  createdAt: number
+  updatedAt: number
 }

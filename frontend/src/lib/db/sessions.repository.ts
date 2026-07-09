@@ -17,6 +17,7 @@ export async function startSession(input: StartSessionInput): Promise<Session> {
   const session: Session = {
     id: crypto.randomUUID(),
     goalId: parsed.goalId,
+    materialId: parsed.materialId ?? null,
     startedAt: now,
     pausedAt: null,
     endedAt: null,

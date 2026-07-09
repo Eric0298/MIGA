@@ -1,23 +1,40 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { startSession } from '@/lib/db/sessions.repository'
 import { useT } from '@/i18n/i18n-context'
 import GoalPicker from './GoalPicker'
+import MaterialPicker from './MaterialPicker'
 
 type StartSessionPanelProps = {
   onStarted?: () => void
   onCancel?: () => void
+  initialGoalId?: string | null
+  initialMaterialId?: string | null
 }
 
-function StartSessionPanel({ onStarted, onCancel }: StartSessionPanelProps) {
+function StartSessionPanel({
+  onStarted,
+  onCancel,
+  initialGoalId,
+  initialMaterialId,
+}: StartSessionPanelProps) {
   const { t } = useT()
-  const [goalId, setGoalId] = useState<string | null>(null)
+  const [goalId, setGoalId] = useState<string | null>(initialGoalId ?? null)
+  const [materialId, setMaterialId] = useState<string | null>(initialMaterialId ?? null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    setMaterialId(null)
+  }, [goalId])
+
+  useEffect(() => {
+    if (initialMaterialId) setMaterialId(initialMaterialId)
+  }, [initialMaterialId])
 
   const handleStart = async () => {
     try {
       setSubmitting(true)
-      await startSession({ goalId })
+      await startSession({ goalId, materialId })
       toast.success(t.timer.sessionStarted)
       onStarted?.()
     } catch (error) {
@@ -41,6 +58,8 @@ function StartSessionPanel({ onStarted, onCancel }: StartSessionPanelProps) {
       </div>
 
       <GoalPicker value={goalId} onChange={setGoalId} />
+
+      <MaterialPicker goalId={goalId} value={materialId} onChange={setMaterialId} />
 
       <div className="flex gap-3">
         <button

@@ -7,6 +7,7 @@ import {
   type Goal,
   type Material,
   type MaterialGoalLink,
+  type MaterialProgress,
   type Session,
 } from './schema'
 
@@ -19,7 +20,7 @@ const goalRecordSchema = z.object({
   updatedAt: z.number(),
 })
 
-const sessionRecordSchema = z.object({
+const sessionV1Schema = z.object({
   id: z.string(),
   goalId: z.string().nullable(),
   startedAt: z.number(),
@@ -29,6 +30,10 @@ const sessionRecordSchema = z.object({
   status: sessionStatus,
   createdAt: z.number(),
   updatedAt: z.number(),
+})
+
+const sessionRecordSchema = sessionV1Schema.extend({
+  materialId: z.string().nullable().optional(),
 })
 
 const materialRecordSchema = z.object({
@@ -50,43 +55,76 @@ const materialGoalLinkRecordSchema = z.object({
   createdAt: z.number(),
 })
 
-export const CURRENT_EXPORT_VERSION = 2
+const materialProgressRecordSchema = z.object({
+  id: z.string(),
+  materialId: z.string(),
+  goalId: z.string().nullable(),
+  sessionId: z.string().nullable(),
+  kind: materialKind,
+  totalWatchedMs: z.number(),
+  videoRanges: z.array(z.tuple([z.number(), z.number()])).optional(),
+  pagesRead: z.array(z.number()).optional(),
+  startedAt: z.number(),
+  endedAt: z.number(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+})
+
+export const CURRENT_EXPORT_VERSION = 3
 
 const payloadV1Schema = z.object({
   version: z.literal(1),
   exportedAt: z.number(),
   goals: z.array(goalRecordSchema),
-  sessions: z.array(sessionRecordSchema),
+  sessions: z.array(sessionV1Schema),
 })
 
 const payloadV2Schema = z.object({
   version: z.literal(2),
   exportedAt: z.number(),
   goals: z.array(goalRecordSchema),
-  sessions: z.array(sessionRecordSchema),
+  sessions: z.array(sessionV1Schema),
   materials: z.array(materialRecordSchema),
   materialGoalLinks: z.array(materialGoalLinkRecordSchema),
 })
 
-export const exportPayloadSchema = z.union([payloadV1Schema, payloadV2Schema])
+const payloadV3Schema = z.object({
+  version: z.literal(3),
+  exportedAt: z.number(),
+  goals: z.array(goalRecordSchema),
+  sessions: z.array(sessionRecordSchema),
+  materials: z.array(materialRecordSchema),
+  materialGoalLinks: z.array(materialGoalLinkRecordSchema),
+  materialProgress: z.array(materialProgressRecordSchema),
+})
 
-export type ExportPayload = z.infer<typeof payloadV2Schema>
+export const exportPayloadSchema = z.union([
+  payloadV1Schema,
+  payloadV2Schema,
+  payloadV3Schema,
+])
+
+export type ExportPayload = z.infer<typeof payloadV3Schema>
 
 export type ImportResult = {
   goalsCount: number
   sessionsCount: number
   materialsCount: number
   linksCount: number
+  progressCount: number
   normalizedActiveSessions: number
 }
 
 export async function buildExportPayload(): Promise<ExportPayload> {
-  const [goals, sessions, materials, materialGoalLinks] = await Promise.all([
-    db.goals.toArray(),
-    db.sessions.toArray(),
-    db.materials.toArray(),
-    db.materialGoalLinks.toArray(),
-  ])
+  const [goals, sessions, materials, materialGoalLinks, materialProgress] = await Promise.all(
+    [
+      db.goals.toArray(),
+      db.sessions.toArray(),
+      db.materials.toArray(),
+      db.materialGoalLinks.toArray(),
+      db.materialProgress.toArray(),
+    ],
+  )
   return {
     version: CURRENT_EXPORT_VERSION,
     exportedAt: Date.now(),
@@ -94,6 +132,7 @@ export async function buildExportPayload(): Promise<ExportPayload> {
     sessions,
     materials,
     materialGoalLinks,
+    materialProgress,
   }
 }
 
@@ -101,12 +140,24 @@ export function parseImportPayload(raw: unknown): ExportPayload {
   const parsed = exportPayloadSchema.parse(raw)
   if (parsed.version === 1) {
     return {
-      version: 2,
+      version: 3,
       exportedAt: parsed.exportedAt,
       goals: parsed.goals,
-      sessions: parsed.sessions,
+      sessions: parsed.sessions.map((s) => ({ ...s, materialId: null })),
       materials: [],
       materialGoalLinks: [],
+      materialProgress: [],
+    }
+  }
+  if (parsed.version === 2) {
+    return {
+      version: 3,
+      exportedAt: parsed.exportedAt,
+      goals: parsed.goals,
+      sessions: parsed.sessions.map((s) => ({ ...s, materialId: null })),
+      materials: parsed.materials,
+      materialGoalLinks: parsed.materialGoalLinks,
+      materialProgress: [],
     }
   }
   return parsed
@@ -117,21 +168,26 @@ export async function importAllData(payload: ExportPayload): Promise<ImportResul
   let normalizedActiveSessions = 0
 
   const sessions: Session[] = payload.sessions.map((s) => {
-    if (s.status === 'running' || s.status === 'paused') {
+    const normalized: Session = {
+      ...s,
+      materialId: s.materialId ?? null,
+    }
+    if (normalized.status === 'running' || normalized.status === 'paused') {
       normalizedActiveSessions += 1
       return {
-        ...s,
+        ...normalized,
         status: 'completed',
-        endedAt: s.endedAt ?? s.updatedAt ?? now,
+        endedAt: normalized.endedAt ?? normalized.updatedAt ?? now,
         pausedAt: null,
       }
     }
-    return s
+    return normalized
   })
 
   const goals: Goal[] = payload.goals
   const materials: Material[] = payload.materials
   const materialGoalLinks: MaterialGoalLink[] = payload.materialGoalLinks
+  const materialProgress: MaterialProgress[] = payload.materialProgress
 
   await db.transaction(
     'rw',
@@ -139,11 +195,13 @@ export async function importAllData(payload: ExportPayload): Promise<ImportResul
     db.sessions,
     db.materials,
     db.materialGoalLinks,
+    db.materialProgress,
     async () => {
       await db.goals.bulkPut(goals)
       await db.sessions.bulkPut(sessions)
       await db.materials.bulkPut(materials)
       await db.materialGoalLinks.bulkPut(materialGoalLinks)
+      await db.materialProgress.bulkPut(materialProgress)
     },
   )
 
@@ -152,6 +210,7 @@ export async function importAllData(payload: ExportPayload): Promise<ImportResul
     sessionsCount: sessions.length,
     materialsCount: materials.length,
     linksCount: materialGoalLinks.length,
+    progressCount: materialProgress.length,
     normalizedActiveSessions,
   }
 }
@@ -163,11 +222,13 @@ export async function clearAllData(): Promise<void> {
     db.sessions,
     db.materials,
     db.materialGoalLinks,
+    db.materialProgress,
     async () => {
       await db.goals.clear()
       await db.sessions.clear()
       await db.materials.clear()
       await db.materialGoalLinks.clear()
+      await db.materialProgress.clear()
     },
   )
 }

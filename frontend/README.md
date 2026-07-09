@@ -6,6 +6,20 @@ PWA mobile-first construida con React + TypeScript + Vite + Tailwind CSS v4.
 
 Node.js 20+.
 
+## Configuración local
+
+Copia `.env.example` a `.env.local` y ajusta los valores si tu backend no está en el puerto
+por defecto:
+
+```bash
+cp .env.example .env.local
+```
+
+Variables disponibles:
+
+- `VITE_API_URL` — Base URL del backend Miga.Api (se usa para el endpoint de metadata
+  de YouTube). Solo `http://` o `https://`. El valor por defecto es `http://localhost:5000`.
+
 ## Scripts
 
 ```bash

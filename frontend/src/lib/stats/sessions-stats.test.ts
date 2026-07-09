@@ -13,6 +13,7 @@ function completed(overrides: Partial<Session>): Session {
   return {
     id: overrides.id ?? crypto.randomUUID(),
     goalId: null,
+    materialId: null,
     startedAt: base,
     pausedAt: null,
     endedAt: base + 60_000,

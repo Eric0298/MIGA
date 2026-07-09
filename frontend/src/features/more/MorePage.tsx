@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import { Link } from 'react-router'
-import { AlertTriangle, Download, Languages, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Download, Languages, PlaySquare, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { clsx } from 'clsx'
@@ -16,9 +16,11 @@ import { getActiveSession } from '@/lib/db/sessions.repository'
 import { useT } from '@/i18n/i18n-context'
 import { tpl } from '@/i18n/tpl'
 import type { Language } from '@/i18n/types'
+import { useSyncTimerVideo } from '@/lib/settings/player-prefs'
 
 function MorePage() {
   const { t, lang, setLang } = useT()
+  const [syncTimerVideo, setSyncTimerVideo] = useSyncTimerVideo()
   const fileRef = useRef<HTMLInputElement>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [busy, setBusy] = useState<'export' | 'import' | 'clear' | null>(null)
@@ -156,6 +158,44 @@ function MorePage() {
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-medium text-charcoal">{t.more.playerSection}</h2>
+        <p className="text-xs text-[color:var(--color-text-muted)]">{t.more.playerHint}</p>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={syncTimerVideo}
+          onClick={() => setSyncTimerVideo(!syncTimerVideo)}
+          className="inline-flex items-center justify-between gap-3 rounded-2xl bg-surface px-5 py-4 text-left text-base font-semibold text-charcoal transition active:scale-[0.98]"
+        >
+          <span className="flex items-center gap-3">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-peach text-charcoal">
+              <PlaySquare size={18} aria-hidden="true" />
+            </span>
+            <span className="flex flex-col">
+              <span>{t.more.syncTimerVideo}</span>
+              <span className="text-xs font-normal text-[color:var(--color-text-muted)]">
+                {t.more.syncTimerVideoHint}
+              </span>
+            </span>
+          </span>
+          <span
+            className={clsx(
+              'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
+              syncTimerVideo ? 'bg-apricot' : 'bg-[color:var(--color-border)]',
+            )}
+            aria-hidden="true"
+          >
+            <span
+              className={clsx(
+                'absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform',
+                syncTimerVideo ? 'translate-x-[22px]' : 'translate-x-0.5',
+              )}
+            />
+          </span>
+        </button>
       </section>
 
       <section className="flex flex-col gap-3">

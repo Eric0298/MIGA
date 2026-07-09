@@ -1,5 +1,11 @@
 import Dexie, { type Table } from 'dexie'
-import type { Goal, Material, MaterialGoalLink, Session } from './schema'
+import type {
+  Goal,
+  Material,
+  MaterialGoalLink,
+  MaterialProgress,
+  Session,
+} from './schema'
 
 type LegacyDayTarget = { day: string; targetMinutes: number }
 type LegacyGoal = {
@@ -15,6 +21,7 @@ class MigaDatabase extends Dexie {
   sessions!: Table<Session, string>
   materials!: Table<Material, string>
   materialGoalLinks!: Table<MaterialGoalLink, string>
+  materialProgress!: Table<MaterialProgress, string>
 
   constructor() {
     super('miga')
@@ -54,6 +61,25 @@ class MigaDatabase extends Dexie {
       materials: '&id, kind, createdAt, updatedAt',
       materialGoalLinks: '&id, materialId, goalId, [materialId+goalId], createdAt',
     })
+
+    this.version(5)
+      .stores({
+        goals: '&id, createdAt, updatedAt',
+        sessions: '&id, goalId, materialId, status, startedAt, endedAt',
+        materials: '&id, kind, createdAt, updatedAt',
+        materialGoalLinks: '&id, materialId, goalId, [materialId+goalId], createdAt',
+        materialProgress: '&id, materialId, goalId, sessionId, createdAt, endedAt',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table<Session>('sessions')
+          .toCollection()
+          .modify((session) => {
+            if (session.materialId === undefined) {
+              session.materialId = null
+            }
+          })
+      })
   }
 }
 
