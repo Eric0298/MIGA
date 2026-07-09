@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef } from 'react'
 import { ExternalLink } from 'lucide-react'
 import type { Material, Session } from '@/lib/db/schema'
 import { createMaterialProgress } from '@/lib/db/material-progress.repository'
 import { useT } from '@/i18n/i18n-context'
+import { tpl } from '@/i18n/tpl'
 import YouTubePlayer from '@/features/materials/components/YouTubePlayer'
 import LocalVideoPlayer from '@/features/materials/components/LocalVideoPlayer'
 import { useVideoTracker } from '@/features/materials/hooks/use-video-tracker'
 import { type MediaPlayer, type MediaPlayerState } from '@/lib/api/media-player'
+import Loading from '@/components/ui/Loading'
 import { getElapsedMs } from '../utils'
+
+const PdfViewer = lazy(() => import('@/features/materials/components/PdfViewer'))
 
 type TimerActiveMaterialProps = {
   session: Session
@@ -23,6 +27,8 @@ function TimerActiveMaterial({ session, material, onPlayerStateChange }: TimerAc
   const persistedRef = useRef(false)
   const elapsedAtStartRef = useRef(getElapsedMs(session, Date.now()))
   const sessionRef = useRef(session)
+  const pagesReadRef = useRef<Set<number>>(new Set())
+  const pagesReadCountsRef = useRef<Map<number, number>>(new Map())
 
   useEffect(() => {
     sessionRef.current = session
@@ -32,6 +38,14 @@ function TimerActiveMaterial({ session, material, onPlayerStateChange }: TimerAc
     trackerSnapshotRef.current = tracker.snapshot
   }, [tracker.snapshot])
 
+  const handlePageRead = useCallback((page: number) => {
+    pagesReadRef.current.add(page)
+    pagesReadCountsRef.current.set(
+      page,
+      (pagesReadCountsRef.current.get(page) ?? 0) + 1,
+    )
+  }, [])
+
   const persistProgress = useCallback(async () => {
     if (persistedRef.current) return
     persistedRef.current = true
@@ -39,6 +53,7 @@ function TimerActiveMaterial({ session, material, onPlayerStateChange }: TimerAc
     if (currentSession.status === 'discarded') return
 
     const isVideo = material.kind === 'video-youtube' || material.kind === 'video-upload'
+    const isPdf = material.kind === 'pdf'
     const snap = trackerSnapshotRef.current()
     const now = Date.now()
     const currentElapsed = getElapsedMs(currentSession, now)
@@ -46,10 +61,27 @@ function TimerActiveMaterial({ session, material, onPlayerStateChange }: TimerAc
 
     const totalWatchedMs = isVideo ? snap.totalWatchedMs : activeElapsed
     const videoRanges = isVideo ? snap.ranges : undefined
+    const pagesRead = isPdf && pagesReadRef.current.size > 0
+      ? Array.from(pagesReadRef.current).sort((a, b) => a - b)
+      : undefined
+    const pagesReadCounts = isPdf && pagesReadCountsRef.current.size > 0
+      ? Object.fromEntries(
+          Array.from(pagesReadCountsRef.current.entries()).map(([page, count]) => [
+            String(page),
+            count,
+          ]),
+        )
+      : undefined
     const startedAt = isVideo ? snap.startedAt : now - activeElapsed
     const endedAt = isVideo ? snap.endedAt : now
 
-    if (totalWatchedMs <= 0 && (!videoRanges || videoRanges.length === 0)) return
+    if (
+      totalWatchedMs <= 0 &&
+      (!videoRanges || videoRanges.length === 0) &&
+      (!pagesRead || pagesRead.length === 0)
+    ) {
+      return
+    }
 
     try {
       await createMaterialProgress({
@@ -59,6 +91,8 @@ function TimerActiveMaterial({ session, material, onPlayerStateChange }: TimerAc
         kind: material.kind,
         totalWatchedMs,
         videoRanges,
+        pagesRead,
+        pagesReadCounts,
         startedAt,
         endedAt,
       })
@@ -146,10 +180,29 @@ function TimerActiveMaterial({ session, material, onPlayerStateChange }: TimerAc
   }
 
   if (material.kind === 'pdf') {
+    const blobId = material.fileBlobKey
+    if (!blobId) {
+      return (
+        <p className="rounded-2xl bg-surface p-5 text-sm text-[color:var(--color-text-muted)]">
+          {t.materials.errors.fileRequired}
+        </p>
+      )
+    }
     return (
-      <div className="rounded-2xl bg-surface p-5 text-center text-sm text-[color:var(--color-text-muted)]">
-        {t.timer.pdfViewerComingSoon}
-      </div>
+      <Suspense fallback={<Loading />}>
+        <PdfViewer
+          blobId={blobId}
+          onPageRead={handlePageRead}
+          fullscreenLabel={t.timer.videoFullscreen}
+          zoomInLabel={t.timer.pdfZoomIn}
+          zoomOutLabel={t.timer.pdfZoomOut}
+          markReadLabel={t.timer.pdfMarkRead}
+          timesReadLabel={(times) => tpl(t.timer.pdfTimesReadShort, { count: times })}
+          pagesReadLabel={(read, total) =>
+            tpl(t.timer.pdfPagesRead, { read, total })
+          }
+        />
+      </Suspense>
     )
   }
 

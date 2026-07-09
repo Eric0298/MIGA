@@ -9,6 +9,7 @@ export type CreateMaterialProgressInput = {
   totalWatchedMs: number
   videoRanges?: VideoRange[]
   pagesRead?: number[]
+  pagesReadCounts?: Record<string, number>
   startedAt: number
   endedAt: number
 }

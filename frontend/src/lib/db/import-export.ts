@@ -68,6 +68,7 @@ const materialProgressRecordSchema = z.object({
   totalWatchedMs: z.number(),
   videoRanges: z.array(z.tuple([z.number(), z.number()])).optional(),
   pagesRead: z.array(z.number()).optional(),
+  pagesReadCounts: z.record(z.string(), z.number().int().nonnegative()).optional(),
   startedAt: z.number(),
   endedAt: z.number(),
   createdAt: z.number(),
