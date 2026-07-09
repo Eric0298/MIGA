@@ -358,6 +358,7 @@ export const va: Messages = {
       text: 'Text',
       voice: 'Veu',
       image: 'Foto',
+      document: 'Document',
     },
     voice: {
       startRecording: 'Gravar',
@@ -376,6 +377,13 @@ export const va: Messages = {
       pickFile: 'Tria una foto',
       hint: 'PNG, JPG, WebP o GIF · màxim {max}',
       notEditable: 'Les fotos no es poden editar; només canviar el títol.',
+    },
+    document: {
+      pickFile: 'Tria un arxiu',
+      replaceFile: 'Substituir arxiu',
+      newFileSelected: 'Nou arxiu: {name}',
+      hint: 'PDF, DOC o DOCX · màxim {max}',
+      open: 'Obrir',
     },
     errors: {
       titleRequired: 'El títol és obligatori',

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ImagePlus, Mic, Plus, StickyNote, X } from 'lucide-react'
+import { FileText, ImagePlus, Mic, Plus, StickyNote, X } from 'lucide-react'
 import { useT } from '@/i18n/i18n-context'
 import type { NoteKind } from '@/lib/db/schema'
 import { useNotesByGoal } from '../hooks/use-notes-by-goal'
@@ -69,7 +69,7 @@ function NotesPanel({ goalId, sourceSessionId = null }: NotesPanelProps) {
           <p className="text-xs font-medium text-[color:var(--color-text-muted)]">
             {t.notes.picker.title}
           </p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <KindTile
               icon={<StickyNote size={18} aria-hidden="true" />}
               label={t.notes.picker.text}
@@ -84,6 +84,11 @@ function NotesPanel({ goalId, sourceSessionId = null }: NotesPanelProps) {
               icon={<ImagePlus size={18} aria-hidden="true" />}
               label={t.notes.picker.image}
               onClick={() => openCreate('image')}
+            />
+            <KindTile
+              icon={<FileText size={18} aria-hidden="true" />}
+              label={t.notes.picker.document}
+              onClick={() => openCreate('document')}
             />
           </div>
         </div>

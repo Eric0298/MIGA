@@ -357,6 +357,7 @@ export const en: Messages = {
       text: 'Text',
       voice: 'Voice',
       image: 'Photo',
+      document: 'Document',
     },
     voice: {
       startRecording: 'Record',
@@ -375,6 +376,13 @@ export const en: Messages = {
       pickFile: 'Choose photo',
       hint: 'PNG, JPG, WebP or GIF · up to {max}',
       notEditable: 'Photos cannot be edited, only the title can be renamed.',
+    },
+    document: {
+      pickFile: 'Choose file',
+      replaceFile: 'Replace file',
+      newFileSelected: 'New file: {name}',
+      hint: 'PDF, DOC or DOCX · up to {max}',
+      open: 'Open',
     },
     errors: {
       titleRequired: 'The title is required',

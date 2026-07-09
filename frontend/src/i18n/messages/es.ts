@@ -357,6 +357,7 @@ export const es = {
       text: 'Texto',
       voice: 'Voz',
       image: 'Foto',
+      document: 'Documento',
     },
     voice: {
       startRecording: 'Grabar',
@@ -375,6 +376,13 @@ export const es = {
       pickFile: 'Elegir foto',
       hint: 'PNG, JPG, WebP o GIF · máximo {max}',
       notEditable: 'Las fotos no se pueden editar; solo cambiar el título.',
+    },
+    document: {
+      pickFile: 'Elegir archivo',
+      replaceFile: 'Sustituir archivo',
+      newFileSelected: 'Nuevo archivo: {name}',
+      hint: 'PDF, DOC o DOCX · máximo {max}',
+      open: 'Abrir',
     },
     errors: {
       titleRequired: 'El título es obligatorio',

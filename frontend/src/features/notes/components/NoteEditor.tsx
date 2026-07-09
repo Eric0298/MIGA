@@ -5,6 +5,7 @@ import { useT } from '@/i18n/i18n-context'
 import TextNoteEditor from './TextNoteEditor'
 import VoiceNoteEditor from './VoiceNoteEditor'
 import ImageNoteEditor from './ImageNoteEditor'
+import DocumentNoteEditor from './DocumentNoteEditor'
 
 type NoteEditorProps = {
   goalId: string
@@ -94,8 +95,19 @@ function NoteEditor({
       />
     )
   }
+  if (kind === 'document') {
+    return (
+      <DocumentNoteEditor
+        goalId={goalId}
+        sourceSessionId={sourceSessionId}
+        existing={loaded}
+        onDone={onDone}
+        onCancel={onCancel}
+      />
+    )
+  }
 
-  // document (N4) or any future kind falls back to a read-only placeholder.
+  // Any future kind falls back to a read-only placeholder.
   return (
     <div className="flex flex-col gap-3">
       {loaded && (
