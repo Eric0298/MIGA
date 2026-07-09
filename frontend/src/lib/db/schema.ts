@@ -130,6 +130,15 @@ export type MaterialGoalLink = {
   createdAt: number
 }
 
+export type MaterialBlob = {
+  id: string
+  materialId: string | null
+  mimeType: string
+  size: number
+  blob: Blob
+  createdAt: number
+}
+
 export type VideoRange = [startSeconds: number, endSeconds: number]
 
 export type MaterialProgress = {

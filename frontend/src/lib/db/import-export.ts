@@ -218,17 +218,21 @@ export async function importAllData(payload: ExportPayload): Promise<ImportResul
 export async function clearAllData(): Promise<void> {
   await db.transaction(
     'rw',
-    db.goals,
-    db.sessions,
-    db.materials,
-    db.materialGoalLinks,
-    db.materialProgress,
+    [
+      db.goals,
+      db.sessions,
+      db.materials,
+      db.materialGoalLinks,
+      db.materialProgress,
+      db.materialBlobs,
+    ],
     async () => {
       await db.goals.clear()
       await db.sessions.clear()
       await db.materials.clear()
       await db.materialGoalLinks.clear()
       await db.materialProgress.clear()
+      await db.materialBlobs.clear()
     },
   )
 }

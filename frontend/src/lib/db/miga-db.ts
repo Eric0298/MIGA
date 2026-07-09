@@ -2,6 +2,7 @@ import Dexie, { type Table } from 'dexie'
 import type {
   Goal,
   Material,
+  MaterialBlob,
   MaterialGoalLink,
   MaterialProgress,
   Session,
@@ -22,6 +23,7 @@ class MigaDatabase extends Dexie {
   materials!: Table<Material, string>
   materialGoalLinks!: Table<MaterialGoalLink, string>
   materialProgress!: Table<MaterialProgress, string>
+  materialBlobs!: Table<MaterialBlob, string>
 
   constructor() {
     super('miga')
@@ -80,6 +82,15 @@ class MigaDatabase extends Dexie {
             }
           })
       })
+
+    this.version(6).stores({
+      goals: '&id, createdAt, updatedAt',
+      sessions: '&id, goalId, materialId, status, startedAt, endedAt',
+      materials: '&id, kind, createdAt, updatedAt',
+      materialGoalLinks: '&id, materialId, goalId, [materialId+goalId], createdAt',
+      materialProgress: '&id, materialId, goalId, sessionId, createdAt, endedAt',
+      materialBlobs: '&id, materialId, createdAt',
+    })
   }
 }
 

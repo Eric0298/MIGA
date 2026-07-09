@@ -54,10 +54,17 @@ export function listAllMaterials(): Promise<Material[]> {
 }
 
 export async function deleteMaterial(id: string): Promise<void> {
-  await db.transaction('rw', db.materials, db.materialGoalLinks, async () => {
-    await db.materialGoalLinks.where('materialId').equals(id).delete()
-    await db.materials.delete(id)
-  })
+  await db.transaction(
+    'rw',
+    db.materials,
+    db.materialGoalLinks,
+    db.materialBlobs,
+    async () => {
+      await db.materialGoalLinks.where('materialId').equals(id).delete()
+      await db.materialBlobs.where('materialId').equals(id).delete()
+      await db.materials.delete(id)
+    },
+  )
 }
 
 export async function attachMaterialToGoal(materialId: string, goalId: string): Promise<void> {
