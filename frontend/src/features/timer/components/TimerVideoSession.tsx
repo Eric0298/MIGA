@@ -79,9 +79,9 @@ function TimerVideoSession({ session }: TimerVideoSessionProps) {
     (state: YouTubePlayerState) => {
       tracker.handleStateChange(state)
       if (!syncEnabled) return
-      if (state === YT_PLAYER_STATE.PAUSED && session.status === 'running') {
-        pauseSession(session.id).catch(() => undefined)
-      }
+      // Asymmetric sync: play resumes the timer, but pausing the video does
+      // NOT pause the timer (pausing may just mean the user is taking notes,
+      // which is still study time).
       if (state === YT_PLAYER_STATE.PLAYING && session.status === 'paused') {
         resumeSession(session.id).catch(() => undefined)
       }
