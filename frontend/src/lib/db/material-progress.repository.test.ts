@@ -7,6 +7,7 @@ import {
   getTotalWatchedMsByMaterial,
   listAllProgress,
   listProgressByMaterial,
+  sumByGoal,
 } from './material-progress.repository'
 
 afterEach(async () => {
@@ -77,6 +78,40 @@ describe('material progress repository', () => {
       endedAt: base + 25_000,
     })
     expect(await getTotalWatchedMsByMaterial('mat-1')).toBe(35_000)
+  })
+
+  it('sums total watched ms per goal, ignoring other goals', async () => {
+    const base = Date.now()
+    await createMaterialProgress({
+      materialId: 'mat-1',
+      goalId: 'goal-A',
+      sessionId: null,
+      kind: 'video-youtube',
+      totalWatchedMs: 4_000,
+      startedAt: base,
+      endedAt: base + 4_000,
+    })
+    await createMaterialProgress({
+      materialId: 'mat-2',
+      goalId: 'goal-A',
+      sessionId: null,
+      kind: 'video-youtube',
+      totalWatchedMs: 6_000,
+      startedAt: base,
+      endedAt: base + 6_000,
+    })
+    await createMaterialProgress({
+      materialId: 'mat-3',
+      goalId: 'goal-B',
+      sessionId: null,
+      kind: 'video-youtube',
+      totalWatchedMs: 9_000,
+      startedAt: base,
+      endedAt: base + 9_000,
+    })
+    expect(await sumByGoal('goal-A')).toBe(10_000)
+    expect(await sumByGoal('goal-B')).toBe(9_000)
+    expect(await sumByGoal('goal-C')).toBe(0)
   })
 
   it('deletes individual progress rows', async () => {

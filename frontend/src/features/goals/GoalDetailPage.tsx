@@ -22,6 +22,7 @@ import EmptyState from '@/components/ui/EmptyState'
 import Loading from '@/components/ui/Loading'
 import { Plus } from 'lucide-react'
 import { useMaterialsByGoal } from '@/features/materials/hooks/use-materials-by-goal'
+import { useGoalVideoWatchedMs } from '@/features/materials/hooks/use-goal-video-watched-ms'
 import MaterialForm from '@/features/materials/components/MaterialForm'
 import MaterialCard from '@/features/materials/components/MaterialCard'
 
@@ -35,6 +36,7 @@ function GoalDetailPage() {
   const goal = useLiveGoal(id)
   const sessions = useCompletedSessions()
   const materials = useMaterialsByGoal(goal?.id)
+  const goalVideoWatchedMs = useGoalVideoWatchedMs(goal?.id)
   const [view, setView] = useState<View>('calendar')
   const [showMaterialForm, setShowMaterialForm] = useState(false)
   const todayIsoStr = toLocalIsoDay(Date.now())
@@ -198,7 +200,16 @@ function GoalDetailPage() {
 
           <section className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-medium text-charcoal">{t.materials.sectionTitle}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-medium text-charcoal">{t.materials.sectionTitle}</h2>
+                {goalVideoWatchedMs > 0 && (
+                  <span className="inline-flex items-center rounded-full bg-peach px-2 py-0.5 text-[11px] font-semibold text-charcoal">
+                    {tpl(t.materials.videoWatched, {
+                      time: formatShortDuration(goalVideoWatchedMs),
+                    })}
+                  </span>
+                )}
+              </div>
               {!showMaterialForm && (
                 <button
                   type="button"

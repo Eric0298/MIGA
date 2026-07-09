@@ -55,6 +55,12 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
             return
           }
           playerRef.current = player
+          const wrapper = wrapperRef.current
+          const iframe = wrapper?.querySelector('iframe')
+          if (iframe) {
+            iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin')
+            iframe.setAttribute('allow', 'fullscreen; encrypted-media; picture-in-picture')
+          }
           setStatus('ready')
           onReady?.(player)
         },

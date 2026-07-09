@@ -36,6 +36,11 @@ export async function getTotalWatchedMsByMaterial(materialId: string): Promise<n
   return rows.reduce((sum, row) => sum + row.totalWatchedMs, 0)
 }
 
+export async function sumByGoal(goalId: string): Promise<number> {
+  const rows = await db.materialProgress.where('goalId').equals(goalId).toArray()
+  return rows.reduce((sum, row) => sum + row.totalWatchedMs, 0)
+}
+
 export function listAllProgress(): Promise<MaterialProgress[]> {
   return db.materialProgress.toArray()
 }
