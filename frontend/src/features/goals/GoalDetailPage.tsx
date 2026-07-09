@@ -25,6 +25,7 @@ import { useMaterialsByGoal } from '@/features/materials/hooks/use-materials-by-
 import { useGoalVideoWatchedMs } from '@/features/materials/hooks/use-goal-video-watched-ms'
 import MaterialForm from '@/features/materials/components/MaterialForm'
 import MaterialCard from '@/features/materials/components/MaterialCard'
+import NotesPanel from '@/features/notes/components/NotesPanel'
 
 const GoalProgressChart = lazy(() => import('./components/GoalProgressChart'))
 
@@ -242,6 +243,8 @@ function GoalDetailPage() {
               </ul>
             )}
           </section>
+
+          <NotesPanel goalId={goal.id} />
         </>
       )}
     </div>
