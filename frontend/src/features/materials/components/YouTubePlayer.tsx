@@ -31,6 +31,17 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
     const playerRef = useRef<YouTubePlayerInstance | null>(null)
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
+    // Keep callbacks in refs so parent re-renders (e.g. timer tick) don't
+    // recreate the iframe. The effect below only depends on videoId.
+    const onReadyRef = useRef(onReady)
+    const onStateChangeRef = useRef(onStateChange)
+    const onErrorRef = useRef(onError)
+    useEffect(() => {
+      onReadyRef.current = onReady
+      onStateChangeRef.current = onStateChange
+      onErrorRef.current = onError
+    })
+
     useImperativeHandle(
       ref,
       () => ({
@@ -62,16 +73,16 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
             iframe.setAttribute('allow', 'fullscreen; encrypted-media; picture-in-picture')
           }
           setStatus('ready')
-          onReady?.(player)
+          onReadyRef.current?.(player)
         },
         onStateChange: (state) => {
           if (cancelled) return
-          onStateChange?.(state)
+          onStateChangeRef.current?.(state)
         },
         onError: (code) => {
           if (cancelled) return
           setStatus('error')
-          onError?.(code)
+          onErrorRef.current?.(code)
         },
       }).catch(() => {
         if (!cancelled) setStatus('error')
@@ -86,7 +97,7 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
         }
         playerRef.current = null
       }
-    }, [videoId, onReady, onStateChange, onError])
+    }, [videoId])
 
     const handleFullscreen = () => {
       const wrapper = wrapperRef.current
