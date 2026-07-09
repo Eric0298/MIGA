@@ -17,7 +17,7 @@ export async function startSession(input: StartSessionInput): Promise<Session> {
   const session: Session = {
     id: crypto.randomUUID(),
     goalId: parsed.goalId,
-    materialId: parsed.materialId ?? null,
+    materialIds: Array.from(new Set(parsed.materialIds ?? [])),
     startedAt: now,
     pausedAt: null,
     endedAt: null,
@@ -28,6 +28,33 @@ export async function startSession(input: StartSessionInput): Promise<Session> {
   }
   await db.sessions.add(session)
   return session
+}
+
+export async function attachMaterialToSession(
+  sessionId: string,
+  materialId: string,
+): Promise<void> {
+  const session = await db.sessions.get(sessionId)
+  if (!session) throw new Error('Sesión no encontrada')
+  if (session.materialIds.includes(materialId)) return
+  await db.sessions.update(sessionId, {
+    materialIds: [...session.materialIds, materialId],
+    updatedAt: Date.now(),
+  })
+}
+
+export async function detachMaterialFromSession(
+  sessionId: string,
+  materialId: string,
+): Promise<void> {
+  const session = await db.sessions.get(sessionId)
+  if (!session) throw new Error('Sesión no encontrada')
+  const next = session.materialIds.filter((id) => id !== materialId)
+  if (next.length === session.materialIds.length) return
+  await db.sessions.update(sessionId, {
+    materialIds: next,
+    updatedAt: Date.now(),
+  })
 }
 
 export async function pauseSession(id: string): Promise<void> {

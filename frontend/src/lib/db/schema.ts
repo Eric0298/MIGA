@@ -25,14 +25,14 @@ export type SessionStatus = z.infer<typeof sessionStatus>
 
 export const startSessionInputSchema = z.object({
   goalId: z.uuid().nullable(),
-  materialId: z.uuid().nullable().optional(),
+  materialIds: z.array(z.uuid()).optional(),
 })
 export type StartSessionInput = z.infer<typeof startSessionInputSchema>
 
 export type Session = {
   id: string
   goalId: string | null
-  materialId: string | null
+  materialIds: string[]
   startedAt: number
   pausedAt: number | null
   endedAt: number | null

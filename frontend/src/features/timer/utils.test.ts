@@ -7,7 +7,7 @@ function baseSession(overrides: Partial<Session>): Session {
   return {
     id: 'test',
     goalId: null,
-    materialId: null,
+    materialIds: [],
     startedAt: now,
     pausedAt: null,
     endedAt: null,

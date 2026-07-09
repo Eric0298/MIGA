@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Link as LinkIcon, Play, PlaySquare, StickyNote, Unlink } from 'lucide-react'
+import { FileText, Film, Link as LinkIcon, Play, PlaySquare, StickyNote, Unlink } from 'lucide-react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
-import type { Material } from '@/lib/db/schema'
+import type { Material, MaterialKind } from '@/lib/db/schema'
 import { detachMaterialFromGoal } from '@/lib/db/materials.repository'
 import { formatShortDuration } from '@/features/timer/utils'
+import { formatBytes } from '@/lib/format-bytes'
 import { useT } from '@/i18n/i18n-context'
 import { tpl } from '@/i18n/tpl'
 import { useMaterialWatchedMs } from '../hooks/use-material-watched-ms'
@@ -101,7 +102,7 @@ function MaterialCard({ material, goalId }: MaterialCardProps) {
         </div>
         <Link
           to="/app/timer"
-          state={{ goalId, materialId: material.id }}
+          state={{ goalId, materialIds: [material.id] }}
           className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-apricot px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98]"
         >
           <Play size={16} aria-hidden="true" />
@@ -115,11 +116,7 @@ function MaterialCard({ material, goalId }: MaterialCardProps) {
     <li className="flex flex-col gap-3 rounded-2xl bg-surface p-4">
       <div className="flex items-start gap-3">
         <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-peach text-charcoal">
-          {material.kind === 'link' ? (
-            <LinkIcon size={16} aria-hidden="true" />
-          ) : (
-            <StickyNote size={16} aria-hidden="true" />
-          )}
+          {kindIcon(material.kind)}
         </span>
         <div className="flex-1 overflow-hidden">
           <h3 className="text-sm font-semibold text-charcoal">{material.title}</h3>
@@ -147,6 +144,12 @@ function MaterialCard({ material, goalId }: MaterialCardProps) {
                   : material.notes}
             </button>
           )}
+          {(material.kind === 'pdf' || material.kind === 'video-upload') &&
+            material.metadata?.fileSizeBytes !== undefined && (
+              <p className="mt-1 truncate text-xs text-[color:var(--color-text-muted)]">
+                {formatBytes(material.metadata.fileSizeBytes)}
+              </p>
+            )}
         </div>
         <button
           type="button"
@@ -158,8 +161,33 @@ function MaterialCard({ material, goalId }: MaterialCardProps) {
           <Unlink size={16} aria-hidden="true" />
         </button>
       </div>
+      <Link
+        to="/app/timer"
+        state={{ goalId, materialIds: [material.id] }}
+        className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-apricot px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98]"
+      >
+        <Play size={16} aria-hidden="true" />
+        {t.materials.startWithMaterial}
+      </Link>
     </li>
   )
+}
+
+function kindIcon(kind: MaterialKind) {
+  switch (kind) {
+    case 'link':
+      return <LinkIcon size={16} aria-hidden="true" />
+    case 'note':
+      return <StickyNote size={16} aria-hidden="true" />
+    case 'video-youtube':
+      return <PlaySquare size={16} aria-hidden="true" />
+    case 'video-upload':
+      return <Film size={16} aria-hidden="true" />
+    case 'pdf':
+      return <FileText size={16} aria-hidden="true" />
+    default:
+      return <StickyNote size={16} aria-hidden="true" />
+  }
 }
 
 export default MaterialCard

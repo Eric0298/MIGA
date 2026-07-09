@@ -18,7 +18,7 @@ function makeSession(overrides: Partial<Session>): Session {
   return {
     id: crypto.randomUUID(),
     goalId: null,
-    materialId: null,
+    materialIds: [],
     startedAt: base,
     pausedAt: null,
     endedAt: base + 60_000,

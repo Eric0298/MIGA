@@ -1,25 +1,36 @@
-import { useCallback, useEffect, useRef } from 'react'
-import { Pause, Play, Square, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
-import type { Session } from '@/lib/db/schema'
-import { useLiveGoals } from '@/features/goals/hooks/use-goals'
-import { useMaterial } from '@/features/materials/hooks/use-material'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  FileText,
+  Film,
+  Link as LinkIcon,
+  Pause,
+  Play,
+  PlaySquare,
+  Plus,
+  Square,
+  StickyNote,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { clsx } from 'clsx'
+import { toast } from 'sonner'
+import type { MaterialKind, Session } from '@/lib/db/schema'
+import { useLiveGoals } from '@/features/goals/hooks/use-goals'
+import { useMaterialsByIds } from '@/features/materials/hooks/use-materials-by-ids'
+import { useMaterialsByGoal } from '@/features/materials/hooks/use-materials-by-goal'
+import {
+  attachMaterialToSession,
   discardSession,
   pauseSession,
   resumeSession,
   stopSession,
 } from '@/lib/db/sessions.repository'
-import { createMaterialProgress } from '@/lib/db/material-progress.repository'
 import { useT } from '@/i18n/i18n-context'
-import { tpl } from '@/i18n/tpl'
 import { useSyncTimerVideo } from '@/lib/settings/player-prefs'
-import { formatDuration, formatShortDuration, getElapsedMs } from '../utils'
+import { formatDuration, getElapsedMs } from '../utils'
 import { useElapsedTick } from '../hooks/use-elapsed-tick'
-import YouTubePlayer from '@/features/materials/components/YouTubePlayer'
-import LocalVideoPlayer from '@/features/materials/components/LocalVideoPlayer'
-import { useVideoTracker } from '@/features/materials/hooks/use-video-tracker'
-import { MEDIA_PLAYER_STATE, type MediaPlayer, type MediaPlayerState } from '@/lib/api/media-player'
+import TimerActiveMaterial from './TimerActiveMaterial'
+import { MEDIA_PLAYER_STATE, type MediaPlayerState } from '@/lib/api/media-player'
 
 type TimerMaterialSessionProps = {
   session: Session
@@ -28,69 +39,48 @@ type TimerMaterialSessionProps = {
 function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
   const { t } = useT()
   const goals = useLiveGoals()
-  const material = useMaterial(session.materialId)
   const goal = goals?.find((g) => g.id === session.goalId) ?? null
   const now = useElapsedTick(session.status === 'running')
   const elapsed = getElapsedMs(session, now)
   const isPaused = session.status === 'paused'
   const [syncEnabled] = useSyncTimerVideo()
+  const [showAdd, setShowAdd] = useState(false)
+  const [activeMaterialId, setActiveMaterialId] = useState<string | null>(
+    session.materialIds[0] ?? null,
+  )
 
-  const playerRef = useRef<MediaPlayer | null>(null)
-  const tracker = useVideoTracker(playerRef)
-  const trackerSnapshotRef = useRef(tracker.snapshot)
-  const persistedRef = useRef(false)
+  const attachedMaterials = useMaterialsByIds(session.materialIds)
+  const goalMaterials = useMaterialsByGoal(session.goalId ?? undefined) ?? []
+  const notYetAttached = useMemo(
+    () => goalMaterials.filter((m) => !session.materialIds.includes(m.id)),
+    [goalMaterials, session.materialIds],
+  )
+  const activeMaterial = attachedMaterials.find((m) => m.id === activeMaterialId) ?? null
 
+  // Keep activeMaterialId in sync with session.materialIds changes.
   useEffect(() => {
-    trackerSnapshotRef.current = tracker.snapshot
-  }, [tracker.snapshot])
-
-  const persistProgress = useCallback(async () => {
-    if (persistedRef.current) return
-    if (!session.materialId || !material) return
-    const snap = trackerSnapshotRef.current()
-    if (snap.totalWatchedMs <= 0 && snap.ranges.length === 0) {
-      persistedRef.current = true
+    if (session.materialIds.length === 0) {
+      if (activeMaterialId !== null) setActiveMaterialId(null)
       return
     }
-    persistedRef.current = true
-    try {
-      await createMaterialProgress({
-        materialId: session.materialId,
-        goalId: session.goalId,
-        sessionId: session.id,
-        kind: material.kind,
-        totalWatchedMs: snap.totalWatchedMs,
-        videoRanges: snap.ranges,
-        startedAt: snap.startedAt,
-        endedAt: snap.endedAt,
-      })
-    } catch {
-      // silent — the session has already been stopped
+    if (activeMaterialId === null || !session.materialIds.includes(activeMaterialId)) {
+      setActiveMaterialId(session.materialIds[0])
     }
-  }, [session.id, session.materialId, session.goalId, material])
-
-  const handlePlayerReady = useCallback((player: MediaPlayer) => {
-    playerRef.current = player
-  }, [])
+  }, [session.materialIds, activeMaterialId])
 
   const handlePlayerStateChange = useCallback(
     (state: MediaPlayerState) => {
-      tracker.handleStateChange(state)
       if (!syncEnabled) return
-      // Asymmetric sync: play resumes the timer, but pausing the video does
-      // NOT pause the timer (pausing may just mean the user is taking notes,
-      // which is still study time).
       if (state === MEDIA_PLAYER_STATE.PLAYING && session.status === 'paused') {
         resumeSession(session.id).catch(() => undefined)
       }
     },
-    [tracker, syncEnabled, session.id, session.status],
+    [syncEnabled, session.id, session.status],
   )
 
   const handlePause = async () => {
     try {
       await pauseSession(session.id)
-      if (syncEnabled) playerRef.current?.pauseVideo()
     } catch {
       toast.error(t.timer.cannotPause)
     }
@@ -99,7 +89,6 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
   const handleResume = async () => {
     try {
       await resumeSession(session.id)
-      if (syncEnabled) playerRef.current?.playVideo()
     } catch {
       toast.error(t.timer.cannotResume)
     }
@@ -107,22 +96,8 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
 
   const handleStop = async () => {
     try {
-      const snap = trackerSnapshotRef.current()
-      const watchedMs = snap.totalWatchedMs
-      const notesMs = Math.max(0, elapsed - watchedMs)
-      await persistProgress()
-      if (syncEnabled) playerRef.current?.pauseVideo()
       await stopSession(session.id)
-      if (watchedMs > 0) {
-        toast.success(
-          tpl(t.timer.sessionSavedBreakdown, {
-            video: formatShortDuration(watchedMs),
-            notes: formatShortDuration(notesMs),
-          }),
-        )
-      } else {
-        toast.success(t.timer.sessionSaved)
-      }
+      toast.success(t.timer.sessionSaved)
     } catch {
       toast.error(t.timer.cannotStop)
     }
@@ -130,8 +105,6 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
 
   const handleDiscard = async () => {
     try {
-      persistedRef.current = true // do not create progress for a discarded session
-      if (syncEnabled) playerRef.current?.pauseVideo()
       await discardSession(session.id)
       toast.success(t.timer.sessionDiscarded)
     } catch {
@@ -139,51 +112,14 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
     }
   }
 
-  useEffect(() => {
-    return () => {
-      void persistProgress()
+  const handleAttach = async (materialId: string) => {
+    try {
+      await attachMaterialToSession(session.id, materialId)
+      setActiveMaterialId(materialId)
+      setShowAdd(false)
+    } catch {
+      toast.error(t.timer.cannotAttachMaterial)
     }
-  }, [persistProgress])
-
-  const renderPlayer = () => {
-    if (!material) return null
-    if (material.kind === 'video-youtube') {
-      const videoId = material.metadata?.youtubeVideoId
-      if (!videoId) {
-        return (
-          <p className="rounded-2xl bg-surface p-5 text-sm text-[color:var(--color-text-muted)]">
-            {t.materials.errors.metadataInvalidUrl}
-          </p>
-        )
-      }
-      return (
-        <YouTubePlayer
-          videoId={videoId}
-          onReady={handlePlayerReady}
-          onStateChange={handlePlayerStateChange}
-          fullscreenLabel={t.timer.videoFullscreen}
-        />
-      )
-    }
-    if (material.kind === 'video-upload') {
-      const blobId = material.fileBlobKey
-      if (!blobId) {
-        return (
-          <p className="rounded-2xl bg-surface p-5 text-sm text-[color:var(--color-text-muted)]">
-            {t.materials.errors.fileRequired}
-          </p>
-        )
-      }
-      return (
-        <LocalVideoPlayer
-          blobId={blobId}
-          onReady={handlePlayerReady}
-          onStateChange={handlePlayerStateChange}
-          fullscreenLabel={t.timer.videoFullscreen}
-        />
-      )
-    }
-    return null
   }
 
   return (
@@ -194,17 +130,16 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
             <p className="truncate text-xs font-medium text-[color:var(--color-text-muted)]">
               {goal ? goal.name : t.common.freeSession}
             </p>
-            <p className="truncate text-sm font-semibold text-charcoal">
-              {material?.title ?? ''}
-            </p>
+            {activeMaterial && (
+              <p className="truncate text-sm font-semibold text-charcoal">
+                {activeMaterial.title}
+              </p>
+            )}
             {isPaused && (
               <p className="mt-0.5 text-xs font-medium text-apricot">{t.timer.paused}</p>
             )}
           </div>
-          <p
-            className="text-2xl font-bold text-charcoal tabular-nums"
-            aria-live="polite"
-          >
+          <p className="text-2xl font-bold text-charcoal tabular-nums" aria-live="polite">
             {formatDuration(elapsed)}
           </p>
         </div>
@@ -247,9 +182,110 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
         </button>
       </div>
 
-      {renderPlayer()}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {attachedMaterials.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            onClick={() => setActiveMaterialId(m.id)}
+            aria-pressed={activeMaterialId === m.id}
+            className={clsx(
+              'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors',
+              activeMaterialId === m.id
+                ? 'bg-apricot text-white'
+                : 'bg-cream text-charcoal ring-1 ring-[color:var(--color-border)]',
+            )}
+          >
+            {kindIcon(m.kind)}
+            <span className="max-w-[10rem] truncate">{m.title}</span>
+          </button>
+        ))}
+        {(session.goalId !== null && notYetAttached.length > 0) || attachedMaterials.length === 0 ? (
+          <button
+            type="button"
+            onClick={() => setShowAdd((v) => !v)}
+            aria-expanded={showAdd}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-charcoal px-3 py-1.5 text-xs font-semibold text-white transition-colors"
+          >
+            <Plus size={14} aria-hidden="true" />
+            {t.timer.addMaterial}
+          </button>
+        ) : null}
+      </div>
+
+      {showAdd && (
+        <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-charcoal">
+              {t.timer.attachMaterialTitle}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowAdd(false)}
+              aria-label={t.common.cancel}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-[color:var(--color-text-muted)] hover:bg-cream hover:text-charcoal"
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
+          {session.goalId === null ? (
+            <p className="text-xs text-[color:var(--color-text-muted)]">
+              {t.timer.attachRequiresGoal}
+            </p>
+          ) : notYetAttached.length === 0 ? (
+            <p className="text-xs text-[color:var(--color-text-muted)]">
+              {t.timer.attachEmpty}
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {notYetAttached.map((m) => (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onClick={() => handleAttach(m.id)}
+                    className="flex w-full items-center gap-3 rounded-xl bg-cream px-3 py-2 text-left ring-1 ring-[color:var(--color-border)] transition-colors hover:bg-peach"
+                  >
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-peach text-charcoal">
+                      {kindIcon(m.kind)}
+                    </span>
+                    <span className="line-clamp-2 flex-1 text-xs font-medium text-charcoal">
+                      {m.title}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {activeMaterial && (
+        <TimerActiveMaterial
+          key={activeMaterial.id}
+          session={session}
+          material={activeMaterial}
+          onPlayerStateChange={handlePlayerStateChange}
+        />
+      )}
     </div>
   )
+}
+
+function kindIcon(kind: MaterialKind) {
+  switch (kind) {
+    case 'link':
+      return <LinkIcon size={14} aria-hidden="true" />
+    case 'note':
+      return <StickyNote size={14} aria-hidden="true" />
+    case 'video-youtube':
+      return <PlaySquare size={14} aria-hidden="true" />
+    case 'video-upload':
+      return <Film size={14} aria-hidden="true" />
+    case 'pdf':
+      return <FileText size={14} aria-hidden="true" />
+    default:
+      return <StickyNote size={14} aria-hidden="true" />
+  }
 }
 
 export default TimerMaterialSession

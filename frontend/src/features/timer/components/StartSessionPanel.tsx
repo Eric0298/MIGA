@@ -9,32 +9,38 @@ type StartSessionPanelProps = {
   onStarted?: () => void
   onCancel?: () => void
   initialGoalId?: string | null
-  initialMaterialId?: string | null
+  initialMaterialIds?: string[]
 }
 
 function StartSessionPanel({
   onStarted,
   onCancel,
   initialGoalId,
-  initialMaterialId,
+  initialMaterialIds,
 }: StartSessionPanelProps) {
   const { t } = useT()
   const [goalId, setGoalId] = useState<string | null>(initialGoalId ?? null)
-  const [materialId, setMaterialId] = useState<string | null>(initialMaterialId ?? null)
+  const [materialIds, setMaterialIds] = useState<string[]>(initialMaterialIds ?? [])
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    setMaterialId(null)
+    setMaterialIds([])
   }, [goalId])
 
   useEffect(() => {
-    if (initialMaterialId) setMaterialId(initialMaterialId)
-  }, [initialMaterialId])
+    if (initialMaterialIds && initialMaterialIds.length > 0) setMaterialIds(initialMaterialIds)
+  }, [initialMaterialIds])
+
+  const toggleMaterial = (id: string) => {
+    setMaterialIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    )
+  }
 
   const handleStart = async () => {
     try {
       setSubmitting(true)
-      await startSession({ goalId, materialId })
+      await startSession({ goalId, materialIds })
       toast.success(t.timer.sessionStarted)
       onStarted?.()
     } catch (error) {
@@ -59,7 +65,7 @@ function StartSessionPanel({
 
       <GoalPicker value={goalId} onChange={setGoalId} />
 
-      <MaterialPicker goalId={goalId} value={materialId} onChange={setMaterialId} />
+      <MaterialPicker goalId={goalId} values={materialIds} onToggle={toggleMaterial} />
 
       <div className="flex gap-3">
         <button

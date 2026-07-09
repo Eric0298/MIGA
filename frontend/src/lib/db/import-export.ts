@@ -32,8 +32,12 @@ const sessionV1Schema = z.object({
   updatedAt: z.number(),
 })
 
-const sessionRecordSchema = sessionV1Schema.extend({
+const sessionV3Schema = sessionV1Schema.extend({
   materialId: z.string().nullable().optional(),
+})
+
+const sessionRecordSchema = sessionV1Schema.extend({
+  materialIds: z.array(z.string()),
 })
 
 const materialRecordSchema = z.object({
@@ -70,7 +74,7 @@ const materialProgressRecordSchema = z.object({
   updatedAt: z.number(),
 })
 
-export const CURRENT_EXPORT_VERSION = 3
+export const CURRENT_EXPORT_VERSION = 4
 
 const payloadV1Schema = z.object({
   version: z.literal(1),
@@ -92,6 +96,16 @@ const payloadV3Schema = z.object({
   version: z.literal(3),
   exportedAt: z.number(),
   goals: z.array(goalRecordSchema),
+  sessions: z.array(sessionV3Schema),
+  materials: z.array(materialRecordSchema),
+  materialGoalLinks: z.array(materialGoalLinkRecordSchema),
+  materialProgress: z.array(materialProgressRecordSchema),
+})
+
+const payloadV4Schema = z.object({
+  version: z.literal(4),
+  exportedAt: z.number(),
+  goals: z.array(goalRecordSchema),
   sessions: z.array(sessionRecordSchema),
   materials: z.array(materialRecordSchema),
   materialGoalLinks: z.array(materialGoalLinkRecordSchema),
@@ -102,9 +116,10 @@ export const exportPayloadSchema = z.union([
   payloadV1Schema,
   payloadV2Schema,
   payloadV3Schema,
+  payloadV4Schema,
 ])
 
-export type ExportPayload = z.infer<typeof payloadV3Schema>
+export type ExportPayload = z.infer<typeof payloadV4Schema>
 
 export type ImportResult = {
   goalsCount: number
@@ -140,10 +155,10 @@ export function parseImportPayload(raw: unknown): ExportPayload {
   const parsed = exportPayloadSchema.parse(raw)
   if (parsed.version === 1) {
     return {
-      version: 3,
+      version: 4,
       exportedAt: parsed.exportedAt,
       goals: parsed.goals,
-      sessions: parsed.sessions.map((s) => ({ ...s, materialId: null })),
+      sessions: parsed.sessions.map((s) => ({ ...s, materialIds: [] })),
       materials: [],
       materialGoalLinks: [],
       materialProgress: [],
@@ -151,13 +166,27 @@ export function parseImportPayload(raw: unknown): ExportPayload {
   }
   if (parsed.version === 2) {
     return {
-      version: 3,
+      version: 4,
       exportedAt: parsed.exportedAt,
       goals: parsed.goals,
-      sessions: parsed.sessions.map((s) => ({ ...s, materialId: null })),
+      sessions: parsed.sessions.map((s) => ({ ...s, materialIds: [] })),
       materials: parsed.materials,
       materialGoalLinks: parsed.materialGoalLinks,
       materialProgress: [],
+    }
+  }
+  if (parsed.version === 3) {
+    return {
+      version: 4,
+      exportedAt: parsed.exportedAt,
+      goals: parsed.goals,
+      sessions: parsed.sessions.map((s) => {
+        const { materialId, ...rest } = s
+        return { ...rest, materialIds: materialId ? [materialId] : [] }
+      }),
+      materials: parsed.materials,
+      materialGoalLinks: parsed.materialGoalLinks,
+      materialProgress: parsed.materialProgress,
     }
   }
   return parsed
@@ -170,7 +199,7 @@ export async function importAllData(payload: ExportPayload): Promise<ImportResul
   const sessions: Session[] = payload.sessions.map((s) => {
     const normalized: Session = {
       ...s,
-      materialId: s.materialId ?? null,
+      materialIds: Array.isArray(s.materialIds) ? s.materialIds : [],
     }
     if (normalized.status === 'running' || normalized.status === 'paused') {
       normalizedActiveSessions += 1

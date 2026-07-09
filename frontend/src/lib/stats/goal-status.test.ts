@@ -20,7 +20,7 @@ function completed(overrides: Partial<Session>): Session {
   return {
     id: crypto.randomUUID(),
     goalId: 'goal-1',
-    materialId: null,
+    materialIds: [],
     startedAt: now,
     pausedAt: null,
     endedAt: now + 60_000,

@@ -19,7 +19,7 @@ afterEach(async () => {
   await db.materialProgress.clear()
 })
 
-describe('import-export v3', () => {
+describe('import-export v4', () => {
   it('builds an export payload with current goals, sessions, materials and links', async () => {
     const goal = await createGoal({
       name: 'Estudiar',
@@ -70,16 +70,46 @@ describe('import-export v3', () => {
       ],
       sessions: [],
     })
-    expect(parsed.version).toBe(3)
+    expect(parsed.version).toBe(4)
     expect(parsed.materials).toEqual([])
     expect(parsed.materialGoalLinks).toEqual([])
     expect(parsed.materialProgress).toEqual([])
+    for (const s of parsed.sessions) expect(Array.isArray(s.materialIds)).toBe(true)
 
     const result = await importAllData(parsed)
     expect(result.goalsCount).toBe(1)
     expect(result.materialsCount).toBe(0)
     expect(result.linksCount).toBe(0)
     expect(result.progressCount).toBe(0)
+  })
+
+  it('migrates a v3 payload wrapping materialId in materialIds', async () => {
+    const now = Date.now()
+    const parsed = parseImportPayload({
+      version: 3,
+      exportedAt: now,
+      goals: [],
+      sessions: [
+        {
+          id: 'sess-1',
+          goalId: null,
+          materialId: 'mat-abc',
+          startedAt: now,
+          pausedAt: null,
+          endedAt: now + 1_000,
+          totalPausedMs: 0,
+          status: 'completed',
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      materials: [],
+      materialGoalLinks: [],
+      materialProgress: [],
+    })
+    expect(parsed.version).toBe(4)
+    expect(parsed.sessions).toHaveLength(1)
+    expect(parsed.sessions[0].materialIds).toEqual(['mat-abc'])
   })
 
   it('completes a v2 round trip including materials', async () => {

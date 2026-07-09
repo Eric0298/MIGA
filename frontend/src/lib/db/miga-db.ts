@@ -74,7 +74,7 @@ class MigaDatabase extends Dexie {
       })
       .upgrade(async (tx) => {
         await tx
-          .table<Session>('sessions')
+          .table<Session & { materialId?: string | null }>('sessions')
           .toCollection()
           .modify((session) => {
             if (session.materialId === undefined) {
@@ -91,6 +91,28 @@ class MigaDatabase extends Dexie {
       materialProgress: '&id, materialId, goalId, sessionId, createdAt, endedAt',
       materialBlobs: '&id, materialId, createdAt',
     })
+
+    // v7 — a Session now holds an array of materials instead of a single one.
+    this.version(7)
+      .stores({
+        goals: '&id, createdAt, updatedAt',
+        sessions: '&id, goalId, status, startedAt, endedAt',
+        materials: '&id, kind, createdAt, updatedAt',
+        materialGoalLinks: '&id, materialId, goalId, [materialId+goalId], createdAt',
+        materialProgress: '&id, materialId, goalId, sessionId, createdAt, endedAt',
+        materialBlobs: '&id, materialId, createdAt',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table<Session & { materialId?: string | null }>('sessions')
+          .toCollection()
+          .modify((session) => {
+            if (!Array.isArray(session.materialIds)) {
+              session.materialIds = session.materialId ? [session.materialId] : []
+            }
+            delete session.materialId
+          })
+      })
   }
 }
 
