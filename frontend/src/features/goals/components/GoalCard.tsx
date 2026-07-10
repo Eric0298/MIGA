@@ -1,9 +1,14 @@
 import { Trash2 } from 'lucide-react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
-import type { Goal, Session } from '@/lib/db/schema'
+import type { ExamAttempt, Goal, Session } from '@/lib/db/schema'
 import { deleteGoal } from '@/lib/db/goals.repository'
-import { filterCompletedByGoal, sumElapsedMs } from '@/lib/stats/sessions-stats'
+import {
+  filterCompletedByGoal,
+  filterFinishedExamsByGoal,
+  sumElapsedMs,
+  sumExamElapsedMs,
+} from '@/lib/stats/sessions-stats'
 import { useT } from '@/i18n/i18n-context'
 import { tpl } from '@/i18n/tpl'
 import GoalProgress from './GoalProgress'
@@ -11,12 +16,14 @@ import GoalProgress from './GoalProgress'
 type GoalCardProps = {
   goal: Goal
   sessions: Session[]
+  examAttempts?: ExamAttempt[]
 }
 
-function GoalCard({ goal, sessions }: GoalCardProps) {
+function GoalCard({ goal, sessions, examAttempts = [] }: GoalCardProps) {
   const { t } = useT()
   const goalSessions = filterCompletedByGoal(sessions, goal.id)
-  const currentMs = sumElapsedMs(goalSessions)
+  const goalExams = filterFinishedExamsByGoal(examAttempts, goal.id)
+  const currentMs = sumElapsedMs(goalSessions) + sumExamElapsedMs(goalExams)
   const dayCount = goal.scheduledDays.length
 
   const handleDelete = async () => {

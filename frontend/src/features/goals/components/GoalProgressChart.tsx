@@ -7,7 +7,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { Goal, Session } from '@/lib/db/schema'
+import type { ExamAttempt, Goal, Session } from '@/lib/db/schema'
 import { buildProgressSeries } from '@/lib/stats/progress-series'
 import { useT } from '@/i18n/i18n-context'
 import { formatMinutes } from '../utils'
@@ -15,12 +15,18 @@ import { formatMinutes } from '../utils'
 type GoalProgressChartProps = {
   goal: Goal
   sessions: Session[]
+  examAttempts?: ExamAttempt[]
   todayIso: string
 }
 
-function GoalProgressChart({ goal, sessions, todayIso }: GoalProgressChartProps) {
+function GoalProgressChart({
+  goal,
+  sessions,
+  examAttempts = [],
+  todayIso,
+}: GoalProgressChartProps) {
   const { t, locale } = useT()
-  const data = buildProgressSeries(goal, sessions, todayIso, locale)
+  const data = buildProgressSeries(goal, sessions, todayIso, locale, examAttempts)
 
   if (data.length === 0) {
     return (

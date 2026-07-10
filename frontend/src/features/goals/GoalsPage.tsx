@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Target } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
 import { useCompletedSessions } from '@/features/sessions/hooks/use-completed-sessions'
+import { useAllExamAttempts } from '@/features/exams/hooks/use-all-exam-attempts'
 import { useT } from '@/i18n/i18n-context'
 import { useLiveGoals } from './hooks/use-goals'
 import GoalForm from './components/GoalForm'
@@ -12,6 +13,7 @@ function GoalsPage() {
   const [showForm, setShowForm] = useState(false)
   const goals = useLiveGoals()
   const sessions = useCompletedSessions()
+  const examAttempts = useAllExamAttempts()
 
   const isLoading = goals === undefined
   const isEmpty = !isLoading && goals.length === 0
@@ -51,7 +53,12 @@ function GoalsPage() {
       {!isLoading && goals.length > 0 && (
         <ul className="flex flex-col gap-3">
           {goals.map((goal) => (
-            <GoalCard key={goal.id} goal={goal} sessions={sessions ?? []} />
+            <GoalCard
+              key={goal.id}
+              goal={goal}
+              sessions={sessions ?? []}
+              examAttempts={examAttempts ?? []}
+            />
           ))}
         </ul>
       )}

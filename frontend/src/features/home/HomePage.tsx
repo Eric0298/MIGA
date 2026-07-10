@@ -6,6 +6,7 @@ import EmptyState from '@/components/ui/EmptyState'
 import { useActiveSession } from '@/features/timer/hooks/use-active-session'
 import { useCompletedSessions } from '@/features/sessions/hooks/use-completed-sessions'
 import { useLiveGoals } from '@/features/goals/hooks/use-goals'
+import { useAllExamAttempts } from '@/features/exams/hooks/use-all-exam-attempts'
 import { formatShortDuration, getElapsedMs } from '@/features/timer/utils'
 import { formatDayRelative } from '@/features/goals/utils'
 import { filterCompletedByDay, sumElapsedMs, toLocalIsoDay } from '@/lib/stats/sessions-stats'
@@ -22,6 +23,7 @@ function HomePage() {
   const active = useActiveSession()
   const sessions = useCompletedSessions()
   const goals = useLiveGoals()
+  const examAttempts = useAllExamAttempts()
   const isLoading = active === undefined || sessions === undefined || goals === undefined
 
   const today = toLocalIsoDay(Date.now())
@@ -113,7 +115,7 @@ function HomePage() {
           <h2 className="text-sm font-medium text-charcoal">{t.home.yourGoals}</h2>
           <ul className="mt-3 flex flex-col gap-2">
             {goals.map((g) => {
-              const info = computeGoalStatus(g, sessions ?? [], today)
+              const info = computeGoalStatus(g, sessions ?? [], today, examAttempts ?? [])
               return (
                 <li key={g.id}>
                   <Link

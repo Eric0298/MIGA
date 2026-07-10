@@ -402,6 +402,11 @@ export const va: Messages = {
     plannedDayOne: '{count} dia planificat',
     plannedDayOther: '{count} dies planificats',
     progressViewLabel: 'Vista de progrés',
+    examSection: 'Exàmens d’esta meta',
+    examOpen: 'Vore tots',
+    examAttempts: 'Intents',
+    examTime: 'Temps',
+    examAverage: 'Mitjana',
   },
   calendar: {
     week: 'Set',

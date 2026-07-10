@@ -1,5 +1,10 @@
-import type { Goal, Session } from '@/lib/db/schema'
-import { filterCompletedByGoal, sumElapsedMs } from './sessions-stats'
+import type { ExamAttempt, Goal, Session } from '@/lib/db/schema'
+import {
+  filterCompletedByGoal,
+  filterFinishedExamsByGoal,
+  sumElapsedMs,
+  sumExamElapsedMs,
+} from './sessions-stats'
 
 export type GoalStatus = 'not-started' | 'on-track' | 'ahead' | 'behind' | 'complete'
 
@@ -19,11 +24,13 @@ export function computeGoalStatus(
   goal: Goal,
   sessions: Session[],
   todayIso: string,
+  examAttempts: ExamAttempt[] = [],
 ): GoalStatusResult {
   const totalPlannedDays = goal.scheduledDays.length
   const targetMs = goal.targetMinutes * 60_000
   const goalSessions = filterCompletedByGoal(sessions, goal.id)
-  const actualMs = sumElapsedMs(goalSessions)
+  const goalExams = filterFinishedExamsByGoal(examAttempts, goal.id)
+  const actualMs = sumElapsedMs(goalSessions) + sumExamElapsedMs(goalExams)
 
   const pastCompletedPlannedDays = goal.scheduledDays.filter((d) => d < todayIso).length
   const firstPlannedDay = totalPlannedDays > 0 ? [...goal.scheduledDays].sort()[0] : null

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Goal, Session } from '@/lib/db/schema'
+import type { ExamAttempt, Goal, Session } from '@/lib/db/schema'
 import { computeGoalStatus } from './goal-status'
 
 function makeGoal(overrides: Partial<Goal>): Goal {
@@ -143,6 +143,68 @@ describe('computeGoalStatus', () => {
     })
     const result = computeGoalStatus(goal, [], '2026-07-10')
     expect(result.pastCompletedPlannedDays).toBe(0)
+    expect(result.status).toBe('on-track')
+  })
+
+  it('counts finished exam attempts toward actualMs', () => {
+    const goal = makeGoal({
+      scheduledDays: ['2026-07-10', '2026-07-15'],
+      targetMinutes: 120,
+    })
+    const now = 1_700_000_000_000
+    const exam: ExamAttempt = {
+      id: 'e1',
+      goalId: 'goal-1',
+      kind: 'questions',
+      title: 't',
+      startedAt: new Date(2026, 6, 10, 9).getTime(),
+      pausedAt: null,
+      endedAt: new Date(2026, 6, 10, 9, 30).getTime(),
+      totalPausedMs: 0,
+      status: 'completed',
+      timeLimitMs: null,
+      score: 5,
+      maxScore: 10,
+      notes: '',
+      questionIds: ['q1'],
+      responses: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+    const result = computeGoalStatus(goal, [], '2026-07-10', [exam])
+    expect(result.actualMs).toBe(30 * 60_000)
+    expect(result.status).toBe('ahead')
+  })
+
+  it('ignores discarded and in-progress exam attempts', () => {
+    const goal = makeGoal({
+      scheduledDays: ['2026-07-10', '2026-07-15'],
+      targetMinutes: 120,
+    })
+    const now = 1_700_000_000_000
+    const makeExam = (status: ExamAttempt['status'], endedAt: number | null): ExamAttempt => ({
+      id: crypto.randomUUID(),
+      goalId: 'goal-1',
+      kind: 'pdf',
+      title: 't',
+      startedAt: new Date(2026, 6, 10, 9).getTime(),
+      pausedAt: null,
+      endedAt,
+      totalPausedMs: 0,
+      status,
+      timeLimitMs: null,
+      score: null,
+      maxScore: null,
+      notes: '',
+      createdAt: now,
+      updatedAt: now,
+    })
+    const attempts: ExamAttempt[] = [
+      makeExam('discarded', new Date(2026, 6, 10, 10).getTime()),
+      makeExam('in-progress', null),
+    ]
+    const result = computeGoalStatus(goal, [], '2026-07-10', attempts)
+    expect(result.actualMs).toBe(0)
     expect(result.status).toBe('on-track')
   })
 })

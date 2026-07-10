@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import type { Session } from '@/lib/db/schema'
+import type { ExamAttempt, Session } from '@/lib/db/schema'
 import {
   filterCompletedByDay,
   filterCompletedByGoal,
+  filterFinishedExamsByGoal,
   groupCompletedMsByDay,
+  groupExamMsByDay,
   sumElapsedMs,
+  sumExamElapsedMs,
   toLocalIsoDay,
 } from './sessions-stats'
 
@@ -84,5 +87,65 @@ describe('sessions-stats', () => {
       completed({ startedAt: 0, endedAt: 120_000, totalPausedMs: 20_000 }),
     ]
     expect(sumElapsedMs(sessions)).toBe(50_000 + 100_000)
+  })
+})
+
+function examAttempt(overrides: Partial<ExamAttempt>): ExamAttempt {
+  const base = 1_700_000_000_000
+  return {
+    id: overrides.id ?? crypto.randomUUID(),
+    goalId: 'goal-a',
+    kind: 'pdf',
+    title: 't',
+    startedAt: base,
+    pausedAt: null,
+    endedAt: base + 60_000,
+    totalPausedMs: 0,
+    status: 'graded',
+    timeLimitMs: null,
+    score: 8,
+    maxScore: 10,
+    notes: '',
+    createdAt: base,
+    updatedAt: base,
+    ...overrides,
+  }
+}
+
+describe('exam-attempt stats', () => {
+  it('filters finished exams by goal, skipping discarded and active', () => {
+    const attempts: ExamAttempt[] = [
+      examAttempt({ goalId: 'goal-a', status: 'graded' }),
+      examAttempt({ goalId: 'goal-a', status: 'completed' }),
+      examAttempt({ goalId: 'goal-a', status: 'in-progress', endedAt: null }),
+      examAttempt({ goalId: 'goal-a', status: 'discarded' }),
+      examAttempt({ goalId: 'goal-b', status: 'graded' }),
+    ]
+    const result = filterFinishedExamsByGoal(attempts, 'goal-a')
+    expect(result).toHaveLength(2)
+    expect(result.every((a) => a.goalId === 'goal-a')).toBe(true)
+  })
+
+  it('sums exam elapsed ms discounting paused time', () => {
+    const attempts: ExamAttempt[] = [
+      examAttempt({ startedAt: 0, endedAt: 60_000, totalPausedMs: 10_000 }),
+      examAttempt({ startedAt: 0, endedAt: 120_000, totalPausedMs: 20_000 }),
+    ]
+    expect(sumExamElapsedMs(attempts)).toBe(50_000 + 100_000)
+  })
+
+  it('groups exam ms by the day the attempt finished', () => {
+    const dayA = new Date(2026, 6, 15, 10, 0, 0).getTime()
+    const dayB = new Date(2026, 6, 16, 10, 0, 0).getTime()
+    const attempts: ExamAttempt[] = [
+      examAttempt({ startedAt: dayA, endedAt: dayA + 60_000, totalPausedMs: 0 }),
+      examAttempt({ startedAt: dayA, endedAt: dayA + 120_000, totalPausedMs: 20_000 }),
+      examAttempt({ startedAt: dayB, endedAt: dayB + 30_000, totalPausedMs: 0 }),
+      examAttempt({ status: 'discarded', endedAt: dayA + 999 }),
+    ]
+    const grouped = groupExamMsByDay(attempts)
+    expect(grouped.get('2026-07-15')).toBe(60_000 + 100_000)
+    expect(grouped.get('2026-07-16')).toBe(30_000)
+    expect(grouped.size).toBe(2)
   })
 })

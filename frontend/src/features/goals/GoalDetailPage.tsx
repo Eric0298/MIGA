@@ -1,16 +1,20 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { ArrowLeft, BarChart3, CalendarDays, Clock, Trash2 } from 'lucide-react'
+import { ArrowLeft, BarChart3, CalendarDays, Clock, GraduationCap, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { clsx } from 'clsx'
 import { useLiveGoal } from './hooks/use-goal'
 import { useCompletedSessions } from '@/features/sessions/hooks/use-completed-sessions'
+import { useExamAttemptsByGoal } from '@/features/exams/hooks/use-exam-attempts-by-goal'
 import { deleteSession } from '@/lib/db/sessions.repository'
 import {
   filterCompletedByGoal,
+  filterFinishedExamsByGoal,
   groupCompletedMsByDay,
+  groupExamMsByDay,
   sumElapsedMs,
+  sumExamElapsedMs,
   toLocalIsoDay,
 } from '@/lib/stats/sessions-stats'
 import { formatShortDuration, getElapsedMs } from '@/features/timer/utils'
@@ -36,6 +40,7 @@ function GoalDetailPage() {
   const { id } = useParams<{ id: string }>()
   const goal = useLiveGoal(id)
   const sessions = useCompletedSessions()
+  const examAttempts = useExamAttemptsByGoal(goal?.id)
   const materials = useMaterialsByGoal(goal?.id)
   const goalVideoWatchedMs = useGoalVideoWatchedMs(goal?.id)
   const [view, setView] = useState<View>('calendar')
@@ -47,11 +52,35 @@ function GoalDetailPage() {
     () => (goal && sessions ? filterCompletedByGoal(sessions, goal.id) : []),
     [goal, sessions],
   )
-  const currentMs = sumElapsedMs(goalSessions)
+  const goalExams = useMemo(
+    () => (goal && examAttempts ? filterFinishedExamsByGoal(examAttempts, goal.id) : []),
+    [goal, examAttempts],
+  )
+  const currentMs = sumElapsedMs(goalSessions) + sumExamElapsedMs(goalExams)
   const workedDays = useMemo(() => {
-    const grouped = groupCompletedMsByDay(goalSessions)
-    return new Set(grouped.keys())
-  }, [goalSessions])
+    const sessionDays = groupCompletedMsByDay(goalSessions)
+    const examDays = groupExamMsByDay(goalExams)
+    return new Set<string>([...sessionDays.keys(), ...examDays.keys()])
+  }, [goalSessions, goalExams])
+  const gradedExams = useMemo(
+    () =>
+      goalExams.filter(
+        (a) =>
+          (a.status === 'graded' || a.status === 'completed') &&
+          a.score !== null &&
+          a.maxScore !== null &&
+          a.maxScore > 0,
+      ),
+    [goalExams],
+  )
+  const avgExamPercent = useMemo(() => {
+    if (gradedExams.length === 0) return null
+    const total = gradedExams.reduce(
+      (sum, a) => sum + (a.score as number) / (a.maxScore as number),
+      0,
+    )
+    return Math.round((total / gradedExams.length) * 100)
+  }, [gradedExams])
   const scheduledDays = useMemo(() => new Set(goal?.scheduledDays ?? []), [goal?.scheduledDays])
 
   const handleDeleteSession = async (sessionId: string) => {
@@ -154,7 +183,12 @@ function GoalDetailPage() {
               <GoalCalendarView scheduledDays={scheduledDays} workedDays={workedDays} />
             ) : (
               <Suspense fallback={<Loading />}>
-                <GoalProgressChart goal={goal} sessions={sessions ?? []} todayIso={todayIsoStr} />
+                <GoalProgressChart
+                  goal={goal}
+                  sessions={sessions ?? []}
+                  examAttempts={examAttempts ?? []}
+                  todayIso={todayIsoStr}
+                />
               </Suspense>
             )}
           </section>
@@ -198,6 +232,49 @@ function GoalDetailPage() {
               </ul>
             )}
           </section>
+
+          {goalExams.length > 0 && (
+            <section className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-medium text-charcoal">
+                  {t.goalDetail.examSection}
+                </h2>
+                <Link
+                  to={`/app/examenes/${goal.id}`}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-cream px-3 py-1.5 text-xs font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] transition active:scale-[0.98]"
+                >
+                  <GraduationCap size={14} aria-hidden="true" />
+                  {t.goalDetail.examOpen}
+                </Link>
+              </div>
+              <div className="grid grid-cols-3 gap-2 rounded-2xl bg-surface p-4">
+                <div className="flex flex-col items-center gap-0.5">
+                  <p className="text-lg font-bold text-charcoal tabular-nums">
+                    {goalExams.length}
+                  </p>
+                  <p className="text-[10px] font-medium text-[color:var(--color-text-muted)]">
+                    {t.goalDetail.examAttempts}
+                  </p>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                  <p className="text-lg font-bold text-charcoal tabular-nums">
+                    {formatShortDuration(sumExamElapsedMs(goalExams))}
+                  </p>
+                  <p className="text-[10px] font-medium text-[color:var(--color-text-muted)]">
+                    {t.goalDetail.examTime}
+                  </p>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                  <p className="text-lg font-bold text-charcoal tabular-nums">
+                    {avgExamPercent !== null ? `${avgExamPercent}%` : '—'}
+                  </p>
+                  <p className="text-[10px] font-medium text-[color:var(--color-text-muted)]">
+                    {t.goalDetail.examAverage}
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
 
           <section className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3">

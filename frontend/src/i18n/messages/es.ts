@@ -401,6 +401,11 @@ export const es = {
     plannedDayOne: '{count} día planificado',
     plannedDayOther: '{count} días planificados',
     progressViewLabel: 'Vista de progreso',
+    examSection: 'Exámenes de esta meta',
+    examOpen: 'Ver todos',
+    examAttempts: 'Intentos',
+    examTime: 'Tiempo',
+    examAverage: 'Media',
   },
   calendar: {
     week: 'Sem',

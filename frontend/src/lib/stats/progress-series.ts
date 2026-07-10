@@ -1,8 +1,13 @@
 import { format, type Locale } from 'date-fns'
 import { es } from 'date-fns/locale'
-import type { Goal, Session } from '@/lib/db/schema'
+import type { ExamAttempt, Goal, Session } from '@/lib/db/schema'
 import { fromIso } from '@/features/goals/utils'
-import { filterCompletedByGoal, groupCompletedMsByDay } from './sessions-stats'
+import {
+  filterCompletedByGoal,
+  filterFinishedExamsByGoal,
+  groupCompletedMsByDay,
+  groupExamMsByDay,
+} from './sessions-stats'
 
 export type ProgressPoint = {
   day: string
@@ -16,6 +21,7 @@ export function buildProgressSeries(
   sessions: Session[],
   todayIso: string,
   locale: Locale = es,
+  examAttempts: ExamAttempt[] = [],
 ): ProgressPoint[] {
   const total = goal.scheduledDays.length
   if (total === 0) return []
@@ -23,10 +29,13 @@ export function buildProgressSeries(
   const targetMinutes = goal.targetMinutes
   const sortedPlanned = [...goal.scheduledDays].sort()
   const goalSessions = filterCompletedByGoal(sessions, goal.id)
-  const msByDay = groupCompletedMsByDay(goalSessions)
+  const goalExams = filterFinishedExamsByGoal(examAttempts, goal.id)
+  const sessionMsByDay = groupCompletedMsByDay(goalSessions)
+  const examMsByDay = groupExamMsByDay(goalExams)
 
   const daySet = new Set<string>(sortedPlanned)
-  for (const day of msByDay.keys()) daySet.add(day)
+  for (const day of sessionMsByDay.keys()) daySet.add(day)
+  for (const day of examMsByDay.keys()) daySet.add(day)
   const firstPlanned = sortedPlanned[0]
   const lastPlanned = sortedPlanned[sortedPlanned.length - 1]
   if (todayIso >= firstPlanned && todayIso <= lastPlanned) {
@@ -38,7 +47,7 @@ export function buildProgressSeries(
   let cumulativeReal = 0
 
   for (const day of days) {
-    const stepMs = msByDay.get(day) ?? 0
+    const stepMs = (sessionMsByDay.get(day) ?? 0) + (examMsByDay.get(day) ?? 0)
     cumulativeReal += Math.round(stepMs / 60_000)
 
     const plannedUpToDay = sortedPlanned.filter((d) => d <= day).length

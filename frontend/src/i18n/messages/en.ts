@@ -400,6 +400,11 @@ export const en: Messages = {
     plannedDayOne: '{count} planned day',
     plannedDayOther: '{count} planned days',
     progressViewLabel: 'Progress view',
+    examSection: 'Exams for this goal',
+    examOpen: 'See all',
+    examAttempts: 'Attempts',
+    examTime: 'Time',
+    examAverage: 'Average',
   },
   calendar: {
     week: 'Wk',
