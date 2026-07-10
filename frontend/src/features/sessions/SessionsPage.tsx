@@ -4,6 +4,7 @@ import { clsx } from 'clsx'
 import EmptyState from '@/components/ui/EmptyState'
 import Loading from '@/components/ui/Loading'
 import { useT } from '@/i18n/i18n-context'
+import { useAllExamAttempts } from '@/features/exams/hooks/use-all-exam-attempts'
 import { useCompletedSessions } from './hooks/use-completed-sessions'
 import SessionCard from './components/SessionCard'
 
@@ -15,6 +16,7 @@ function SessionsPage() {
   const { t } = useT()
   const [view, setView] = useState<View>('list')
   const sessions = useCompletedSessions()
+  const examAttempts = useAllExamAttempts()
   const isLoading = sessions === undefined
   const isEmpty = !isLoading && sessions.length === 0
 
@@ -83,7 +85,7 @@ function SessionsPage() {
 
       {!isLoading && view === 'stats' && (
         <Suspense fallback={<Loading />}>
-          <WeeklyStats sessions={sessions} />
+          <WeeklyStats sessions={sessions} examAttempts={examAttempts ?? []} />
         </Suspense>
       )}
     </div>

@@ -4,6 +4,7 @@ import {
   filterCompletedByDay,
   filterCompletedByGoal,
   filterFinishedExamsByGoal,
+  getGoalExamScoreSeries,
   groupCompletedMsByDay,
   groupExamMsByDay,
   sumElapsedMs,
@@ -147,5 +148,79 @@ describe('exam-attempt stats', () => {
     expect(grouped.get('2026-07-15')).toBe(60_000 + 100_000)
     expect(grouped.get('2026-07-16')).toBe(30_000)
     expect(grouped.size).toBe(2)
+  })
+
+  it('builds the exam score series ordered by end date, skipping ungraded and other goals', () => {
+    const jul10 = new Date(2026, 6, 10, 10, 0, 0).getTime()
+    const jul12 = new Date(2026, 6, 12, 10, 0, 0).getTime()
+    const jul14 = new Date(2026, 6, 14, 10, 0, 0).getTime()
+    const attempts: ExamAttempt[] = [
+      examAttempt({
+        id: 'a-later',
+        goalId: 'goal-a',
+        endedAt: jul14,
+        status: 'graded',
+        score: 6,
+        maxScore: 10,
+        title: 'Later',
+      }),
+      examAttempt({
+        id: 'a-earlier',
+        goalId: 'goal-a',
+        endedAt: jul10,
+        status: 'graded',
+        score: 4,
+        maxScore: 10,
+        title: 'Earlier',
+      }),
+      examAttempt({
+        id: 'a-middle',
+        goalId: 'goal-a',
+        endedAt: jul12,
+        status: 'completed',
+        score: 8,
+        maxScore: 10,
+        title: 'Middle',
+      }),
+      examAttempt({
+        id: 'a-nograde',
+        goalId: 'goal-a',
+        endedAt: jul12,
+        status: 'pending-grade',
+        score: null,
+        maxScore: null,
+        title: 'Pending',
+      }),
+      examAttempt({
+        id: 'a-discarded',
+        goalId: 'goal-a',
+        endedAt: jul12,
+        status: 'discarded',
+        score: 5,
+        maxScore: 10,
+        title: 'Discarded',
+      }),
+      examAttempt({
+        id: 'other-goal',
+        goalId: 'goal-b',
+        endedAt: jul12,
+        status: 'graded',
+        score: 9,
+        maxScore: 10,
+        title: 'Other',
+      }),
+    ]
+    const series = getGoalExamScoreSeries(attempts, 'goal-a')
+    expect(series.map((p) => p.attemptId)).toEqual(['a-earlier', 'a-middle', 'a-later'])
+    expect(series.map((p) => p.percent)).toEqual([40, 80, 60])
+    expect(series[0].day).toBe('2026-07-10')
+  })
+
+  it('returns an empty score series when no attempt is graded', () => {
+    const attempts: ExamAttempt[] = [
+      examAttempt({ goalId: 'goal-a', status: 'pending-grade', score: null, maxScore: null }),
+      examAttempt({ goalId: 'goal-a', status: 'in-progress', endedAt: null }),
+    ]
+    expect(getGoalExamScoreSeries(attempts, 'goal-a')).toEqual([])
   })
 })

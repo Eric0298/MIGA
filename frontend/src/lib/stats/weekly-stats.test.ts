@@ -1,15 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import type { Session } from '@/lib/db/schema'
+import type { ExamAttempt, Session } from '@/lib/db/schema'
 import {
+  EXAM_KEY,
   FREE_SESSION_KEY,
+  countPreviousWeekExamAttempts,
+  countWeekExamAttempts,
   getCurrentStreakDays,
+  getPreviousWeekAvgExamPercent,
   getWeekActiveGoalKeys,
+  getWeekActiveKeysWithExams,
+  getWeekAvgExamPercent,
+  getWeekDailyExamMinutes,
   getWeekDailyMs,
   getWeekDailyMsByGoal,
   getWeekGoalRanking,
   getWeekRange,
   getWeekStackedDailyMs,
+  mergeExamMinutesIntoStackedRows,
+  sumPreviousWeekExamMs,
   sumPreviousWeekMs,
+  sumWeekExamMs,
   sumWeekMs,
 } from './weekly-stats'
 
@@ -160,5 +170,155 @@ describe('weekly-stats', () => {
     expect(rows).toHaveLength(7)
     expect(rows[0]).toMatchObject({ label: 'L', dayIndex: 0, 'goal-a': 30, 'goal-b': 20 })
     expect(rows[3]).toMatchObject({ label: 'J', 'goal-b': 45, [FREE_SESSION_KEY]: 15 })
+  })
+})
+
+function examAttempt(overrides: Partial<ExamAttempt>): ExamAttempt {
+  const base = 1_700_000_000_000
+  return {
+    id: overrides.id ?? crypto.randomUUID(),
+    goalId: 'goal-a',
+    kind: 'pdf',
+    title: 't',
+    startedAt: base,
+    pausedAt: null,
+    endedAt: base + 60_000,
+    totalPausedMs: 0,
+    status: 'graded',
+    timeLimitMs: null,
+    score: 8,
+    maxScore: 10,
+    notes: '',
+    createdAt: base,
+    updatedAt: base,
+    ...overrides,
+  }
+}
+
+function finishedAt(day: Date, minutes: number, overrides: Partial<ExamAttempt> = {}): ExamAttempt {
+  const end = day.getTime()
+  const start = end - minutes * 60_000
+  return examAttempt({ startedAt: start, endedAt: end, ...overrides })
+}
+
+describe('weekly-stats · exams', () => {
+  const reference = new Date(2026, 6, 15, 12)
+
+  it('sums exam time only for the reference week, skipping discarded and active', () => {
+    const attempts: ExamAttempt[] = [
+      finishedAt(new Date(2026, 6, 13, 10), 40, { status: 'graded' }),
+      finishedAt(new Date(2026, 6, 14, 10), 20, { status: 'completed' }),
+      finishedAt(new Date(2026, 6, 6, 10), 30, { status: 'graded' }),
+      finishedAt(new Date(2026, 6, 13, 12), 15, { status: 'discarded' }),
+    ]
+    expect(sumWeekExamMs(attempts, reference)).toBe((40 + 20) * 60_000)
+    expect(sumPreviousWeekExamMs(attempts, reference)).toBe(30 * 60_000)
+  })
+
+  it('counts weekly finished exam attempts', () => {
+    const attempts: ExamAttempt[] = [
+      finishedAt(new Date(2026, 6, 13, 10), 30, { status: 'graded' }),
+      finishedAt(new Date(2026, 6, 15, 10), 30, { status: 'completed' }),
+      finishedAt(new Date(2026, 6, 6, 10), 30, { status: 'graded' }),
+      finishedAt(new Date(2026, 6, 13, 12), 30, { status: 'discarded' }),
+    ]
+    expect(countWeekExamAttempts(attempts, reference)).toBe(2)
+    expect(countPreviousWeekExamAttempts(attempts, reference)).toBe(1)
+  })
+
+  it('averages the weekly score, ignoring ungraded and other weeks', () => {
+    const attempts: ExamAttempt[] = [
+      finishedAt(new Date(2026, 6, 13, 10), 30, { status: 'graded', score: 8, maxScore: 10 }),
+      finishedAt(new Date(2026, 6, 14, 10), 30, { status: 'graded', score: 4, maxScore: 10 }),
+      finishedAt(new Date(2026, 6, 14, 12), 30, {
+        status: 'pending-grade',
+        score: null,
+        maxScore: null,
+      }),
+      finishedAt(new Date(2026, 6, 6, 10), 30, { status: 'graded', score: 5, maxScore: 10 }),
+    ]
+    expect(getWeekAvgExamPercent(attempts, reference)).toBe(60)
+    expect(getPreviousWeekAvgExamPercent(attempts, reference)).toBe(50)
+  })
+
+  it('returns null avg when the week has no graded attempt', () => {
+    const attempts: ExamAttempt[] = [
+      finishedAt(new Date(2026, 6, 13, 10), 30, {
+        status: 'pending-grade',
+        score: null,
+        maxScore: null,
+      }),
+    ]
+    expect(getWeekAvgExamPercent(attempts, reference)).toBeNull()
+  })
+
+  it('buckets exam minutes into 7 daily slots (L..D)', () => {
+    const attempts: ExamAttempt[] = [
+      finishedAt(new Date(2026, 6, 13, 10), 20),
+      finishedAt(new Date(2026, 6, 15, 10), 45),
+      finishedAt(new Date(2026, 6, 19, 10), 30),
+    ]
+    const daily = getWeekDailyExamMinutes(attempts, reference)
+    expect(daily).toHaveLength(7)
+    expect(daily[0]).toBe(20)
+    expect(daily[2]).toBe(45)
+    expect(daily[6]).toBe(30)
+    expect(daily[1]).toBe(0)
+  })
+
+  it('appends EXAM_KEY to active keys when the week has exam time', () => {
+    const attempts: ExamAttempt[] = [finishedAt(new Date(2026, 6, 13, 10), 20)]
+    const sessions: Session[] = [
+      completedAt(new Date(2026, 6, 13, 10), 30, 'goal-b'),
+      completedAt(new Date(2026, 6, 15, 11), 15, null),
+    ]
+    const keys = getWeekActiveKeysWithExams(sessions, attempts, reference)
+    expect(keys).toEqual(['goal-b', EXAM_KEY, FREE_SESSION_KEY])
+  })
+
+  it('does not append EXAM_KEY when the week has no exam time', () => {
+    const sessions: Session[] = [completedAt(new Date(2026, 6, 13, 10), 30, 'goal-a')]
+    const keys = getWeekActiveKeysWithExams(sessions, [], reference)
+    expect(keys).toEqual(getWeekActiveGoalKeys(sessions, reference))
+  })
+
+  it('merges exam minutes into the stacked rows under EXAM_KEY', () => {
+    const sessions: Session[] = [
+      completedAt(new Date(2026, 6, 13, 10), 30, 'goal-a'),
+      completedAt(new Date(2026, 6, 15, 11), 20, 'goal-a'),
+    ]
+    const attempts: ExamAttempt[] = [
+      finishedAt(new Date(2026, 6, 13, 12), 15),
+      finishedAt(new Date(2026, 6, 15, 12), 25),
+    ]
+    const keys = ['goal-a', EXAM_KEY] as const
+    const labels = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const
+    const rows = getWeekStackedDailyMs(sessions, reference, keys, labels)
+    const merged = mergeExamMinutesIntoStackedRows(rows, attempts, reference, keys)
+    expect(merged[0]).toMatchObject({ 'goal-a': 30, [EXAM_KEY]: 15 })
+    expect(merged[2]).toMatchObject({ 'goal-a': 20, [EXAM_KEY]: 25 })
+  })
+
+  it('leaves stacked rows unchanged when EXAM_KEY is not among the keys', () => {
+    const sessions: Session[] = [completedAt(new Date(2026, 6, 13, 10), 30, 'goal-a')]
+    const attempts: ExamAttempt[] = [finishedAt(new Date(2026, 6, 13, 12), 25)]
+    const keys = ['goal-a'] as const
+    const labels = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const
+    const rows = getWeekStackedDailyMs(sessions, reference, keys, labels)
+    const merged = mergeExamMinutesIntoStackedRows(rows, attempts, reference, keys)
+    expect(merged).toEqual(rows)
+  })
+
+  it('includes exam-attempt days in the streak', () => {
+    const jul09 = new Date(2026, 6, 9, 10, 0, 0).getTime()
+    const sessions: Session[] = [
+      completedAt(new Date(2026, 6, 10, 10), 30),
+      completedAt(new Date(2026, 6, 8, 10), 30),
+    ]
+    const attempts: ExamAttempt[] = [
+      examAttempt({ startedAt: jul09 - 10_000, endedAt: jul09, status: 'graded' }),
+    ]
+    expect(getCurrentStreakDays(sessions, '2026-07-10', attempts)).toBe(3)
+    expect(getCurrentStreakDays(sessions, '2026-07-10')).toBe(1)
   })
 })

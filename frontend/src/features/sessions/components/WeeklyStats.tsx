@@ -9,48 +9,68 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { Flame } from 'lucide-react'
+import { Flame, GraduationCap } from 'lucide-react'
 import { clsx } from 'clsx'
 import { formatShortDuration } from '@/features/timer/utils'
 import { useLiveGoals } from '@/features/goals/hooks/use-goals'
-import { toLocalIsoDay } from '@/lib/stats/sessions-stats'
 import {
+  getGoalExamScoreSeries,
+  toLocalIsoDay,
+} from '@/lib/stats/sessions-stats'
+import {
+  EXAM_KEY,
   FREE_SESSION_KEY,
+  countPreviousWeekExamAttempts,
+  countWeekExamAttempts,
   getCurrentStreakDays,
-  getWeekActiveGoalKeys,
+  getPreviousWeekAvgExamPercent,
+  getWeekActiveKeysWithExams,
+  getWeekAvgExamPercent,
   getWeekGoalRanking,
   getWeekStackedDailyMs,
+  mergeExamMinutesIntoStackedRows,
   sumPreviousWeekMs,
+  sumWeekExamMs,
   sumWeekMs,
   type GoalKey,
 } from '@/lib/stats/weekly-stats'
-import type { Goal, Session } from '@/lib/db/schema'
+import type { ExamAttempt, Goal, Session } from '@/lib/db/schema'
 import { useT } from '@/i18n/i18n-context'
 import { tpl } from '@/i18n/tpl'
 import EmptyState from '@/components/ui/EmptyState'
 import NestedBarChart, { type NestedDay } from './NestedBarChart'
+import ExamScoreEvolutionChart from './ExamScoreEvolutionChart'
 
 type WeeklyStatsProps = {
   sessions: Session[]
+  examAttempts?: ExamAttempt[]
 }
 
 const DAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const
 const GOAL_PALETTE = ['#FF8A4C', '#A7CDA3', '#F5C97B', '#F09999', '#7FA87B', '#E86D28']
 const FREE_COLOR = '#FFDCC2'
+const EXAM_COLOR = '#6B7FD7'
 
 function colorFor(key: GoalKey, keys: readonly GoalKey[]): string {
   if (key === FREE_SESSION_KEY) return FREE_COLOR
-  const goalKeys = keys.filter((k) => k !== FREE_SESSION_KEY)
+  if (key === EXAM_KEY) return EXAM_COLOR
+  const goalKeys = keys.filter((k) => k !== FREE_SESSION_KEY && k !== EXAM_KEY)
   const index = goalKeys.indexOf(key)
   return GOAL_PALETTE[index % GOAL_PALETTE.length]
 }
 
-function nameFor(key: GoalKey, goals: Goal[] | undefined, freeLabel: string): string {
+function nameFor(
+  key: GoalKey,
+  goals: Goal[] | undefined,
+  freeLabel: string,
+  examLabel: string,
+): string {
   if (key === FREE_SESSION_KEY) return freeLabel
+  if (key === EXAM_KEY) return examLabel
   return goals?.find((g) => g.id === key)?.name ?? '—'
 }
 
-function WeeklyStats({ sessions }: WeeklyStatsProps) {
+function WeeklyStats({ sessions, examAttempts = [] }: WeeklyStatsProps) {
   const { t } = useT()
   const goals = useLiveGoals()
   const now = useMemo(() => new Date(), [])
@@ -61,11 +81,35 @@ function WeeklyStats({ sessions }: WeeklyStatsProps) {
 
   const weekMs = useMemo(() => sumWeekMs(sessions, now), [sessions, now])
   const previousWeekMs = useMemo(() => sumPreviousWeekMs(sessions, now), [sessions, now])
-  const activeKeys = useMemo(() => getWeekActiveGoalKeys(sessions, now), [sessions, now])
-  const stackedData = useMemo(
-    () => getWeekStackedDailyMs(sessions, now, activeKeys, DAY_LABELS),
-    [sessions, now, activeKeys],
+  const weekExamMs = useMemo(() => sumWeekExamMs(examAttempts, now), [examAttempts, now])
+  const weekExamCount = useMemo(
+    () => countWeekExamAttempts(examAttempts, now),
+    [examAttempts, now],
   )
+  const previousWeekExamCount = useMemo(
+    () => countPreviousWeekExamAttempts(examAttempts, now),
+    [examAttempts, now],
+  )
+  const weekAvgExamPercent = useMemo(
+    () => getWeekAvgExamPercent(examAttempts, now),
+    [examAttempts, now],
+  )
+  const previousWeekAvgExamPercent = useMemo(
+    () => getPreviousWeekAvgExamPercent(examAttempts, now),
+    [examAttempts, now],
+  )
+  const goalRanking = useMemo(
+    () => getWeekGoalRanking(sessions, now).slice(0, 3),
+    [sessions, now],
+  )
+  const activeKeys = useMemo(
+    () => getWeekActiveKeysWithExams(sessions, examAttempts, now),
+    [sessions, examAttempts, now],
+  )
+  const stackedData = useMemo(() => {
+    const rows = getWeekStackedDailyMs(sessions, now, activeKeys, DAY_LABELS)
+    return mergeExamMinutesIntoStackedRows(rows, examAttempts, now, activeKeys)
+  }, [sessions, examAttempts, now, activeKeys])
   const nestedKeys = useMemo<readonly GoalKey[]>(
     () => (selectedGoal === null ? activeKeys : [selectedGoal]),
     [selectedGoal, activeKeys],
@@ -77,18 +121,39 @@ function WeeklyStats({ sessions }: WeeklyStatsProps) {
         segments: nestedKeys
           .map((key) => ({
             key: String(key),
-            name: nameFor(key, goals, t.stats.freeSessionsChip),
+            name: nameFor(key, goals, t.stats.freeSessionsChip, t.stats.examSegmentLabel),
             color: colorFor(key, activeKeys),
             minutes: (row[key] as number | undefined) ?? 0,
           }))
           .filter((s) => s.minutes > 0),
       })),
-    [stackedData, nestedKeys, goals, activeKeys, t.stats.freeSessionsChip],
+    [stackedData, nestedKeys, goals, activeKeys, t.stats.freeSessionsChip, t.stats.examSegmentLabel],
   )
-  const ranking = useMemo(() => getWeekGoalRanking(sessions, now).slice(0, 3), [sessions, now])
-  const streak = useMemo(() => getCurrentStreakDays(sessions, today), [sessions, today])
+  const scoreEvolution = useMemo(() => {
+    if (!goals) return []
+    return goalRanking
+      .map((entry) => {
+        const goal = goals.find((g) => g.id === entry.goalId)
+        if (!goal) return null
+        const points = getGoalExamScoreSeries(examAttempts, entry.goalId)
+        if (points.length === 0) return null
+        return {
+          goalId: entry.goalId,
+          name: goal.name,
+          color: colorFor(entry.goalId, activeKeys),
+          points,
+        }
+      })
+      .filter((v): v is NonNullable<typeof v> => v !== null)
+  }, [goalRanking, goals, examAttempts, activeKeys])
+  const streak = useMemo(
+    () => getCurrentStreakDays(sessions, today, examAttempts),
+    [sessions, today, examAttempts],
+  )
+  const hasWeeklyExamActivity = weekExamCount > 0 || weekExamMs > 0
+  const ranking = goalRanking
 
-  if (sessions.length === 0) {
+  if (sessions.length === 0 && examAttempts.length === 0) {
     return (
       <EmptyState
         icon={<Flame size={20} aria-hidden="true" />}
@@ -134,6 +199,38 @@ function WeeklyStats({ sessions }: WeeklyStatsProps) {
         </div>
       </div>
 
+      {hasWeeklyExamActivity && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-surface p-5">
+            <div className="flex items-center gap-1.5">
+              <GraduationCap size={14} className="text-charcoal" aria-hidden="true" />
+              <p className="text-xs font-medium text-[color:var(--color-text-muted)]">
+                {t.stats.examAttemptsKpi}
+              </p>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-charcoal tabular-nums">
+              {weekExamCount}
+            </p>
+            <p className="mt-1 text-xs text-[color:var(--color-text-muted)]">
+              {renderExamAttemptsDelta(t, weekExamCount, previousWeekExamCount)}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-surface p-5">
+            <p className="text-xs font-medium text-[color:var(--color-text-muted)]">
+              {t.stats.examAvgScoreKpi}
+            </p>
+            <p className="mt-2 text-2xl font-bold text-charcoal tabular-nums">
+              {weekAvgExamPercent === null
+                ? '—'
+                : tpl(t.stats.examScorePercent, { percent: weekAvgExamPercent })}
+            </p>
+            <p className="mt-1 text-xs text-[color:var(--color-text-muted)]">
+              {renderAvgScoreDelta(t, weekAvgExamPercent, previousWeekAvgExamPercent)}
+            </p>
+          </div>
+        </div>
+      )}
+
       {activeKeys.length > 0 && (
         <section className="flex flex-col gap-3">
           <div>
@@ -158,7 +255,7 @@ function WeeklyStats({ sessions }: WeeklyStatsProps) {
                 <FilterChip
                   key={key}
                   active={selectedGoal === key}
-                  label={nameFor(key, goals, t.stats.freeSessionsChip)}
+                  label={nameFor(key, goals, t.stats.freeSessionsChip, t.stats.examSegmentLabel)}
                   color={colorFor(key, activeKeys)}
                   onClick={() => setSelectedGoal(key)}
                 />
@@ -203,6 +300,35 @@ function WeeklyStats({ sessions }: WeeklyStatsProps) {
         </section>
       )}
 
+      {scoreEvolution.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div>
+            <p className="text-sm font-medium text-charcoal">{t.stats.examScoreEvolution}</p>
+            <p className="mt-0.5 text-xs text-[color:var(--color-text-muted)]">
+              {t.stats.examScoreEvolutionHint}
+            </p>
+          </div>
+          <ul className="flex flex-col gap-3">
+            {scoreEvolution.map((entry) => (
+              <li
+                key={entry.goalId}
+                className="flex flex-col gap-2 rounded-2xl bg-surface p-4"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: entry.color }}
+                    aria-hidden="true"
+                  />
+                  <p className="text-sm font-medium text-charcoal">{entry.name}</p>
+                </div>
+                <ExamScoreEvolutionChart points={entry.points} color={entry.color} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {activeKeys.length > 0 && (
         <section className="flex flex-col gap-3">
           <div>
@@ -240,13 +366,23 @@ function WeeklyStats({ sessions }: WeeklyStatsProps) {
                   }}
                   formatter={(value, name) => [
                     formatShortDuration(Number(value) * 60_000),
-                    nameFor(String(name) as GoalKey, goals, t.stats.freeSessionsChip),
+                    nameFor(
+                      String(name) as GoalKey,
+                      goals,
+                      t.stats.freeSessionsChip,
+                      t.stats.examSegmentLabel,
+                    ),
                   ]}
                   labelFormatter={(label) => String(label ?? '')}
                 />
                 <Legend
                   formatter={(value) =>
-                    nameFor(String(value) as GoalKey, goals, t.stats.freeSessionsChip)
+                    nameFor(
+                      String(value) as GoalKey,
+                      goals,
+                      t.stats.freeSessionsChip,
+                      t.stats.examSegmentLabel,
+                    )
                   }
                   wrapperStyle={{ fontSize: 11, paddingTop: 6 }}
                   iconType="circle"
@@ -307,6 +443,29 @@ function renderDelta(t: ReturnType<typeof useT>['t'], current: number, previous:
   if (rounded === 0) return t.stats.vsPreviousSame
   if (rounded > 0) return tpl(t.stats.vsPreviousWeekUp, { percent: rounded })
   return tpl(t.stats.vsPreviousWeekDown, { percent: rounded })
+}
+
+function renderExamAttemptsDelta(
+  t: ReturnType<typeof useT>['t'],
+  current: number,
+  previous: number,
+): string {
+  if (current === 1) return tpl(t.stats.examAttemptsOne, { count: current })
+  if (previous === 0) return tpl(t.stats.examAttemptsOther, { count: current })
+  return renderDelta(t, current, previous)
+}
+
+function renderAvgScoreDelta(
+  t: ReturnType<typeof useT>['t'],
+  current: number | null,
+  previous: number | null,
+): string {
+  if (current === null) return t.stats.examAvgScoreEmpty
+  if (previous === null) return t.stats.examAvgScoreNoPrev
+  const diff = current - previous
+  if (diff === 0) return t.stats.examAvgScoreVsPreviousSame
+  if (diff > 0) return tpl(t.stats.examAvgScoreVsPreviousUp, { points: diff })
+  return tpl(t.stats.examAvgScoreVsPreviousDown, { points: diff })
 }
 
 export default WeeklyStats

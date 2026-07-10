@@ -70,3 +70,42 @@ export function groupExamMsByDay(attempts: ExamAttempt[]): Map<string, number> {
   }
   return map
 }
+
+export type ExamScorePoint = {
+  attemptId: string
+  endedAt: number
+  day: string
+  percent: number
+  title: string
+}
+
+/**
+ * Chronological list of graded exam scores for a goal (oldest first). Only
+ * attempts with a valid score contribute; discarded / in-progress / paused
+ * attempts and those without a score are skipped.
+ */
+export function getGoalExamScoreSeries(
+  attempts: ExamAttempt[],
+  goalId: string,
+): ExamScorePoint[] {
+  return attempts
+    .filter(
+      (a) =>
+        a.goalId === goalId &&
+        a.endedAt !== null &&
+        a.status !== 'discarded' &&
+        a.status !== 'in-progress' &&
+        a.status !== 'paused' &&
+        a.score !== null &&
+        a.maxScore !== null &&
+        a.maxScore > 0,
+    )
+    .sort((a, b) => (a.endedAt as number) - (b.endedAt as number))
+    .map((a) => ({
+      attemptId: a.id,
+      endedAt: a.endedAt as number,
+      day: toLocalIsoDay(a.endedAt as number),
+      percent: Math.round(((a.score as number) / (a.maxScore as number)) * 100),
+      title: a.title,
+    }))
+}
