@@ -17,7 +17,7 @@ function renderNav(initialPath = '/app') {
 describe('BottomNav', () => {
   it('renders the five main sections', () => {
     renderNav()
-    for (const label of ['Inicio', 'Timer', 'Metas', 'Sesiones', 'Más']) {
+    for (const label of ['Inicio', 'Timer', 'Metas', 'Estudio', 'Más']) {
       expect(screen.getByRole('link', { name: new RegExp(label, 'i') })).toBeInTheDocument()
     }
   })

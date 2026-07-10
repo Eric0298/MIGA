@@ -7,11 +7,17 @@ import TimerPage from '@/features/timer/TimerPage'
 import GoalsPage from '@/features/goals/GoalsPage'
 import SessionsPage from '@/features/sessions/SessionsPage'
 import MorePage from '@/features/more/MorePage'
+import EstudioHubPage from '@/features/estudio/EstudioHubPage'
 
 const LandingPage = lazy(() => import('@/features/landing/LandingPage'))
 const ArchitecturePage = lazy(() => import('@/features/architecture/ArchitecturePage'))
 const GoalDetailPage = lazy(() => import('@/features/goals/GoalDetailPage'))
 const NotFoundPage = lazy(() => import('@/features/not-found/NotFoundPage'))
+const RepasoPage = lazy(() => import('@/features/estudio/RepasoPage'))
+const RepasoGoalPage = lazy(() => import('@/features/estudio/RepasoGoalPage'))
+const ApuntesPage = lazy(() => import('@/features/estudio/ApuntesPage'))
+const ApuntesGoalPage = lazy(() => import('@/features/estudio/ApuntesGoalPage'))
+const ExamenesPage = lazy(() => import('@/features/estudio/ExamenesPage'))
 
 function App() {
   return (
@@ -26,7 +32,13 @@ function App() {
             <Route path="timer" element={<TimerPage />} />
             <Route path="metas" element={<GoalsPage />} />
             <Route path="metas/:id" element={<GoalDetailPage />} />
+            <Route path="estudio" element={<EstudioHubPage />} />
             <Route path="sesiones" element={<SessionsPage />} />
+            <Route path="apuntes" element={<ApuntesPage />} />
+            <Route path="apuntes/:id" element={<ApuntesGoalPage />} />
+            <Route path="repaso" element={<RepasoPage />} />
+            <Route path="repaso/:id" element={<RepasoGoalPage />} />
+            <Route path="examenes" element={<ExamenesPage />} />
             <Route path="mas" element={<MorePage />} />
           </Route>
 

@@ -1,11 +1,11 @@
 import { NavLink } from 'react-router'
-import { Clock, House, MoreHorizontal, Target, Timer } from 'lucide-react'
+import { BookOpen, House, MoreHorizontal, Target, Timer } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useT } from '@/i18n/i18n-context'
 
 type Item = {
   to: string
-  labelKey: 'home' | 'timer' | 'goals' | 'sessions' | 'more'
+  labelKey: 'home' | 'timer' | 'goals' | 'estudio' | 'more'
   icon: typeof House
   end?: boolean
 }
@@ -14,7 +14,7 @@ const items: Item[] = [
   { to: '/app', labelKey: 'home', icon: House, end: true },
   { to: '/app/timer', labelKey: 'timer', icon: Timer },
   { to: '/app/metas', labelKey: 'goals', icon: Target },
-  { to: '/app/sesiones', labelKey: 'sessions', icon: Clock },
+  { to: '/app/estudio', labelKey: 'estudio', icon: BookOpen },
   { to: '/app/mas', labelKey: 'more', icon: MoreHorizontal },
 ]
 
