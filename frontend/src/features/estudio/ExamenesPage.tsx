@@ -1,10 +1,24 @@
 import { Link } from 'react-router'
-import { ArrowLeft, ClipboardCheck } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveGoals } from '@/features/goals/hooks/use-goals'
+import { db } from '@/lib/db/miga-db'
 import { useT } from '@/i18n/i18n-context'
-import EmptyState from '@/components/ui/EmptyState'
+import GoalsBrowseGrid from './components/GoalsBrowseGrid'
 
 function ExamenesPage() {
   const { t } = useT()
+  const goals = useLiveGoals()
+  const counts = useLiveQuery(async () => {
+    const rows = await db.examAttempts.toArray()
+    const acc: Record<string, number> = {}
+    for (const attempt of rows) {
+      if (attempt.status === 'discarded') continue
+      acc[attempt.goalId] = (acc[attempt.goalId] ?? 0) + 1
+    }
+    return acc
+  }, [])
+
   return (
     <div className="flex flex-col gap-6">
       <header>
@@ -17,16 +31,28 @@ function ExamenesPage() {
         </Link>
       </header>
 
-      <section className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold text-charcoal">{t.examenes.title}</h1>
-        <p className="text-sm text-[color:var(--color-text-muted)]">{t.examenes.subtitle}</p>
-      </section>
+      <section className="flex flex-col gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-charcoal">{t.examenes.title}</h1>
+          <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">
+            {t.examenes.subtitle}
+          </p>
+        </div>
 
-      <EmptyState
-        icon={<ClipboardCheck size={20} aria-hidden="true" />}
-        title={t.examenes.comingSoonTitle}
-        description={t.examenes.comingSoonDescription}
-      />
+        {goals === undefined ? (
+          <p className="text-sm text-[color:var(--color-text-muted)]">{t.common.loading}</p>
+        ) : (
+          <GoalsBrowseGrid
+            goals={goals}
+            counts={counts ?? {}}
+            basePath="/app/examenes"
+            itemLabelOne={t.examenes.attemptsCountOne}
+            itemLabelOther={t.examenes.attemptsCountOther}
+            emptyGoalsTitle={t.examenes.emptyGoalsTitle}
+            emptyGoalsDescription={t.examenes.emptyGoalsDescription}
+          />
+        )}
+      </section>
     </div>
   )
 }

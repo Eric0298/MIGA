@@ -16,6 +16,9 @@ const NotFoundPage = lazy(() => import('@/features/not-found/NotFoundPage'))
 const RepasoPage = lazy(() => import('@/features/estudio/RepasoPage'))
 const RepasoGoalPage = lazy(() => import('@/features/estudio/RepasoGoalPage'))
 const RepasoSessionPage = lazy(() => import('@/features/estudio/RepasoSessionPage'))
+const ExamenesGoalPage = lazy(() => import('@/features/estudio/ExamenesGoalPage'))
+const SimulacroCreatePage = lazy(() => import('@/features/estudio/SimulacroCreatePage'))
+const SimulacroSessionPage = lazy(() => import('@/features/estudio/SimulacroSessionPage'))
 const ApuntesPage = lazy(() => import('@/features/estudio/ApuntesPage'))
 const ApuntesGoalPage = lazy(() => import('@/features/estudio/ApuntesGoalPage'))
 const ExamenesPage = lazy(() => import('@/features/estudio/ExamenesPage'))
@@ -41,6 +44,15 @@ function App() {
             <Route path="repaso/:id" element={<RepasoGoalPage />} />
             <Route path="repaso/:id/sesion" element={<RepasoSessionPage />} />
             <Route path="examenes" element={<ExamenesPage />} />
+            <Route path="examenes/:id" element={<ExamenesGoalPage />} />
+            <Route
+              path="examenes/:id/simulacro/nuevo"
+              element={<SimulacroCreatePage />}
+            />
+            <Route
+              path="examenes/:id/simulacro/:attemptId"
+              element={<SimulacroSessionPage />}
+            />
             <Route path="mas" element={<MorePage />} />
           </Route>
 
