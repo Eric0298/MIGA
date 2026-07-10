@@ -195,6 +195,11 @@ export async function finishQuestionsExamAttempt(
   })
 }
 
+/** Updates only the notes of an exam attempt. Used from the results screen. */
+export async function updateExamAttemptNotes(id: string, notes: string): Promise<void> {
+  await db.examAttempts.update(id, { notes, updatedAt: Date.now() })
+}
+
 export async function discardExamAttempt(id: string): Promise<void> {
   const attempt = await db.examAttempts.get(id)
   if (!attempt) throw new Error('Intento no encontrado')

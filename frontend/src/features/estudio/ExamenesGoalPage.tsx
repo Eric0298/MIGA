@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft, FilePlus2, PlayCircle, Trash2 } from 'lucide-react'
+import { ArrowLeft, Eye, FilePlus2, PlayCircle, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { clsx } from 'clsx'
 import { toast } from 'sonner'
@@ -53,6 +53,9 @@ function ExamenesGoalPage() {
   }
 
   const pdfAttempts = attempts.filter((a) => a.kind === 'pdf' && a.status !== 'discarded')
+  const questionAttempts = attempts.filter(
+    (a) => a.kind === 'questions' && a.status !== 'discarded',
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -173,14 +176,111 @@ function ExamenesGoalPage() {
         )}
       </section>
 
-      {/* --------- Own-questions exams (placeholder, E5) --------- */}
-      <section className="flex flex-col gap-2 rounded-2xl bg-surface p-4">
-        <h2 className="text-sm font-semibold text-charcoal">
-          {t.examenes.questionsSection}
-        </h2>
-        <p className="text-xs text-[color:var(--color-text-muted)]">
-          {t.examenes.questionsSectionPlaceholder}
-        </p>
+      {/* --------- Own-questions exams --------- */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-charcoal">
+            {t.examenes.questionsSection}
+          </h2>
+          <button
+            type="button"
+            onClick={() => navigate(`/app/examenes/${goal.id}/preguntas/nuevo`)}
+            className="inline-flex items-center gap-1 rounded-xl bg-apricot px-3 py-1.5 text-xs font-semibold text-white transition active:scale-[0.98]"
+          >
+            <FilePlus2 size={14} aria-hidden="true" />
+            {t.examenes.newQuestionsExam}
+          </button>
+        </div>
+
+        {questionAttempts.length === 0 ? (
+          <p className="text-xs text-[color:var(--color-text-muted)]">
+            {t.examenes.emptyQuestionAttempts}
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {questionAttempts.map((attempt) => (
+              <li
+                key={attempt.id}
+                className="flex flex-col gap-2 rounded-2xl bg-surface p-4 ring-1 ring-[color:var(--color-border)]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-charcoal">
+                      {attempt.title}
+                    </p>
+                    <p className="mt-0.5 text-xs text-[color:var(--color-text-muted)]">
+                      {format(new Date(attempt.startedAt), "d 'de' LLL · HH:mm", {
+                        locale,
+                      })}
+                    </p>
+                  </div>
+                  <StatusBadge status={attempt.status} />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+                  <span className="inline-flex items-center rounded-full bg-cream px-2 py-0.5 text-charcoal ring-1 ring-[color:var(--color-border)]">
+                    {formatDuration(getExamElapsedMs(attempt))}
+                  </span>
+                  {attempt.status === 'completed' &&
+                    attempt.score !== null &&
+                    attempt.maxScore !== null && (
+                      <>
+                        <span className="inline-flex items-center rounded-full bg-pistachio/40 px-2 py-0.5 text-charcoal">
+                          {attempt.score} / {attempt.maxScore}
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-peach px-2 py-0.5 text-charcoal">
+                          {Math.round((attempt.score / attempt.maxScore) * 100)}%
+                        </span>
+                      </>
+                    )}
+                </div>
+
+                {attempt.notes && (
+                  <p className="whitespace-pre-wrap rounded-xl bg-cream/60 px-3 py-2 text-xs text-charcoal">
+                    {attempt.notes}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-between gap-2">
+                  {attempt.status === 'in-progress' && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(`/app/examenes/${goal.id}/preguntas/${attempt.id}`)
+                      }
+                      className="inline-flex items-center gap-1 rounded-xl bg-apricot px-3 py-1.5 text-xs font-semibold text-white transition active:scale-[0.98]"
+                    >
+                      <PlayCircle size={14} aria-hidden="true" />
+                      {t.examenes.continue}
+                    </button>
+                  )}
+                  {attempt.status === 'completed' && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(`/app/examenes/${goal.id}/preguntas/${attempt.id}`)
+                      }
+                      className="inline-flex items-center gap-1 rounded-xl bg-cream px-3 py-1.5 text-xs font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] transition active:scale-[0.98]"
+                    >
+                      <Eye size={14} aria-hidden="true" />
+                      {t.examenes.viewResults}
+                    </button>
+                  )}
+                  {attempt.status !== 'in-progress' && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(attempt)}
+                      aria-label={t.examenes.deleteAttempt}
+                      className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-xl text-[color:var(--color-text-muted)] transition-colors hover:bg-cream hover:text-charcoal"
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {gradingAttempt && (
