@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { ArrowLeft, Brain } from 'lucide-react'
 import { useLiveGoal } from '@/features/goals/hooks/use-goal'
 import { useQuestionsByGoal } from '@/features/questions/hooks/use-questions-by-goal'
@@ -8,6 +8,7 @@ import EmptyState from '@/components/ui/EmptyState'
 
 function RepasoGoalPage() {
   const { t } = useT()
+  const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const goal = useLiveGoal(id)
   const questions = useQuestionsByGoal(goal?.id)
@@ -58,12 +59,11 @@ function RepasoGoalPage() {
           {hasQuestions && (
             <button
               type="button"
-              disabled
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-apricot/40 px-5 py-3 text-base font-semibold text-white transition"
+              onClick={() => navigate(`/app/repaso/${goal.id}/sesion`)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-apricot px-5 py-3 text-base font-semibold text-white transition active:scale-[0.98]"
             >
               <Brain size={18} aria-hidden="true" />
               {t.repaso.startReview}
-              <span className="ml-2 text-xs font-normal">({t.common.comingSoon})</span>
             </button>
           )}
         </>
