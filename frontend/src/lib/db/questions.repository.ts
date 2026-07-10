@@ -3,6 +3,7 @@ import {
   questionInputSchema,
   type Question,
   type QuestionAnswer,
+  type QuestionAnswerInput,
   type QuestionInput,
   type QuestionReviewState,
 } from './schema'
@@ -20,7 +21,7 @@ export type UpdateQuestionPatch = {
   prompt?: string
   imageBlobKey?: string | null
   audioBlobKey?: string | null
-  answers?: QuestionAnswer[]
+  answers?: QuestionAnswerInput[]
 }
 
 function withAnswerIds(answers: QuestionInput['answers']): QuestionAnswer[] {
