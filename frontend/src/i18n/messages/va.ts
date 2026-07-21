@@ -120,6 +120,16 @@ export const va: Messages = {
       inProgressTag: 'en curs',
       unknownGoal: 'Meta desconeguda',
     },
+    pendingGrade: {
+      titleOne: 'Tens un simulacre sense qualificar',
+      titleOther: 'Tens {count} simulacres sense qualificar',
+      description: 'Afig la nota perquè compten en les teues estadístiques.',
+      gradeNow: 'Qualificar',
+      delete: 'Eliminar intent',
+      deleted: 'Intent eliminat',
+      deleteError: 'No s’ha pogut eliminar l’intent',
+      unknownGoal: 'Meta desconeguda',
+    },
     create: {
       title: 'Nou simulacre',
       subtitle: 'Tria el PDF a cronometrar i opcionalment un temps límit.',

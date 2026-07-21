@@ -118,6 +118,16 @@ export const es = {
       inProgressTag: 'en curso',
       unknownGoal: 'Meta desconocida',
     },
+    pendingGrade: {
+      titleOne: 'Tienes un simulacro sin calificar',
+      titleOther: 'Tienes {count} simulacros sin calificar',
+      description: 'Añade la nota para que cuenten en tus estadísticas.',
+      gradeNow: 'Calificar',
+      delete: 'Eliminar intento',
+      deleted: 'Intento eliminado',
+      deleteError: 'No se pudo eliminar el intento',
+      unknownGoal: 'Meta desconocida',
+    },
     create: {
       title: 'Nuevo simulacro',
       subtitle: 'Elige el PDF a cronometrar y opcionalmente un tiempo límite.',

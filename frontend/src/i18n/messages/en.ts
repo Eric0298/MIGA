@@ -119,6 +119,16 @@ export const en: Messages = {
       inProgressTag: 'in progress',
       unknownGoal: 'Unknown goal',
     },
+    pendingGrade: {
+      titleOne: 'You have an ungraded simulation',
+      titleOther: 'You have {count} ungraded simulations',
+      description: 'Add the score so they count in your stats.',
+      gradeNow: 'Grade',
+      delete: 'Delete attempt',
+      deleted: 'Attempt deleted',
+      deleteError: 'Could not delete the attempt',
+      unknownGoal: 'Unknown goal',
+    },
     create: {
       title: 'New simulation',
       subtitle: 'Pick the PDF to time and optionally a time limit.',

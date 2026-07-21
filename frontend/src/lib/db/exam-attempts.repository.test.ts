@@ -11,6 +11,7 @@ import {
   gradePdfExamAttempt,
   listActiveExamAttempts,
   listExamAttemptsByGoal,
+  listPendingGradeExamAttempts,
   pauseExamAttempt,
   resumeExamAttempt,
   startPdfExamAttempt,
@@ -227,6 +228,36 @@ describe('exam attempts — housekeeping', () => {
     expect(list.map((x) => x.id)).toEqual([a.id, b.id])
     expect(list[0].status).toBe('in-progress')
     expect(list[1].status).toBe('paused')
+  })
+
+  it('lists pending-grade PDF attempts across goals, oldest ended first', async () => {
+    const a = await startPdfExamAttempt({
+      goalId: GOAL_A,
+      title: 'A',
+      pdfMaterialId: 'mat-1',
+    })
+    await finishPdfExamAttempt(a.id, { score: null, maxScore: null })
+    await new Promise((r) => setTimeout(r, 5))
+    const b = await startPdfExamAttempt({
+      goalId: GOAL_B,
+      title: 'B',
+      pdfMaterialId: 'mat-1',
+    })
+    await finishPdfExamAttempt(b.id, { score: null, maxScore: null })
+
+    // In progress → excluded
+    await startPdfExamAttempt({ goalId: GOAL_A, title: 'C', pdfMaterialId: 'mat-1' })
+    // Graded → excluded
+    const d = await startPdfExamAttempt({
+      goalId: GOAL_A,
+      title: 'D',
+      pdfMaterialId: 'mat-1',
+    })
+    await finishPdfExamAttempt(d.id, { score: 6, maxScore: 10 })
+
+    const list = await listPendingGradeExamAttempts()
+    expect(list.map((x) => x.id)).toEqual([a.id, b.id])
+    expect(list.every((x) => x.status === 'pending-grade')).toBe(true)
   })
 })
 

@@ -93,6 +93,15 @@ export function listActiveExamAttempts(): Promise<ExamAttempt[]> {
     .sortBy('startedAt')
 }
 
+/**
+ * PDF simulations the user finished as "grade later" and hasn't graded yet.
+ * Ordered oldest → newest by `endedAt`. Only PDF attempts reach the
+ * `pending-grade` status; question-based attempts auto-grade on finish.
+ */
+export function listPendingGradeExamAttempts(): Promise<ExamAttempt[]> {
+  return db.examAttempts.where('status').equals('pending-grade').sortBy('endedAt')
+}
+
 export async function pauseExamAttempt(id: string): Promise<void> {
   const attempt = await db.examAttempts.get(id)
   if (!attempt) throw new Error('Intento no encontrado')

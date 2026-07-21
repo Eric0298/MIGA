@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { Brain, Clock, ClipboardCheck, StickyNote } from 'lucide-react'
 import { useT } from '@/i18n/i18n-context'
 import ActiveExamAttemptsBanner from '@/features/exams/components/ActiveExamAttemptsBanner'
+import PendingGradeExamsBanner from '@/features/exams/components/PendingGradeExamsBanner'
 
 type Tile = {
   to: string
@@ -36,6 +37,7 @@ function EstudioHubPage() {
       </header>
 
       <ActiveExamAttemptsBanner />
+      <PendingGradeExamsBanner />
 
       <div className="grid grid-cols-2 gap-3">
         {tiles.map(({ to, labelKey, descriptionKey, icon: Icon }) => (
