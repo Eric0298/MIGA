@@ -80,6 +80,19 @@ export function listExamAttemptsByGoal(goalId: string): Promise<ExamAttempt[]> {
   return db.examAttempts.where('goalId').equals(goalId).reverse().sortBy('startedAt')
 }
 
+/**
+ * Returns every attempt still open (in-progress or paused), ordered from
+ * oldest to newest by `startedAt`. Used by the recovery banner to surface
+ * exams the user abandoned and hasn't resumed. Discarded, graded and
+ * completed attempts are excluded.
+ */
+export function listActiveExamAttempts(): Promise<ExamAttempt[]> {
+  return db.examAttempts
+    .where('status')
+    .anyOf('in-progress', 'paused')
+    .sortBy('startedAt')
+}
+
 export async function pauseExamAttempt(id: string): Promise<void> {
   const attempt = await db.examAttempts.get(id)
   if (!attempt) throw new Error('Intento no encontrado')

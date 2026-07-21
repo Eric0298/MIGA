@@ -9,6 +9,7 @@ import {
   getExamAttempt,
   getExamElapsedMs,
   gradePdfExamAttempt,
+  listActiveExamAttempts,
   listExamAttemptsByGoal,
   pauseExamAttempt,
   resumeExamAttempt,
@@ -192,6 +193,40 @@ describe('exam attempts — housekeeping', () => {
     })
     await deleteExamAttempt(a.id)
     expect(await getExamAttempt(a.id)).toBeNull()
+  })
+
+  it('lists active attempts (in-progress and paused) across goals, oldest first', async () => {
+    const a = await startPdfExamAttempt({
+      goalId: GOAL_A,
+      title: 'A',
+      pdfMaterialId: 'mat-1',
+    })
+    await new Promise((r) => setTimeout(r, 5))
+    const b = await startQuestionsExamAttempt({
+      goalId: GOAL_B,
+      title: 'B',
+      questionIds: ['q1'],
+    })
+    await pauseExamAttempt(b.id)
+    const c = await startPdfExamAttempt({
+      goalId: GOAL_A,
+      title: 'C',
+      pdfMaterialId: 'mat-1',
+    })
+    // c is finished (graded) — excluded from active list.
+    await finishPdfExamAttempt(c.id, { score: 5, maxScore: 10 })
+    const d = await startPdfExamAttempt({
+      goalId: GOAL_B,
+      title: 'D',
+      pdfMaterialId: 'mat-1',
+    })
+    // d is discarded — excluded from active list.
+    await discardExamAttempt(d.id)
+
+    const list = await listActiveExamAttempts()
+    expect(list.map((x) => x.id)).toEqual([a.id, b.id])
+    expect(list[0].status).toBe('in-progress')
+    expect(list[1].status).toBe('paused')
   })
 })
 

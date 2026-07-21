@@ -108,6 +108,18 @@ export const va: Messages = {
       completed: 'Acabat',
       discarded: 'Descartat',
     },
+    recovery: {
+      titleOne: 'Tens un examen sense acabar',
+      titleOther: 'Tens {count} exàmens sense acabar',
+      description: 'Reprén-lo o descarta’l abans de començar una altra cosa.',
+      resume: 'Reprendre',
+      discard: 'Descartar intent',
+      discarded: 'Intent descartat',
+      discardError: 'No s’ha pogut descartar l’intent',
+      pausedTag: 'pausat',
+      inProgressTag: 'en curs',
+      unknownGoal: 'Meta desconeguda',
+    },
     create: {
       title: 'Nou simulacre',
       subtitle: 'Tria el PDF a cronometrar i opcionalment un temps límit.',

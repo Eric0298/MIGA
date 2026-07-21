@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 import { Brain, Clock, ClipboardCheck, StickyNote } from 'lucide-react'
 import { useT } from '@/i18n/i18n-context'
+import ActiveExamAttemptsBanner from '@/features/exams/components/ActiveExamAttemptsBanner'
 
 type Tile = {
   to: string
@@ -33,6 +34,8 @@ function EstudioHubPage() {
         <h1 className="text-2xl font-bold text-charcoal">{t.estudio.title}</h1>
         <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">{t.estudio.subtitle}</p>
       </header>
+
+      <ActiveExamAttemptsBanner />
 
       <div className="grid grid-cols-2 gap-3">
         {tiles.map(({ to, labelKey, descriptionKey, icon: Icon }) => (

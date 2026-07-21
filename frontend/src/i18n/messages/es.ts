@@ -106,6 +106,18 @@ export const es = {
       completed: 'Terminado',
       discarded: 'Descartado',
     },
+    recovery: {
+      titleOne: 'Tienes un examen sin terminar',
+      titleOther: 'Tienes {count} exámenes sin terminar',
+      description: 'Reanúdalo o descártalo antes de empezar otra cosa.',
+      resume: 'Reanudar',
+      discard: 'Descartar intento',
+      discarded: 'Intento descartado',
+      discardError: 'No se pudo descartar el intento',
+      pausedTag: 'pausado',
+      inProgressTag: 'en curso',
+      unknownGoal: 'Meta desconocida',
+    },
     create: {
       title: 'Nuevo simulacro',
       subtitle: 'Elige el PDF a cronometrar y opcionalmente un tiempo límite.',

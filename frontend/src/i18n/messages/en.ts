@@ -107,6 +107,18 @@ export const en: Messages = {
       completed: 'Finished',
       discarded: 'Discarded',
     },
+    recovery: {
+      titleOne: 'You have an unfinished exam',
+      titleOther: 'You have {count} unfinished exams',
+      description: 'Resume it or discard it before starting something else.',
+      resume: 'Resume',
+      discard: 'Discard attempt',
+      discarded: 'Attempt discarded',
+      discardError: 'Could not discard the attempt',
+      pausedTag: 'paused',
+      inProgressTag: 'in progress',
+      unknownGoal: 'Unknown goal',
+    },
     create: {
       title: 'New simulation',
       subtitle: 'Pick the PDF to time and optionally a time limit.',

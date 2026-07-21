@@ -7,6 +7,7 @@ import { useActiveSession } from '@/features/timer/hooks/use-active-session'
 import { useCompletedSessions } from '@/features/sessions/hooks/use-completed-sessions'
 import { useLiveGoals } from '@/features/goals/hooks/use-goals'
 import { useAllExamAttempts } from '@/features/exams/hooks/use-all-exam-attempts'
+import ActiveExamAttemptsBanner from '@/features/exams/components/ActiveExamAttemptsBanner'
 import { formatShortDuration, getElapsedMs } from '@/features/timer/utils'
 import { formatDayRelative } from '@/features/goals/utils'
 import { filterCompletedByDay, sumElapsedMs, toLocalIsoDay } from '@/lib/stats/sessions-stats'
@@ -53,6 +54,8 @@ function HomePage() {
       {isLoading && (
         <p className="text-sm text-[color:var(--color-text-muted)]">{t.common.loading}</p>
       )}
+
+      <ActiveExamAttemptsBanner />
 
       {!isLoading && active && (
         <Link
