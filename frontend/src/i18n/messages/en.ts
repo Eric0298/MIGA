@@ -481,7 +481,9 @@ export const en: Messages = {
     exportError: 'Could not export',
     import: 'Import backup',
     importBadge: 'Overwrites by id',
-    importSuccess: 'Imported {goals} goals and {sessions} sessions{extras}',
+    importSuccess: 'Import complete',
+    importSummary:
+      '{goals} goals · {sessions} sessions · {materials} materials · {notes} notes · {questions} questions · {exams} exams{extras}',
     importActiveCleared: ' ({count} active session closed)',
     importInvalid: 'Invalid file',
     importBlocked: 'Stop the active session before importing',
@@ -490,7 +492,7 @@ export const en: Messages = {
     clearBlocked: 'Stop the active session before deleting',
     clearConfirmTitle: 'Delete all local data?',
     clearConfirmDescription:
-      '{goals} {goalWord} and {sessions} {sessionWord} will be removed from this device. This cannot be undone.',
+      '{goals} {goalWord}, {sessions} {sessionWord}, {materials} materials, {notes} notes, {questions} questions and {exams} exams will be removed from this device. This cannot be undone.',
     goalWordOne: 'goal',
     goalWordOther: 'goals',
     sessionWordOne: 'session',

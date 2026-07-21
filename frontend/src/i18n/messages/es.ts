@@ -482,7 +482,9 @@ export const es = {
     exportError: 'No se pudo exportar',
     import: 'Importar copia',
     importBadge: 'Sobrescribe por id',
-    importSuccess: 'Importadas {goals} metas y {sessions} sesiones{extras}',
+    importSuccess: 'Importación completada',
+    importSummary:
+      '{goals} metas · {sessions} sesiones · {materials} materiales · {notes} apuntes · {questions} preguntas · {exams} exámenes{extras}',
     importActiveCleared: ' ({count} sesión activa cerrada)',
     importInvalid: 'Archivo inválido',
     importBlocked: 'Detén la sesión activa antes de importar',
@@ -491,7 +493,7 @@ export const es = {
     clearBlocked: 'Detén la sesión activa antes de borrar',
     clearConfirmTitle: '¿Borrar todos los datos locales?',
     clearConfirmDescription:
-      'Se eliminarán {goals} {goalWord} y {sessions} {sessionWord} de este dispositivo. Esta acción no se puede deshacer.',
+      'Se eliminarán {goals} {goalWord}, {sessions} {sessionWord}, {materials} materiales, {notes} apuntes, {questions} preguntas y {exams} exámenes de este dispositivo. Esta acción no se puede deshacer.',
     goalWordOne: 'meta',
     goalWordOther: 'metas',
     sessionWordOne: 'sesión',

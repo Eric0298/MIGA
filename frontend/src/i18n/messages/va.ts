@@ -483,7 +483,9 @@ export const va: Messages = {
     exportError: 'No s’ha pogut exportar',
     import: 'Importar còpia',
     importBadge: 'Sobreescriu per id',
-    importSuccess: 'Importades {goals} metes i {sessions} sessions{extras}',
+    importSuccess: 'Importació completada',
+    importSummary:
+      '{goals} metes · {sessions} sessions · {materials} materials · {notes} apunts · {questions} preguntes · {exams} exàmens{extras}',
     importActiveCleared: ' ({count} sessió activa tancada)',
     importInvalid: 'Fitxer invàlid',
     importBlocked: 'Detén la sessió activa abans d’importar',
@@ -492,7 +494,7 @@ export const va: Messages = {
     clearBlocked: 'Detén la sessió activa abans d’esborrar',
     clearConfirmTitle: 'Esborrar totes les dades locals?',
     clearConfirmDescription:
-      'S’eliminaran {goals} {goalWord} i {sessions} {sessionWord} d’este dispositiu. Esta acció no es pot desfer.',
+      'S’eliminaran {goals} {goalWord}, {sessions} {sessionWord}, {materials} materials, {notes} apunts, {questions} preguntes i {exams} exàmens d’este dispositiu. Esta acció no es pot desfer.',
     goalWordOne: 'meta',
     goalWordOther: 'metes',
     sessionWordOne: 'sessió',

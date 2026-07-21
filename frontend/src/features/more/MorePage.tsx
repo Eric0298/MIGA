@@ -28,6 +28,10 @@ function MorePage() {
     async () => ({
       goals: await db.goals.count(),
       sessions: await db.sessions.count(),
+      materials: await db.materials.count(),
+      notes: await db.notes.count(),
+      questions: await db.questions.count(),
+      examAttempts: await db.examAttempts.count(),
     }),
     [],
   )
@@ -77,13 +81,17 @@ function MorePage() {
         result.normalizedActiveSessions > 0
           ? tpl(t.more.importActiveCleared, { count: result.normalizedActiveSessions })
           : ''
-      toast.success(
-        tpl(t.more.importSuccess, {
+      toast.success(t.more.importSuccess, {
+        description: tpl(t.more.importSummary, {
           goals: result.goalsCount,
           sessions: result.sessionsCount,
+          materials: result.materialsCount,
+          notes: result.notesCount,
+          questions: result.questionsCount,
+          exams: result.examAttemptsCount,
           extras,
         }),
-      )
+      })
     } catch {
       toast.error(t.more.importInvalid)
     } finally {
@@ -283,6 +291,10 @@ function MorePage() {
                   sessions: totals?.sessions ?? 0,
                   sessionWord:
                     (totals?.sessions ?? 0) === 1 ? t.more.sessionWordOne : t.more.sessionWordOther,
+                  materials: totals?.materials ?? 0,
+                  notes: totals?.notes ?? 0,
+                  questions: totals?.questions ?? 0,
+                  exams: totals?.examAttempts ?? 0,
                 })}
               </p>
             </div>
