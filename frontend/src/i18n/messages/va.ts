@@ -269,6 +269,17 @@ export const va: Messages = {
       questionIndex: 'Pregunta {current} de {total}',
       correctBadge: 'Encert',
       wrongBadge: 'Fallada',
+      saveAsNote: 'Guardar com a apunt',
+      savedAsNote: 'Guardat als apunts',
+      saveAsNoteToast: 'Apunt creat a partir de la pregunta.',
+      saveAsNoteError: 'No s’ha pogut crear l’apunt.',
+      noteBuilder: {
+        titlePrefix: 'Repàs',
+        correctHeader: 'Resposta(es) correcta(es)',
+        yourAnswerHeader: 'La teua resposta',
+        yourAnswerEmpty: 'Sense resposta',
+        fromExam: 'De l’examen',
+      },
     },
   },
   landing: {

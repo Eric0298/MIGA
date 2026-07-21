@@ -267,6 +267,17 @@ export const es = {
       questionIndex: 'Pregunta {current} de {total}',
       correctBadge: 'Acierto',
       wrongBadge: 'Fallo',
+      saveAsNote: 'Guardar como apunte',
+      savedAsNote: 'Guardado en apuntes',
+      saveAsNoteToast: 'Apunte creado a partir de la pregunta.',
+      saveAsNoteError: 'No se pudo crear el apunte.',
+      noteBuilder: {
+        titlePrefix: 'Repaso',
+        correctHeader: 'Respuesta(s) correcta(s)',
+        yourAnswerHeader: 'Tu respuesta',
+        yourAnswerEmpty: 'Sin respuesta',
+        fromExam: 'Del examen',
+      },
     },
   },
   landing: {

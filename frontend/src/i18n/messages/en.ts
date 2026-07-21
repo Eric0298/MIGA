@@ -267,6 +267,17 @@ export const en: Messages = {
       questionIndex: 'Question {current} of {total}',
       correctBadge: 'Correct',
       wrongBadge: 'Wrong',
+      saveAsNote: 'Save as note',
+      savedAsNote: 'Saved to notes',
+      saveAsNoteToast: 'Note created from the question.',
+      saveAsNoteError: 'Could not create the note.',
+      noteBuilder: {
+        titlePrefix: 'Review',
+        correctHeader: 'Correct answer(s)',
+        yourAnswerHeader: 'Your answer',
+        yourAnswerEmpty: 'No answer',
+        fromExam: 'From exam',
+      },
     },
   },
   landing: {

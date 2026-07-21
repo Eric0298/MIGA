@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Save,
   Square,
+  StickyNote,
   Trash2,
   X,
 } from 'lucide-react'
@@ -21,6 +22,8 @@ import {
   updateExamAttemptNotes,
 } from '@/lib/db/exam-attempts.repository'
 import { useQuestionsForAttempt } from '@/features/exams/hooks/use-questions-for-attempt'
+import { buildQuestionNoteFields } from '@/features/exams/utils/question-to-note'
+import { createNote } from '@/lib/db/notes.repository'
 import { useElapsedTick } from '@/features/timer/hooks/use-elapsed-tick'
 import QuestionMediaViewer from '@/features/questions/components/QuestionMediaViewer'
 import { isAnswerCorrect } from '@/lib/srs/srs'
@@ -391,6 +394,8 @@ function QuestionsExamResults({
   const [notes, setNotes] = useState<string>(attempt.notes ?? '')
   const [savingNotes, setSavingNotes] = useState(false)
   const [showAll, setShowAll] = useState(false)
+  const [savedNoteIds, setSavedNoteIds] = useState<Set<string>>(() => new Set())
+  const [savingNoteId, setSavingNoteId] = useState<string | null>(null)
 
   const responses = attempt.responses ?? []
   const responsesByQuestion = useMemo(() => {
@@ -398,6 +403,30 @@ function QuestionsExamResults({
     for (const r of responses) map.set(r.questionId, r)
     return map
   }, [responses])
+
+  const handleSaveAsNote = async (question: Question) => {
+    try {
+      setSavingNoteId(question.id)
+      const input = buildQuestionNoteFields({
+        goalId: attempt.goalId,
+        question,
+        response: responsesByQuestion.get(question.id),
+        examTitle: attempt.title,
+        labels: t.examenes.questionsResult.noteBuilder,
+      })
+      await createNote(input)
+      setSavedNoteIds((prev) => {
+        const next = new Set(prev)
+        next.add(question.id)
+        return next
+      })
+      toast.success(t.examenes.questionsResult.saveAsNoteToast)
+    } catch {
+      toast.error(t.examenes.questionsResult.saveAsNoteError)
+    } finally {
+      setSavingNoteId(null)
+    }
+  }
 
   const score = attempt.score ?? 0
   const maxScore = attempt.maxScore ?? questions.length
