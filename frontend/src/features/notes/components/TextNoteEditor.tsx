@@ -4,9 +4,10 @@ import { AlertTriangle } from 'lucide-react'
 import { createNote, deleteNote, updateNote } from '@/lib/db/notes.repository'
 import type { Note } from '@/lib/db/schema'
 import { useT } from '@/i18n/i18n-context'
+import GoalMultiPicker from './GoalMultiPicker'
 
 type TextNoteEditorProps = {
-  goalId: string
+  goalIds: string[]
   sourceSessionId?: string | null
   existing?: Note | null
   onDone: () => void
@@ -14,7 +15,7 @@ type TextNoteEditorProps = {
 }
 
 function TextNoteEditor({
-  goalId,
+  goalIds,
   sourceSessionId = null,
   existing,
   onDone,
@@ -23,6 +24,10 @@ function TextNoteEditor({
   const { t } = useT()
   const [title, setTitle] = useState(existing?.title ?? '')
   const [text, setText] = useState(existing?.text ?? '')
+  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>(
+    existing?.goalIds ?? goalIds,
+  )
+  const [goalsError, setGoalsError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
@@ -30,8 +35,14 @@ function TextNoteEditor({
     if (existing) {
       setTitle(existing.title)
       setText(existing.text ?? '')
+      setSelectedGoalIds(existing.goalIds)
     }
   }, [existing])
+
+  const handleGoalsChange = (ids: string[]) => {
+    setGoalsError(null)
+    setSelectedGoalIds(ids)
+  }
 
   const handleSave = async () => {
     const trimmedTitle = title.trim()
@@ -47,13 +58,21 @@ function TextNoteEditor({
       toast.error(t.notes.errors.textRequired)
       return
     }
+    if (selectedGoalIds.length === 0) {
+      setGoalsError(t.notes.errors.selectGoals)
+      return
+    }
     try {
       setSaving(true)
       if (existing) {
-        await updateNote(existing.id, { title: trimmedTitle, text })
+        await updateNote(existing.id, {
+          title: trimmedTitle,
+          text,
+          goalIds: selectedGoalIds,
+        })
       } else {
         await createNote({
-          goalIds: [goalId],
+          goalIds: selectedGoalIds,
           kind: 'text',
           title: trimmedTitle,
           text,
@@ -82,6 +101,11 @@ function TextNoteEditor({
 
   return (
     <div className="flex flex-col gap-3">
+      <GoalMultiPicker
+        selectedIds={selectedGoalIds}
+        onChange={handleGoalsChange}
+        error={goalsError}
+      />
       <input
         type="text"
         value={title}

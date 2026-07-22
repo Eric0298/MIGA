@@ -13,9 +13,10 @@ import { formatBytes } from '@/lib/format-bytes'
 import { useT } from '@/i18n/i18n-context'
 import { tpl } from '@/i18n/tpl'
 import type { Messages } from '@/i18n/messages/es'
+import GoalMultiPicker from './GoalMultiPicker'
 
 type ImageNoteEditorProps = {
-  goalId: string
+  goalIds: string[]
   sourceSessionId?: string | null
   existing?: Note | null
   onDone: () => void
@@ -41,7 +42,7 @@ function translateFileError(
 }
 
 function ImageNoteEditor({
-  goalId,
+  goalIds,
   sourceSessionId = null,
   existing,
   onDone,
@@ -54,8 +55,17 @@ function ImageNoteEditor({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [existingUrl, setExistingUrl] = useState<string | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
+  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>(
+    existing?.goalIds ?? goalIds,
+  )
+  const [goalsError, setGoalsError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  const handleGoalsChange = (ids: string[]) => {
+    setGoalsError(null)
+    setSelectedGoalIds(ids)
+  }
 
   // Load the existing image blob for preview.
   useEffect(() => {
@@ -106,13 +116,17 @@ function ImageNoteEditor({
       toast.error(t.notes.errors.titleRequired)
       return
     }
+    if (selectedGoalIds.length === 0) {
+      setGoalsError(t.notes.errors.selectGoals)
+      return
+    }
     let blobId: string | null = null
     try {
       setSaving(true)
       const record = await putNoteBlob({ blob: file, mimeType: file.type })
       blobId = record.id
       const note = await createNote({
-        goalIds: [goalId],
+        goalIds: selectedGoalIds,
         kind: 'image',
         title: trimmedTitle,
         fileBlobKey: blobId,
@@ -147,9 +161,13 @@ function ImageNoteEditor({
       toast.error(t.notes.errors.titleRequired)
       return
     }
+    if (selectedGoalIds.length === 0) {
+      setGoalsError(t.notes.errors.selectGoals)
+      return
+    }
     try {
       setSaving(true)
-      await updateNote(existing.id, { title: trimmedTitle })
+      await updateNote(existing.id, { title: trimmedTitle, goalIds: selectedGoalIds })
       toast.success(t.notes.saved)
       onDone()
     } catch {
@@ -174,6 +192,11 @@ function ImageNoteEditor({
   if (existing) {
     return (
       <div className="flex flex-col gap-3">
+        <GoalMultiPicker
+          selectedIds={selectedGoalIds}
+          onChange={handleGoalsChange}
+          error={goalsError}
+        />
         <input
           type="text"
           value={title}
@@ -256,6 +279,11 @@ function ImageNoteEditor({
   // --------- Create new image note ---------
   return (
     <div className="flex flex-col gap-3">
+      <GoalMultiPicker
+        selectedIds={selectedGoalIds}
+        onChange={handleGoalsChange}
+        error={goalsError}
+      />
       <input
         type="text"
         value={title}

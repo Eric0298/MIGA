@@ -110,7 +110,7 @@ function NotesPanel({ goalId, sourceSessionId = null }: NotesPanelProps) {
 
       {isEditor && (
         <NoteEditor
-          goalId={goalId}
+          goalIds={[goalId]}
           sourceSessionId={sourceSessionId}
           existingNoteId={editingId}
           createKind={createKind}

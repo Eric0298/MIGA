@@ -75,6 +75,7 @@ export const es = {
     notesCountOther: '{count} apuntes',
     emptyGoalsTitle: 'Aún no tienes metas',
     emptyGoalsDescription: 'Crea una meta primero para poder tomar apuntes.',
+    addNote: 'Añadir apunte',
   },
   examenes: {
     title: 'Exámenes',
@@ -640,6 +641,8 @@ export const es = {
     confirmDeleteTitle: '¿Eliminar este apunte?',
     confirmDeleteYes: 'Sí, eliminar',
     notEditableYet: 'Este tipo de apunte todavía no se puede editar.',
+    selectGoalsTitle: 'Metas',
+    noGoalsAvailable: 'Crea una meta antes de añadir apuntes.',
     picker: {
       title: 'Elige el tipo de apunte',
       text: 'Texto',
@@ -677,6 +680,7 @@ export const es = {
       titleMax: 'Máximo 80 caracteres',
       textRequired: 'Escribe algo antes de guardar',
       textMax: 'El texto es demasiado largo',
+      selectGoals: 'Selecciona al menos una meta.',
     },
   },
   questions: {

@@ -8,7 +8,9 @@ import ImageNoteEditor from './ImageNoteEditor'
 import DocumentNoteEditor from './DocumentNoteEditor'
 
 type NoteEditorProps = {
-  goalId: string
+  /** Initial selection of goals for a new note (empty when the editor is
+   *  triggered from the global apuntes hub without a specific goal context). */
+  goalIds: string[]
   sourceSessionId?: string | null
   existingNoteId?: string
   /** Kind requested when creating a new note. Ignored when editing an
@@ -24,7 +26,7 @@ type NoteEditorProps = {
  * ImageNoteEditor. Document notes (N4) will land here as another branch.
  */
 function NoteEditor({
-  goalId,
+  goalIds,
   sourceSessionId = null,
   existingNoteId,
   createKind = 'text',
@@ -65,7 +67,7 @@ function NoteEditor({
   if (kind === 'text') {
     return (
       <TextNoteEditor
-        goalId={goalId}
+        goalIds={goalIds}
         sourceSessionId={sourceSessionId}
         existing={loaded}
         onDone={onDone}
@@ -76,7 +78,7 @@ function NoteEditor({
   if (kind === 'voice') {
     return (
       <VoiceNoteEditor
-        goalId={goalId}
+        goalIds={goalIds}
         sourceSessionId={sourceSessionId}
         existing={loaded}
         onDone={onDone}
@@ -87,7 +89,7 @@ function NoteEditor({
   if (kind === 'image') {
     return (
       <ImageNoteEditor
-        goalId={goalId}
+        goalIds={goalIds}
         sourceSessionId={sourceSessionId}
         existing={loaded}
         onDone={onDone}
@@ -98,7 +100,7 @@ function NoteEditor({
   if (kind === 'document') {
     return (
       <DocumentNoteEditor
-        goalId={goalId}
+        goalIds={goalIds}
         sourceSessionId={sourceSessionId}
         existing={loaded}
         onDone={onDone}

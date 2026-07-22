@@ -76,6 +76,7 @@ export const en: Messages = {
     notesCountOther: '{count} notes',
     emptyGoalsTitle: 'No goals yet',
     emptyGoalsDescription: 'Create a goal first so you can take notes.',
+    addNote: 'Add note',
   },
   examenes: {
     title: 'Exams',
@@ -638,6 +639,8 @@ export const en: Messages = {
     confirmDeleteTitle: 'Delete this note?',
     confirmDeleteYes: 'Yes, delete',
     notEditableYet: 'This note type cannot be edited yet.',
+    selectGoalsTitle: 'Goals',
+    noGoalsAvailable: 'Create a goal before adding notes.',
     picker: {
       title: 'Choose the note type',
       text: 'Text',
@@ -675,6 +678,7 @@ export const en: Messages = {
       titleMax: 'Maximum 80 characters',
       textRequired: 'Write something before saving',
       textMax: 'The text is too long',
+      selectGoals: 'Select at least one goal.',
     },
   },
   questions: {

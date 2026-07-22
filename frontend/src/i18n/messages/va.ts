@@ -76,6 +76,7 @@ export const va: Messages = {
     notesCountOther: '{count} apunts',
     emptyGoalsTitle: 'Encara no tens metes',
     emptyGoalsDescription: 'Crea primer una meta per a poder prendre apunts.',
+    addNote: 'Afegir apunt',
   },
   examenes: {
     title: 'Exàmens',
@@ -641,6 +642,8 @@ export const va: Messages = {
     confirmDeleteTitle: 'Eliminar este apunt?',
     confirmDeleteYes: 'Sí, eliminar',
     notEditableYet: 'Este tipus d’apunt encara no es pot editar.',
+    selectGoalsTitle: 'Metes',
+    noGoalsAvailable: 'Crea una meta abans d’afegir apunts.',
     picker: {
       title: 'Tria el tipus d’apunt',
       text: 'Text',
@@ -678,6 +681,7 @@ export const va: Messages = {
       titleMax: 'Màxim 80 caràcters',
       textRequired: 'Escriu alguna cosa abans de guardar',
       textMax: 'El text és massa llarg',
+      selectGoals: 'Tria almenys una meta.',
     },
   },
   questions: {
