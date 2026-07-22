@@ -7,6 +7,7 @@ import {
   materialMetadataSchema,
   noteKind,
   noteMetadataSchema,
+  noteSource,
   sessionStatus,
   type ExamAttempt,
   type Goal,
@@ -14,6 +15,7 @@ import {
   type MaterialGoalLink,
   type MaterialProgress,
   type Note,
+  type NoteSource,
   type Question,
   type Session,
 } from './schema'
@@ -82,7 +84,7 @@ const materialProgressRecordSchema = z.object({
   updatedAt: z.number(),
 })
 
-const noteRecordSchema = z.object({
+const noteV5RecordSchema = z.object({
   id: z.string(),
   goalId: z.string(),
   kind: noteKind,
@@ -94,6 +96,29 @@ const noteRecordSchema = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
 })
+
+const noteRecordSchema = z.object({
+  id: z.string(),
+  goalIds: z.array(z.string()).min(1),
+  kind: noteKind,
+  title: z.string(),
+  text: z.string().optional(),
+  fileBlobKey: z.string().optional(),
+  metadata: noteMetadataSchema,
+  sourceSessionId: z.string().nullable(),
+  source: noteSource,
+  createdAt: z.number(),
+  updatedAt: z.number(),
+})
+
+function inferNoteSource(
+  sourceSessionId: string | null,
+  title: string,
+): NoteSource {
+  if (sourceSessionId) return 'session'
+  if (title.startsWith('Repaso · ')) return 'exam'
+  return 'manual'
+}
 
 const questionRecordSchema = z.object({
   id: z.string(),
@@ -148,7 +173,7 @@ const examAttemptRecordSchema = z.object({
   updatedAt: z.number(),
 })
 
-export const CURRENT_EXPORT_VERSION = 6
+export const CURRENT_EXPORT_VERSION = 7
 
 const payloadV1Schema = z.object({
   version: z.literal(1),
@@ -194,11 +219,24 @@ const payloadV5Schema = z.object({
   materials: z.array(materialRecordSchema),
   materialGoalLinks: z.array(materialGoalLinkRecordSchema),
   materialProgress: z.array(materialProgressRecordSchema),
-  notes: z.array(noteRecordSchema),
+  notes: z.array(noteV5RecordSchema),
 })
 
 const payloadV6Schema = z.object({
   version: z.literal(6),
+  exportedAt: z.number(),
+  goals: z.array(goalRecordSchema),
+  sessions: z.array(sessionRecordSchema),
+  materials: z.array(materialRecordSchema),
+  materialGoalLinks: z.array(materialGoalLinkRecordSchema),
+  materialProgress: z.array(materialProgressRecordSchema),
+  notes: z.array(noteV5RecordSchema),
+  questions: z.array(questionRecordSchema),
+  examAttempts: z.array(examAttemptRecordSchema),
+})
+
+const payloadV7Schema = z.object({
+  version: z.literal(7),
   exportedAt: z.number(),
   goals: z.array(goalRecordSchema),
   sessions: z.array(sessionRecordSchema),
@@ -217,9 +255,10 @@ export const exportPayloadSchema = z.union([
   payloadV4Schema,
   payloadV5Schema,
   payloadV6Schema,
+  payloadV7Schema,
 ])
 
-export type ExportPayload = z.infer<typeof payloadV6Schema>
+export type ExportPayload = z.infer<typeof payloadV7Schema>
 
 export type ImportResult = {
   goalsCount: number
@@ -272,11 +311,24 @@ export async function buildExportPayload(): Promise<ExportPayload> {
   }
 }
 
+function migrateV5NotesToV7(
+  notes: z.infer<typeof noteV5RecordSchema>[],
+): z.infer<typeof noteRecordSchema>[] {
+  return notes.map((n) => {
+    const { goalId, ...rest } = n
+    return {
+      ...rest,
+      goalIds: [goalId],
+      source: inferNoteSource(rest.sourceSessionId, rest.title),
+    }
+  })
+}
+
 export function parseImportPayload(raw: unknown): ExportPayload {
   const parsed = exportPayloadSchema.parse(raw)
   if (parsed.version === 1) {
     return {
-      version: 6,
+      version: 7,
       exportedAt: parsed.exportedAt,
       goals: parsed.goals,
       sessions: parsed.sessions.map((s) => ({ ...s, materialIds: [] })),
@@ -290,7 +342,7 @@ export function parseImportPayload(raw: unknown): ExportPayload {
   }
   if (parsed.version === 2) {
     return {
-      version: 6,
+      version: 7,
       exportedAt: parsed.exportedAt,
       goals: parsed.goals,
       sessions: parsed.sessions.map((s) => ({ ...s, materialIds: [] })),
@@ -304,7 +356,7 @@ export function parseImportPayload(raw: unknown): ExportPayload {
   }
   if (parsed.version === 3) {
     return {
-      version: 6,
+      version: 7,
       exportedAt: parsed.exportedAt,
       goals: parsed.goals,
       sessions: parsed.sessions.map((s) => {
@@ -322,7 +374,7 @@ export function parseImportPayload(raw: unknown): ExportPayload {
   if (parsed.version === 4) {
     return {
       ...parsed,
-      version: 6,
+      version: 7,
       notes: [],
       questions: [],
       examAttempts: [],
@@ -331,9 +383,17 @@ export function parseImportPayload(raw: unknown): ExportPayload {
   if (parsed.version === 5) {
     return {
       ...parsed,
-      version: 6,
+      version: 7,
+      notes: migrateV5NotesToV7(parsed.notes),
       questions: [],
       examAttempts: [],
+    }
+  }
+  if (parsed.version === 6) {
+    return {
+      ...parsed,
+      version: 7,
+      notes: migrateV5NotesToV7(parsed.notes),
     }
   }
   return parsed

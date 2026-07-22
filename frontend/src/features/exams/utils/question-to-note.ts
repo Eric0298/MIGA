@@ -64,9 +64,10 @@ export function buildQuestionNoteFields(params: {
   const text = lines.join('\n').slice(0, NOTE_LIMITS.text.maxChars)
 
   return {
-    goalId,
+    goalIds: [goalId],
     kind: 'text',
     title,
     text,
+    source: 'exam',
   }
 }

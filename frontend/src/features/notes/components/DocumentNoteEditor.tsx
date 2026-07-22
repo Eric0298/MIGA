@@ -134,7 +134,7 @@ function DocumentNoteEditor({
       const record = await putNoteBlob({ blob: file, mimeType: file.type })
       blobId = record.id
       const note = await createNote({
-        goalId,
+        goalIds: [goalId],
         kind: 'document',
         title: trimmedTitle,
         fileBlobKey: blobId,

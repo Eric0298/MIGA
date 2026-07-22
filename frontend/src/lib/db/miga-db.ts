@@ -151,6 +151,51 @@ class MigaDatabase extends Dexie {
       questionBlobs: '&id, questionId, createdAt',
       examAttempts: '&id, goalId, kind, status, startedAt, endedAt',
     })
+
+    // v10 — notes can belong to more than one goal (goalIds: string[] indexed
+    // multi-entry) and now carry a `source` categorising their origin so the
+    // upcoming global notes hub can filter by "manual / session / exam".
+    this.version(10)
+      .stores({
+        goals: '&id, createdAt, updatedAt',
+        sessions: '&id, goalId, status, startedAt, endedAt',
+        materials: '&id, kind, createdAt, updatedAt',
+        materialGoalLinks: '&id, materialId, goalId, [materialId+goalId], createdAt',
+        materialProgress: '&id, materialId, goalId, sessionId, createdAt, endedAt',
+        materialBlobs: '&id, materialId, createdAt',
+        notes: '&id, *goalIds, kind, source, sourceSessionId, createdAt, updatedAt',
+        noteBlobs: '&id, noteId, createdAt',
+        questions: '&id, goalId, createdAt, updatedAt',
+        questionBlobs: '&id, questionId, createdAt',
+        examAttempts: '&id, goalId, kind, status, startedAt, endedAt',
+      })
+      .upgrade(async (tx) => {
+        type LegacyNote = {
+          goalId?: string
+          goalIds?: string[]
+          source?: string
+          sourceSessionId?: string | null
+          title?: string
+        }
+        await tx
+          .table<LegacyNote>('notes')
+          .toCollection()
+          .modify((note) => {
+            if (!Array.isArray(note.goalIds)) {
+              note.goalIds = note.goalId ? [note.goalId] : []
+            }
+            delete note.goalId
+            if (!note.source) {
+              if (note.sourceSessionId) {
+                note.source = 'session'
+              } else if (typeof note.title === 'string' && note.title.startsWith('Repaso · ')) {
+                note.source = 'exam'
+              } else {
+                note.source = 'manual'
+              }
+            }
+          })
+      })
   }
 }
 

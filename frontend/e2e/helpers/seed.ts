@@ -199,6 +199,9 @@ export async function seedQuestions(page: Page, goalId: string): Promise<string[
       const build = (index: number) => {
         const correctId = crypto.randomUUID()
         const wrongId = crypto.randomUUID()
+        // Stagger createdAt by index so `sortBy('createdAt')` is deterministic
+        // and "original order" in the exam create page respects (1, 2, ...).
+        const at = now + index
         return {
           id: crypto.randomUUID(),
           goalId: gId,
@@ -208,8 +211,8 @@ export async function seedQuestions(page: Page, goalId: string): Promise<string[
             { id: wrongId, text: `Incorrecta ${index}`, isCorrect: false },
           ],
           reviewState: emptyReviewState,
-          createdAt: now,
-          updatedAt: now,
+          createdAt: at,
+          updatedAt: at,
         }
       }
       const rows = [build(1), build(2)]

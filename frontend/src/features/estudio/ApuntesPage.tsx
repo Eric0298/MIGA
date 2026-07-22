@@ -13,7 +13,9 @@ function ApuntesPage() {
     const rows = await db.notes.toArray()
     const acc: Record<string, number> = {}
     for (const n of rows) {
-      acc[n.goalId] = (acc[n.goalId] ?? 0) + 1
+      for (const gid of n.goalIds) {
+        acc[gid] = (acc[gid] ?? 0) + 1
+      }
     }
     return acc
   }, [])

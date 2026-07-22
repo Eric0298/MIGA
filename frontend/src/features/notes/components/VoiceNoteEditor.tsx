@@ -192,7 +192,7 @@ function VoiceNoteEditor({
       const record = await putNoteBlob({ blob: audioBlob, mimeType: audioBlob.type })
       blobId = record.id
       const note = await createNote({
-        goalId,
+        goalIds: [goalId],
         kind: 'voice',
         title: trimmedTitle,
         fileBlobKey: blobId,

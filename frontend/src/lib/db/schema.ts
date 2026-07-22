@@ -200,6 +200,16 @@ export const noteKind = z.enum(['text', 'voice', 'document', 'image'])
 export type NoteKind = z.infer<typeof noteKind>
 
 /**
+ * Where a note came from. Set on create so global-listing screens can filter
+ * without having to reverse-engineer the title or hunt for `sourceSessionId`.
+ *  - 'manual'  → user typed it in an apuntes editor.
+ *  - 'session' → created inside a live session (has sourceSessionId).
+ *  - 'exam'    → generated from a failed exam question via the E9b bridge.
+ */
+export const noteSource = z.enum(['manual', 'session', 'exam'])
+export type NoteSource = z.infer<typeof noteSource>
+
+/**
  * Upload limits and quality settings for user-recorded voice notes.
  * Kept in schema so both the recorder UI and the input validation share them.
  */
@@ -238,13 +248,14 @@ export type NoteMetadata = z.infer<typeof noteMetadataSchema>
 
 export const noteInputSchema = z
   .object({
-    goalId: z.uuid(),
+    goalIds: z.array(z.uuid()).min(1, 'selectGoals'),
     kind: noteKind,
     title: z.string().trim().min(1, 'titleRequired').max(80, 'titleMax'),
     text: z.string().max(NOTE_LIMITS.text.maxChars, 'textMax').optional(),
     fileBlobKey: z.string().optional(),
     metadata: noteMetadataSchema.optional(),
     sourceSessionId: z.uuid().nullable().optional(),
+    source: noteSource.optional(),
   })
   .superRefine((data, ctx) => {
     if (data.kind === 'text') {
@@ -303,13 +314,14 @@ export type NoteInput = z.infer<typeof noteInputSchema>
 
 export type Note = {
   id: string
-  goalId: string
+  goalIds: string[]
   kind: NoteKind
   title: string
   text?: string
   fileBlobKey?: string
   metadata: NoteMetadata
   sourceSessionId: string | null
+  source: NoteSource
   createdAt: number
   updatedAt: number
 }

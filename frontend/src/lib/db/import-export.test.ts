@@ -29,7 +29,7 @@ afterEach(async () => {
   await db.examAttempts.clear()
 })
 
-describe('import-export v6', () => {
+describe('import-export v7', () => {
   it('builds an export payload with current goals, sessions, materials and links', async () => {
     const goal = await createGoal({
       name: 'Estudiar',
@@ -80,7 +80,7 @@ describe('import-export v6', () => {
       ],
       sessions: [],
     })
-    expect(parsed.version).toBe(6)
+    expect(parsed.version).toBe(7)
     expect(parsed.materials).toEqual([])
     expect(parsed.materialGoalLinks).toEqual([])
     expect(parsed.materialProgress).toEqual([])
@@ -110,7 +110,7 @@ describe('import-export v6', () => {
       materialGoalLinks: [],
       materialProgress: [],
     })
-    expect(parsed.version).toBe(6)
+    expect(parsed.version).toBe(7)
     expect(parsed.notes).toEqual([])
     expect(parsed.questions).toEqual([])
     expect(parsed.examAttempts).toEqual([])
@@ -128,7 +128,7 @@ describe('import-export v6', () => {
       materialProgress: [],
       notes: [],
     })
-    expect(parsed.version).toBe(6)
+    expect(parsed.version).toBe(7)
     expect(parsed.questions).toEqual([])
     expect(parsed.examAttempts).toEqual([])
   })
@@ -157,7 +157,7 @@ describe('import-export v6', () => {
       materialGoalLinks: [],
       materialProgress: [],
     })
-    expect(parsed.version).toBe(6)
+    expect(parsed.version).toBe(7)
     expect(parsed.sessions).toHaveLength(1)
     expect(parsed.sessions[0].materialIds).toEqual(['mat-abc'])
     expect(parsed.notes).toEqual([])
@@ -300,13 +300,13 @@ describe('import-export v6', () => {
       scheduledDays: ['2026-07-10'],
     })
     await createNote({
-      goalId: goal.id,
+      goalIds: [goal.id],
       kind: 'text',
       title: 'Ideas',
       text: 'Repasar hoy',
     })
     await createNote({
-      goalId: goal.id,
+      goalIds: [goal.id],
       kind: 'text',
       title: 'Duda',
       text: 'Revisar el ejercicio 4',
@@ -341,8 +341,8 @@ describe('import-export v6', () => {
       [goalA.id],
     )
     await attachMaterialToGoal(material.id, goalB.id)
-    await createNote({ goalId: goalA.id, kind: 'text', title: 'A', text: 'x' })
-    await createNote({ goalId: goalB.id, kind: 'text', title: 'B', text: 'x' })
+    await createNote({ goalIds: [goalA.id], kind: 'text', title: 'A', text: 'x' })
+    await createNote({ goalIds: [goalB.id], kind: 'text', title: 'B', text: 'x' })
 
     await deleteGoal(goalA.id)
     const remainingLinks = await db.materialGoalLinks.toArray()

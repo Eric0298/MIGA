@@ -112,7 +112,7 @@ function ImageNoteEditor({
       const record = await putNoteBlob({ blob: file, mimeType: file.type })
       blobId = record.id
       const note = await createNote({
-        goalId,
+        goalIds: [goalId],
         kind: 'image',
         title: trimmedTitle,
         fileBlobKey: blobId,

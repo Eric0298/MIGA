@@ -53,7 +53,7 @@ function TextNoteEditor({
         await updateNote(existing.id, { title: trimmedTitle, text })
       } else {
         await createNote({
-          goalId,
+          goalIds: [goalId],
           kind: 'text',
           title: trimmedTitle,
           text,

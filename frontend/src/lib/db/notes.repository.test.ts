@@ -22,23 +22,24 @@ afterEach(async () => {
 describe('notes repository', () => {
   it('creates a text note with generated id and timestamps', async () => {
     const note = await createNote({
-      goalId: GOAL_A,
+      goalIds: [GOAL_A],
       kind: 'text',
       title: 'Ideas',
       text: 'Repasar el capítulo 2',
     })
     expect(note.id).toBeTypeOf('string')
-    expect(note.goalId).toBe(GOAL_A)
+    expect(note.goalIds).toEqual([GOAL_A])
     expect(note.kind).toBe('text')
     expect(note.text).toBe('Repasar el capítulo 2')
     expect(note.sourceSessionId).toBeNull()
+    expect(note.source).toBe('manual')
     expect(note.createdAt).toBeGreaterThan(0)
     expect(note.updatedAt).toBe(note.createdAt)
   })
 
   it('records the source session id when the note was created inside a session', async () => {
     const note = await createNote({
-      goalId: GOAL_A,
+      goalIds: [GOAL_A],
       kind: 'text',
       title: 'Ideas',
       text: 'x',
@@ -50,7 +51,7 @@ describe('notes repository', () => {
   it('rejects a text note without text via zod', async () => {
     await expect(
       createNote({
-        goalId: GOAL_A,
+        goalIds: [GOAL_A],
         kind: 'text',
         title: 'Ideas',
       }),
@@ -60,7 +61,7 @@ describe('notes repository', () => {
   it('rejects a voice note without fileBlobKey', async () => {
     await expect(
       createNote({
-        goalId: GOAL_A,
+        goalIds: [GOAL_A],
         kind: 'voice',
         title: 'Grabación',
       }),
@@ -70,7 +71,7 @@ describe('notes repository', () => {
   it('rejects a document note with an unsupported mime type', async () => {
     await expect(
       createNote({
-        goalId: GOAL_A,
+        goalIds: [GOAL_A],
         kind: 'document',
         title: 'Fichero',
         fileBlobKey: 'blob-1',
@@ -85,7 +86,7 @@ describe('notes repository', () => {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ]) {
       const note = await createNote({
-        goalId: GOAL_A,
+        goalIds: [GOAL_A],
         kind: 'document',
         title: 'Fichero',
         fileBlobKey: 'blob-1',
@@ -97,26 +98,26 @@ describe('notes repository', () => {
 
   it('lists notes of a goal ordered by updatedAt desc', async () => {
     const first = await createNote({
-      goalId: GOAL_A,
+      goalIds: [GOAL_A],
       kind: 'text',
       title: 'A',
       text: 'x',
     })
     await new Promise((r) => setTimeout(r, 5))
     const second = await createNote({
-      goalId: GOAL_A,
+      goalIds: [GOAL_A],
       kind: 'text',
       title: 'B',
       text: 'x',
     })
-    await createNote({ goalId: GOAL_B, kind: 'text', title: 'Other', text: 'x' })
+    await createNote({ goalIds: [GOAL_B], kind: 'text', title: 'Other', text: 'x' })
     const list = await listNotesByGoal(GOAL_A)
     expect(list.map((n) => n.id)).toEqual([second.id, first.id])
   })
 
   it('updates title and text and bumps updatedAt', async () => {
     const note = await createNote({
-      goalId: GOAL_A,
+      goalIds: [GOAL_A],
       kind: 'text',
       title: 'A',
       text: 'x',
@@ -133,7 +134,7 @@ describe('notes repository', () => {
   it('rejects updating the text of a voice note', async () => {
     const blob = await putNoteBlob({ blob: new Blob(['x'], { type: 'audio/webm' }) })
     const note = await createNote({
-      goalId: GOAL_A,
+      goalIds: [GOAL_A],
       kind: 'voice',
       title: 'Voz',
       fileBlobKey: blob.id,
@@ -149,7 +150,7 @@ describe('notes repository', () => {
   it('rejects updating the file of an image note but allows renaming', async () => {
     const blob = await putNoteBlob({ blob: new Blob(['x'], { type: 'image/png' }) })
     const note = await createNote({
-      goalId: GOAL_A,
+      goalIds: [GOAL_A],
       kind: 'image',
       title: 'Foto',
       fileBlobKey: blob.id,
@@ -164,7 +165,7 @@ describe('notes repository', () => {
   it('accepts image files of allowed mime types', async () => {
     for (const mime of ['image/png', 'image/jpeg', 'image/webp', 'image/gif']) {
       const note = await createNote({
-        goalId: GOAL_A,
+        goalIds: [GOAL_A],
         kind: 'image',
         title: 'Foto',
         fileBlobKey: 'blob-x',
@@ -177,7 +178,7 @@ describe('notes repository', () => {
   it('rejects an image note with an unsupported mime type', async () => {
     await expect(
       createNote({
-        goalId: GOAL_A,
+        goalIds: [GOAL_A],
         kind: 'image',
         title: 'Foto',
         fileBlobKey: 'blob-x',
@@ -189,7 +190,7 @@ describe('notes repository', () => {
   it('deletes a note and cascades its blob', async () => {
     const blob = await putNoteBlob({ blob: new Blob(['x'], { type: 'audio/webm' }) })
     const note = await createNote({
-      goalId: GOAL_A,
+      goalIds: [GOAL_A],
       kind: 'voice',
       title: 'Voz',
       fileBlobKey: blob.id,
@@ -202,11 +203,58 @@ describe('notes repository', () => {
   })
 
   it('deletes every note of a goal at once', async () => {
-    await createNote({ goalId: GOAL_A, kind: 'text', title: 'A', text: 'x' })
-    await createNote({ goalId: GOAL_A, kind: 'text', title: 'B', text: 'x' })
-    await createNote({ goalId: GOAL_B, kind: 'text', title: 'C', text: 'x' })
+    await createNote({ goalIds: [GOAL_A], kind: 'text', title: 'A', text: 'x' })
+    await createNote({ goalIds: [GOAL_A], kind: 'text', title: 'B', text: 'x' })
+    await createNote({ goalIds: [GOAL_B], kind: 'text', title: 'C', text: 'x' })
     await deleteNotesByGoal(GOAL_A)
     expect((await listNotesByGoal(GOAL_A)).length).toBe(0)
     expect((await listNotesByGoal(GOAL_B)).length).toBe(1)
+  })
+
+  it('lists a note under every goal it belongs to', async () => {
+    const shared = await createNote({
+      goalIds: [GOAL_A, GOAL_B],
+      kind: 'text',
+      title: 'Compartida',
+      text: 'x',
+    })
+    const listA = await listNotesByGoal(GOAL_A)
+    const listB = await listNotesByGoal(GOAL_B)
+    expect(listA.map((n) => n.id)).toContain(shared.id)
+    expect(listB.map((n) => n.id)).toContain(shared.id)
+  })
+
+  it('unlinks a shared note when only one of its goals is deleted', async () => {
+    const shared = await createNote({
+      goalIds: [GOAL_A, GOAL_B],
+      kind: 'text',
+      title: 'Compartida',
+      text: 'x',
+    })
+    await deleteNotesByGoal(GOAL_A)
+    const kept = await getNote(shared.id)
+    expect(kept?.goalIds).toEqual([GOAL_B])
+  })
+
+  it('infers source=session when sourceSessionId is provided', async () => {
+    const note = await createNote({
+      goalIds: [GOAL_A],
+      kind: 'text',
+      title: 'Idea de sesión',
+      text: 'x',
+      sourceSessionId: SESSION_A,
+    })
+    expect(note.source).toBe('session')
+  })
+
+  it('respects an explicit source override (e.g. exam bridge)', async () => {
+    const note = await createNote({
+      goalIds: [GOAL_A],
+      kind: 'text',
+      title: 'Repaso · pregunta',
+      text: 'x',
+      source: 'exam',
+    })
+    expect(note.source).toBe('exam')
   })
 })
