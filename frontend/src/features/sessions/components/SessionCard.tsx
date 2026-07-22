@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -31,14 +32,18 @@ function SessionCard({ session }: SessionCardProps) {
 
   return (
     <li className="flex items-start justify-between gap-3 rounded-2xl bg-surface p-5">
-      <div className="flex-1">
+      <Link
+        to={`/app/sesiones/${session.id}`}
+        aria-label={t.sessions.detail.openAria}
+        className="flex-1 rounded-xl transition-colors hover:bg-cream/60"
+      >
         <h3 className="text-base font-semibold text-charcoal">
           {goal ? goal.name : t.common.freeSession}
         </h3>
         <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">
           {formatShortDuration(duration)} · {dateLabel}
         </p>
-      </div>
+      </Link>
       <button
         type="button"
         onClick={handleDelete}

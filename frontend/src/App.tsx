@@ -12,6 +12,7 @@ import EstudioHubPage from '@/features/estudio/EstudioHubPage'
 const LandingPage = lazy(() => import('@/features/landing/LandingPage'))
 const ArchitecturePage = lazy(() => import('@/features/architecture/ArchitecturePage'))
 const GoalDetailPage = lazy(() => import('@/features/goals/GoalDetailPage'))
+const SessionDetailPage = lazy(() => import('@/features/sessions/SessionDetailPage'))
 const NotFoundPage = lazy(() => import('@/features/not-found/NotFoundPage'))
 const RepasoPage = lazy(() => import('@/features/estudio/RepasoPage'))
 const RepasoGoalPage = lazy(() => import('@/features/estudio/RepasoGoalPage'))
@@ -45,6 +46,7 @@ function App() {
             <Route path="metas/:id" element={<GoalDetailPage />} />
             <Route path="estudio" element={<EstudioHubPage />} />
             <Route path="sesiones" element={<SessionsPage />} />
+            <Route path="sesiones/:id" element={<SessionDetailPage />} />
             <Route path="apuntes" element={<ApuntesPage />} />
             <Route path="apuntes/:id" element={<ApuntesGoalPage />} />
             <Route path="notas" element={<NotasAllPage />} />
