@@ -21,6 +21,7 @@ const SimulacroCreatePage = lazy(() => import('@/features/estudio/SimulacroCreat
 const SimulacroSessionPage = lazy(() => import('@/features/estudio/SimulacroSessionPage'))
 const ApuntesPage = lazy(() => import('@/features/estudio/ApuntesPage'))
 const ApuntesGoalPage = lazy(() => import('@/features/estudio/ApuntesGoalPage'))
+const NotasAllPage = lazy(() => import('@/features/estudio/NotasAllPage'))
 const ExamenesPage = lazy(() => import('@/features/estudio/ExamenesPage'))
 const QuestionsExamCreatePage = lazy(
   () => import('@/features/estudio/QuestionsExamCreatePage'),
@@ -46,6 +47,7 @@ function App() {
             <Route path="sesiones" element={<SessionsPage />} />
             <Route path="apuntes" element={<ApuntesPage />} />
             <Route path="apuntes/:id" element={<ApuntesGoalPage />} />
+            <Route path="notas" element={<NotasAllPage />} />
             <Route path="repaso" element={<RepasoPage />} />
             <Route path="repaso/:id" element={<RepasoGoalPage />} />
             <Route path="repaso/:id/sesion" element={<RepasoSessionPage />} />

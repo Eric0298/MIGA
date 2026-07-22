@@ -1,13 +1,16 @@
 import { FileText, ImageIcon, Mic, StickyNote } from 'lucide-react'
 import { format } from 'date-fns'
-import type { Note, NoteKind } from '@/lib/db/schema'
+import type { Goal, Note, NoteKind } from '@/lib/db/schema'
 
 type NoteCardProps = {
   note: Note
   onClick?: () => void
+  /** When provided, the card shows small chips with each goal name. Used by
+   *  the global notes hub where notes can span more than one goal. */
+  goals?: Goal[]
 }
 
-function NoteCard({ note, onClick }: NoteCardProps) {
+function NoteCard({ note, onClick, goals }: NoteCardProps) {
   const preview =
     note.kind === 'text' && note.text
       ? note.text.replace(/\s+/g, ' ').slice(0, 140)
@@ -41,6 +44,18 @@ function NoteCard({ note, onClick }: NoteCardProps) {
           <p className="mt-0.5 line-clamp-2 text-xs text-[color:var(--color-text-muted)]">
             {preview}
           </p>
+        )}
+        {goals && goals.length > 0 && (
+          <ul className="mt-1.5 flex flex-wrap gap-1">
+            {goals.map((g) => (
+              <li
+                key={g.id}
+                className="inline-flex max-w-[10rem] items-center rounded-full bg-white/60 px-2 py-0.5 text-[10px] font-semibold text-charcoal ring-1 ring-[color:var(--color-border)]"
+              >
+                <span className="truncate">{g.name}</span>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </button>

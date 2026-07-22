@@ -17,7 +17,7 @@ type Tile = {
 
 const tiles: Tile[] = [
   { to: '/app/sesiones', labelKey: 'sessions', descriptionKey: 'sessionsDesc', icon: Clock },
-  { to: '/app/apuntes', labelKey: 'notes', descriptionKey: 'notesDesc', icon: StickyNote },
+  { to: '/app/notas', labelKey: 'notes', descriptionKey: 'notesDesc', icon: StickyNote },
   { to: '/app/repaso', labelKey: 'review', descriptionKey: 'reviewDesc', icon: Brain },
   {
     to: '/app/examenes',
