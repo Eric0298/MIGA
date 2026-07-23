@@ -102,6 +102,10 @@ export const es = {
     emptyNoNotesTitle: 'Aún no tienes notas',
     emptyNoNotesDescription: 'Las notas que crees en tus metas aparecerán aquí.',
     unknownGoal: 'Meta borrada',
+    detailEmptyTitle: 'Selecciona una nota',
+    detailEmptyDescription: 'Elige una nota de la lista para leerla o editarla aquí.',
+    listSection: 'Lista de notas',
+    detailSection: 'Detalle de la nota',
   },
   examenes: {
     title: 'Exámenes',

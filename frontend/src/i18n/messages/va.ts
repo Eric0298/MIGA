@@ -103,6 +103,10 @@ export const va: Messages = {
     emptyNoNotesTitle: 'Encara no tens notes',
     emptyNoNotesDescription: 'Les notes que crees en les teues metes apareixeran ací.',
     unknownGoal: 'Meta esborrada',
+    detailEmptyTitle: 'Selecciona una nota',
+    detailEmptyDescription: 'Tria una nota de la llista per a llegir-la o editar-la ací.',
+    listSection: 'Llista de notes',
+    detailSection: 'Detall de la nota',
   },
   examenes: {
     title: 'Exàmens',

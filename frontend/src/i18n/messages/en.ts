@@ -103,6 +103,10 @@ export const en: Messages = {
     emptyNoNotesTitle: 'No notes yet',
     emptyNoNotesDescription: 'Notes you create on your goals will appear here.',
     unknownGoal: 'Deleted goal',
+    detailEmptyTitle: 'Select a note',
+    detailEmptyDescription: 'Pick a note from the list to read or edit it here.',
+    listSection: 'Notes list',
+    detailSection: 'Note detail',
   },
   examenes: {
     title: 'Exams',

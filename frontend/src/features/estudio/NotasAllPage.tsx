@@ -14,7 +14,7 @@ import { startOfMonth, startOfWeek } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useLiveGoals } from '@/features/goals/hooks/use-goals'
 import { listAllNotes } from '@/lib/db/notes.repository'
-import type { Goal, NoteKind, NoteSource } from '@/lib/db/schema'
+import type { Goal, Note, NoteKind, NoteSource } from '@/lib/db/schema'
 import { useT } from '@/i18n/i18n-context'
 import { tpl } from '@/i18n/tpl'
 import EmptyState from '@/components/ui/EmptyState'
@@ -89,6 +89,43 @@ function NotasAllPage() {
   const editingNote = editingId ? notes.find((n) => n.id === editingId) ?? null : null
   const canAddNote = goals.length > 0
   const backToIdle = () => setCreateMode({ kind: 'idle' })
+  const openPicker = () => {
+    setEditingId(null)
+    setCreateMode({ kind: 'picker' })
+  }
+  const openNoteInDetail = (id: string) => {
+    setCreateMode({ kind: 'idle' })
+    setEditingId(id)
+  }
+
+  const filters = (
+    <FiltersPanel
+      t={t}
+      goals={goals}
+      datePreset={datePreset}
+      selectedGoalIds={selectedGoalIds}
+      selectedSources={selectedSources}
+      onDatePreset={setDatePreset}
+      onToggleGoal={toggleGoal}
+      onToggleSource={toggleSource}
+      onClear={clearFilters}
+      hasFilters={hasFilters}
+    />
+  )
+
+  const createSection =
+    createMode.kind === 'idle' ? null : createMode.kind === 'picker' ? (
+      <CreatePicker t={t} onPick={(k) => setCreateMode({ kind: 'editor', noteKind: k })} onClose={backToIdle} />
+    ) : (
+      <div className="rounded-2xl bg-surface p-4">
+        <NoteEditor
+          goalIds={[]}
+          createKind={createMode.noteKind}
+          onDone={backToIdle}
+          onCancel={backToIdle}
+        />
+      </div>
+    )
 
   return (
     <div className="flex flex-col gap-6">
@@ -102,77 +139,27 @@ function NotasAllPage() {
         </Link>
       </header>
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-charcoal">{t.notasAll.title}</h1>
-            <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">
-              {t.notasAll.subtitle}
-            </p>
-          </div>
-          {createMode.kind === 'idle' && canAddNote && (
-            <button
-              type="button"
-              onClick={() => setCreateMode({ kind: 'picker' })}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-apricot px-3 py-2 text-xs font-semibold text-white transition active:scale-[0.98]"
-            >
-              <Plus size={14} aria-hidden="true" />
-              {t.apuntesHub.addNote}
-            </button>
-          )}
+      <section className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-charcoal lg:text-3xl">{t.notasAll.title}</h1>
+          <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">
+            {t.notasAll.subtitle}
+          </p>
         </div>
-
-        {createMode.kind === 'picker' && (
-          <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-medium text-[color:var(--color-text-muted)]">
-                {t.notes.picker.title}
-              </p>
-              <button
-                type="button"
-                onClick={backToIdle}
-                aria-label={t.common.cancel}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-[color:var(--color-text-muted)] transition-colors hover:bg-cream hover:text-charcoal"
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <KindTile
-                icon={<StickyNote size={18} aria-hidden="true" />}
-                label={t.notes.picker.text}
-                onClick={() => setCreateMode({ kind: 'editor', noteKind: 'text' })}
-              />
-              <KindTile
-                icon={<Mic size={18} aria-hidden="true" />}
-                label={t.notes.picker.voice}
-                onClick={() => setCreateMode({ kind: 'editor', noteKind: 'voice' })}
-              />
-              <KindTile
-                icon={<ImagePlus size={18} aria-hidden="true" />}
-                label={t.notes.picker.image}
-                onClick={() => setCreateMode({ kind: 'editor', noteKind: 'image' })}
-              />
-              <KindTile
-                icon={<FileText size={18} aria-hidden="true" />}
-                label={t.notes.picker.document}
-                onClick={() => setCreateMode({ kind: 'editor', noteKind: 'document' })}
-              />
-            </div>
-          </div>
-        )}
-
-        {createMode.kind === 'editor' && (
-          <div className="rounded-2xl bg-surface p-4">
-            <NoteEditor
-              goalIds={[]}
-              createKind={createMode.noteKind}
-              onDone={backToIdle}
-              onCancel={backToIdle}
-            />
-          </div>
+        {canAddNote && (
+          <button
+            type="button"
+            onClick={openPicker}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-apricot px-3 py-2 text-xs font-semibold text-white transition active:scale-[0.98] lg:px-4 lg:py-2.5 lg:text-sm"
+          >
+            <Plus size={14} aria-hidden="true" />
+            {t.apuntesHub.addNote}
+          </button>
         )}
       </section>
+
+      {/* Mobile / tablet: create picker + editor inline above list. Hidden on lg (moves to right panel). */}
+      {createSection && <div className="lg:hidden">{createSection}</div>}
 
       {notes.length === 0 && createMode.kind === 'idle' ? (
         <EmptyState
@@ -180,70 +167,15 @@ function NotasAllPage() {
           description={t.notasAll.emptyNoNotesDescription}
         />
       ) : notes.length > 0 ? (
-        <>
+        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1.1fr)_minmax(0,1.4fr)] lg:items-start lg:gap-6">
+          {/* Mobile / tablet: filters inline. Desktop: filters live in the left column. */}
+          <div className="lg:hidden">{filters}</div>
+          <aside className="hidden lg:sticky lg:top-20 lg:block">{filters}</aside>
+
           <section
-            aria-label={t.notasAll.filtersLabel}
-            className="flex flex-col gap-3 rounded-2xl bg-surface p-4"
+            aria-label={t.notasAll.listSection}
+            className="flex flex-col gap-2"
           >
-            <FilterRow label={t.notasAll.dateLabel}>
-              <PresetChip
-                active={datePreset === 'all'}
-                onClick={() => setDatePreset('all')}
-              >
-                {t.notasAll.dateAll}
-              </PresetChip>
-              <PresetChip
-                active={datePreset === 'week'}
-                onClick={() => setDatePreset('week')}
-              >
-                {t.notasAll.dateWeek}
-              </PresetChip>
-              <PresetChip
-                active={datePreset === 'month'}
-                onClick={() => setDatePreset('month')}
-              >
-                {t.notasAll.dateMonth}
-              </PresetChip>
-            </FilterRow>
-
-            {goals.length > 0 && (
-              <FilterRow label={t.notasAll.goalLabel}>
-                {goals.map((g) => (
-                  <PresetChip
-                    key={g.id}
-                    active={selectedGoalIds.includes(g.id)}
-                    onClick={() => toggleGoal(g.id)}
-                  >
-                    <span className="max-w-[10rem] truncate">{g.name}</span>
-                  </PresetChip>
-                ))}
-              </FilterRow>
-            )}
-
-            <FilterRow label={t.notasAll.sourceLabel}>
-              {ALL_SOURCES.map((s) => (
-                <PresetChip
-                  key={s}
-                  active={selectedSources.includes(s)}
-                  onClick={() => toggleSource(s)}
-                >
-                  {sourceLabel(s, t)}
-                </PresetChip>
-              ))}
-            </FilterRow>
-
-            {hasFilters && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="self-start text-xs font-semibold text-apricot underline decoration-dotted underline-offset-2"
-              >
-                {t.notasAll.clearFilters}
-              </button>
-            )}
-          </section>
-
-          <section className="flex flex-col gap-2">
             <p className="text-xs font-medium text-[color:var(--color-text-muted)]">
               {tpl(
                 filtered.length === 1
@@ -258,25 +190,49 @@ function NotasAllPage() {
               </p>
             ) : (
               <ul className="flex flex-col gap-2">
-                {filtered.map((n) => (
-                  <li key={n.id}>
-                    <NoteCard
-                      note={n}
-                      onClick={() => setEditingId(n.id)}
-                      goals={n.goalIds
-                        .map((id) => goalsById.get(id))
-                        .filter((g): g is Goal => Boolean(g))}
-                    />
-                  </li>
-                ))}
+                {filtered.map((n) => {
+                  const selected = editingId === n.id
+                  return (
+                    <li key={n.id}>
+                      <div
+                        className={clsx(
+                          'rounded-xl lg:rounded-2xl lg:transition-shadow',
+                          selected &&
+                            'lg:ring-2 lg:ring-apricot lg:ring-offset-2 lg:ring-offset-[color:var(--color-background)]',
+                        )}
+                      >
+                        <NoteCard
+                          note={n}
+                          onClick={() => openNoteInDetail(n.id)}
+                          goals={n.goalIds
+                            .map((id) => goalsById.get(id))
+                            .filter((g): g is Goal => Boolean(g))}
+                        />
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </section>
-        </>
+
+          <aside
+            aria-label={t.notasAll.detailSection}
+            className="hidden lg:sticky lg:top-20 lg:flex lg:max-h-[calc(100dvh-6rem)] lg:flex-col lg:overflow-y-auto lg:rounded-2xl lg:bg-surface lg:p-5"
+          >
+            <DetailPanel
+              t={t}
+              createSection={createSection}
+              editingNote={editingNote}
+              onDoneEditing={() => setEditingId(null)}
+            />
+          </aside>
+        </div>
       ) : null}
 
+      {/* Mobile / tablet: modal for editing an existing note. Hidden on lg (moves to right panel). */}
       {editingNote && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-charcoal/40 p-3 sm:items-center">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-charcoal/40 p-3 sm:items-center lg:hidden">
           <div className="flex max-h-[90vh] w-full max-w-lg flex-col gap-3 overflow-y-auto rounded-2xl bg-surface p-4">
             <NoteEditor
               goalIds={editingNote.goalIds}
@@ -287,6 +243,169 @@ function NotasAllPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+type FiltersPanelProps = {
+  t: ReturnType<typeof useT>['t']
+  goals: Goal[]
+  datePreset: DatePreset
+  selectedGoalIds: string[]
+  selectedSources: NoteSource[]
+  onDatePreset: (p: DatePreset) => void
+  onToggleGoal: (id: string) => void
+  onToggleSource: (s: NoteSource) => void
+  onClear: () => void
+  hasFilters: boolean
+}
+
+function FiltersPanel({
+  t,
+  goals,
+  datePreset,
+  selectedGoalIds,
+  selectedSources,
+  onDatePreset,
+  onToggleGoal,
+  onToggleSource,
+  onClear,
+  hasFilters,
+}: FiltersPanelProps) {
+  return (
+    <section
+      aria-label={t.notasAll.filtersLabel}
+      className="flex flex-col gap-3 rounded-2xl bg-surface p-4"
+    >
+      <FilterRow label={t.notasAll.dateLabel}>
+        <PresetChip active={datePreset === 'all'} onClick={() => onDatePreset('all')}>
+          {t.notasAll.dateAll}
+        </PresetChip>
+        <PresetChip active={datePreset === 'week'} onClick={() => onDatePreset('week')}>
+          {t.notasAll.dateWeek}
+        </PresetChip>
+        <PresetChip active={datePreset === 'month'} onClick={() => onDatePreset('month')}>
+          {t.notasAll.dateMonth}
+        </PresetChip>
+      </FilterRow>
+
+      {goals.length > 0 && (
+        <FilterRow label={t.notasAll.goalLabel}>
+          {goals.map((g) => (
+            <PresetChip
+              key={g.id}
+              active={selectedGoalIds.includes(g.id)}
+              onClick={() => onToggleGoal(g.id)}
+            >
+              <span className="max-w-[10rem] truncate">{g.name}</span>
+            </PresetChip>
+          ))}
+        </FilterRow>
+      )}
+
+      <FilterRow label={t.notasAll.sourceLabel}>
+        {ALL_SOURCES.map((s) => (
+          <PresetChip
+            key={s}
+            active={selectedSources.includes(s)}
+            onClick={() => onToggleSource(s)}
+          >
+            {sourceLabel(s, t)}
+          </PresetChip>
+        ))}
+      </FilterRow>
+
+      {hasFilters && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="self-start text-xs font-semibold text-apricot underline decoration-dotted underline-offset-2"
+        >
+          {t.notasAll.clearFilters}
+        </button>
+      )}
+    </section>
+  )
+}
+
+type CreatePickerProps = {
+  t: ReturnType<typeof useT>['t']
+  onPick: (kind: NoteKind) => void
+  onClose: () => void
+}
+
+function CreatePicker({ t, onPick, onClose }: CreatePickerProps) {
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-[color:var(--color-text-muted)]">
+          {t.notes.picker.title}
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t.common.cancel}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-[color:var(--color-text-muted)] transition-colors hover:bg-cream hover:text-charcoal"
+        >
+          <X size={16} aria-hidden="true" />
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2">
+        <KindTile
+          icon={<StickyNote size={18} aria-hidden="true" />}
+          label={t.notes.picker.text}
+          onClick={() => onPick('text')}
+        />
+        <KindTile
+          icon={<Mic size={18} aria-hidden="true" />}
+          label={t.notes.picker.voice}
+          onClick={() => onPick('voice')}
+        />
+        <KindTile
+          icon={<ImagePlus size={18} aria-hidden="true" />}
+          label={t.notes.picker.image}
+          onClick={() => onPick('image')}
+        />
+        <KindTile
+          icon={<FileText size={18} aria-hidden="true" />}
+          label={t.notes.picker.document}
+          onClick={() => onPick('document')}
+        />
+      </div>
+    </div>
+  )
+}
+
+type DetailPanelProps = {
+  t: ReturnType<typeof useT>['t']
+  createSection: React.ReactNode
+  editingNote: Note | null
+  onDoneEditing: () => void
+}
+
+function DetailPanel({ t, createSection, editingNote, onDoneEditing }: DetailPanelProps) {
+  if (createSection) {
+    return <>{createSection}</>
+  }
+  if (editingNote) {
+    return (
+      <NoteEditor
+        goalIds={editingNote.goalIds}
+        existingNoteId={editingNote.id}
+        onDone={onDoneEditing}
+        onCancel={onDoneEditing}
+      />
+    )
+  }
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 py-12 text-center">
+      <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-peach text-charcoal">
+        <StickyNote size={20} aria-hidden="true" />
+      </span>
+      <p className="text-sm font-semibold text-charcoal">{t.notasAll.detailEmptyTitle}</p>
+      <p className="max-w-xs text-xs text-[color:var(--color-text-muted)]">
+        {t.notasAll.detailEmptyDescription}
+      </p>
     </div>
   )
 }
