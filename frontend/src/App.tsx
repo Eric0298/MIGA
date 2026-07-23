@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router'
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router'
 import AppShell from '@/components/layout/AppShell'
 import Loading from '@/components/ui/Loading'
 import HomePage from '@/features/home/HomePage'
@@ -8,6 +8,12 @@ import GoalsPage from '@/features/goals/GoalsPage'
 import SessionsPage from '@/features/sessions/SessionsPage'
 import MorePage from '@/features/more/MorePage'
 import EstudioHubPage from '@/features/estudio/EstudioHubPage'
+
+/** Legacy /app/apuntes/:id URLs now live under /app/notas/:id. */
+function LegacyApuntesGoalRedirect() {
+  const { id } = useParams<{ id: string }>()
+  return <Navigate to={`/app/notas/${id}`} replace />
+}
 
 const LandingPage = lazy(() => import('@/features/landing/LandingPage'))
 const ArchitecturePage = lazy(() => import('@/features/architecture/ArchitecturePage'))
@@ -20,9 +26,8 @@ const RepasoSessionPage = lazy(() => import('@/features/estudio/RepasoSessionPag
 const ExamenesGoalPage = lazy(() => import('@/features/estudio/ExamenesGoalPage'))
 const SimulacroCreatePage = lazy(() => import('@/features/estudio/SimulacroCreatePage'))
 const SimulacroSessionPage = lazy(() => import('@/features/estudio/SimulacroSessionPage'))
-const ApuntesPage = lazy(() => import('@/features/estudio/ApuntesPage'))
-const ApuntesGoalPage = lazy(() => import('@/features/estudio/ApuntesGoalPage'))
 const NotasAllPage = lazy(() => import('@/features/estudio/NotasAllPage'))
+const NotasGoalPage = lazy(() => import('@/features/estudio/NotasGoalPage'))
 const ExamenesPage = lazy(() => import('@/features/estudio/ExamenesPage'))
 const QuestionsExamCreatePage = lazy(
   () => import('@/features/estudio/QuestionsExamCreatePage'),
@@ -47,9 +52,10 @@ function App() {
             <Route path="estudio" element={<EstudioHubPage />} />
             <Route path="sesiones" element={<SessionsPage />} />
             <Route path="sesiones/:id" element={<SessionDetailPage />} />
-            <Route path="apuntes" element={<ApuntesPage />} />
-            <Route path="apuntes/:id" element={<ApuntesGoalPage />} />
             <Route path="notas" element={<NotasAllPage />} />
+            <Route path="notas/:id" element={<NotasGoalPage />} />
+            <Route path="apuntes" element={<Navigate to="/app/notas" replace />} />
+            <Route path="apuntes/:id" element={<LegacyApuntesGoalRedirect />} />
             <Route path="repaso" element={<RepasoPage />} />
             <Route path="repaso/:id" element={<RepasoGoalPage />} />
             <Route path="repaso/:id/sesion" element={<RepasoSessionPage />} />

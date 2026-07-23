@@ -5,7 +5,12 @@ import NotesPanel from '@/features/notes/components/NotesPanel'
 import { useT } from '@/i18n/i18n-context'
 import EmptyState from '@/components/ui/EmptyState'
 
-function ApuntesGoalPage() {
+/**
+ * Per-goal notes view. Reachable at /app/notas/:id (redirected to from the
+ * legacy /app/apuntes/:id) so users can browse and edit a single goal's
+ * notes with the goal pre-selected in the editor.
+ */
+function NotasGoalPage() {
   const { t } = useT()
   const { id } = useParams<{ id: string }>()
   const goal = useLiveGoal(id)
@@ -14,7 +19,7 @@ function ApuntesGoalPage() {
     <div className="flex flex-col gap-6">
       <header>
         <Link
-          to="/app/apuntes"
+          to="/app/notas"
           className="inline-flex items-center gap-2 text-sm font-medium text-charcoal"
         >
           <ArrowLeft size={18} aria-hidden="true" />
@@ -32,7 +37,7 @@ function ApuntesGoalPage() {
           description={t.goalDetail.notFoundDescription}
           action={
             <Link
-              to="/app/apuntes"
+              to="/app/notas"
               className="inline-flex rounded-2xl bg-apricot px-5 py-3 text-sm font-semibold text-white"
             >
               {t.apuntesHub.backToApuntes}
@@ -57,4 +62,4 @@ function ApuntesGoalPage() {
   )
 }
 
-export default ApuntesGoalPage
+export default NotasGoalPage

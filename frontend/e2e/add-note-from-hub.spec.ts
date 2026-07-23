@@ -9,9 +9,9 @@ test('adds a text note pinned to multiple goals from the apuntes hub', async ({ 
   const goalA = await seedGoal(page, 'Meta A')
   const goalB = await seedGoal(page, 'Meta B')
 
-  await page.goto('/app/apuntes')
+  await page.goto('/app/notas')
 
-  await page.getByRole('button', { name: 'Añadir apunte' }).click()
+  await page.getByRole('button', { name: 'Añadir nota' }).click()
 
   await page.getByRole('button', { name: 'Texto' }).click()
 
@@ -19,18 +19,14 @@ test('adds a text note pinned to multiple goals from the apuntes hub', async ({ 
   await page.getByRole('button', { name: goalA.name }).click()
   await page.getByRole('button', { name: goalB.name }).click()
 
-  await page.locator('input[placeholder="Título del apunte"]').fill('Apunte compartido')
+  await page.locator('input[placeholder="Título de la nota"]').fill('Nota compartida')
   await page.locator('textarea').fill('Contenido de prueba')
 
   await page.getByRole('button', { name: 'Guardar' }).click()
 
-  await expect(page.getByText('Apunte guardado')).toBeVisible()
+  await expect(page.getByText('Nota guardada')).toBeVisible()
 
-  // Both goal cards show a "1 apunte" count.
-  await expect(
-    page.getByRole('link', { name: new RegExp(`${goalA.name}[\\s\\S]*1 apunte`) }),
-  ).toBeVisible()
-  await expect(
-    page.getByRole('link', { name: new RegExp(`${goalB.name}[\\s\\S]*1 apunte`) }),
-  ).toBeVisible()
+  // The saved note surfaces in the global list (single row with both goals).
+  await expect(page.getByText('Nota compartida')).toBeVisible()
+  await expect(page.getByText('1 nota')).toBeVisible()
 })

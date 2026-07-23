@@ -71,6 +71,6 @@ test('opens the session detail from the sessions list', async ({ page }) => {
   // Paused = 5 minutes → "00:05:00".
   await expect(page.getByText('00:05:00')).toBeVisible()
   // Notes section shows the session note.
-  await expect(page.getByText('Apuntes de la sesión')).toBeVisible()
+  await expect(page.getByText('Notas de la sesión')).toBeVisible()
   await expect(page.getByText('Idea rápida')).toBeVisible()
 })

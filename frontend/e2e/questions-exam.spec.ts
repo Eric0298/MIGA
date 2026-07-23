@@ -31,6 +31,6 @@ test('runs a questions exam end-to-end with mixed answers', async ({ page }) => 
 
   await expect(page.getByText('Resultado')).toBeVisible()
   await expect(page.getByText('1 / 2')).toBeVisible()
-  // Failed question surfaces with the "Guardar como apunte" bridge.
-  await expect(page.getByRole('button', { name: 'Guardar como apunte' })).toBeVisible()
+  // Failed question surfaces with the "Guardar como nota" bridge.
+  await expect(page.getByRole('button', { name: 'Guardar como nota' })).toBeVisible()
 })

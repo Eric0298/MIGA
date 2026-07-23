@@ -1,12 +1,20 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { ArrowLeft } from 'lucide-react'
+import {
+  ArrowLeft,
+  FileText,
+  ImagePlus,
+  Mic,
+  Plus,
+  StickyNote,
+  X,
+} from 'lucide-react'
 import { clsx } from 'clsx'
 import { startOfMonth, startOfWeek } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useLiveGoals } from '@/features/goals/hooks/use-goals'
 import { listAllNotes } from '@/lib/db/notes.repository'
-import type { Goal, NoteSource } from '@/lib/db/schema'
+import type { Goal, NoteKind, NoteSource } from '@/lib/db/schema'
 import { useT } from '@/i18n/i18n-context'
 import { tpl } from '@/i18n/tpl'
 import EmptyState from '@/components/ui/EmptyState'
@@ -17,6 +25,11 @@ import NoteEditor from '@/features/notes/components/NoteEditor'
 type DatePreset = 'all' | 'week' | 'month'
 const ALL_SOURCES: readonly NoteSource[] = ['manual', 'session', 'exam'] as const
 
+type CreateMode =
+  | { kind: 'idle' }
+  | { kind: 'picker' }
+  | { kind: 'editor'; noteKind: NoteKind }
+
 function NotasAllPage() {
   const { t } = useT()
   const notes = useLiveQuery(() => listAllNotes(), [])
@@ -26,6 +39,7 @@ function NotasAllPage() {
   const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>([])
   const [selectedSources, setSelectedSources] = useState<NoteSource[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [createMode, setCreateMode] = useState<CreateMode>({ kind: 'idle' })
 
   const goalsById = useMemo(() => {
     const map = new Map<string, Goal>()
@@ -73,10 +87,12 @@ function NotasAllPage() {
   if (notes === undefined || goals === undefined) return <Loading />
 
   const editingNote = editingId ? notes.find((n) => n.id === editingId) ?? null : null
+  const canAddNote = goals.length > 0
+  const backToIdle = () => setCreateMode({ kind: 'idle' })
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex items-center justify-between gap-2">
+      <header>
         <Link
           to="/app/estudio"
           className="inline-flex items-center gap-2 text-sm font-medium text-charcoal"
@@ -84,27 +100,86 @@ function NotasAllPage() {
           <ArrowLeft size={18} aria-hidden="true" />
           {t.estudio.backToHub}
         </Link>
-        <Link
-          to="/app/apuntes"
-          className="text-xs font-semibold text-apricot underline-offset-2 hover:underline"
-        >
-          {t.notasAll.browseByGoal}
-        </Link>
       </header>
 
-      <section className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold text-charcoal">{t.notasAll.title}</h1>
-        <p className="text-sm text-[color:var(--color-text-muted)]">
-          {t.notasAll.subtitle}
-        </p>
+      <section className="flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-charcoal">{t.notasAll.title}</h1>
+            <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">
+              {t.notasAll.subtitle}
+            </p>
+          </div>
+          {createMode.kind === 'idle' && canAddNote && (
+            <button
+              type="button"
+              onClick={() => setCreateMode({ kind: 'picker' })}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-apricot px-3 py-2 text-xs font-semibold text-white transition active:scale-[0.98]"
+            >
+              <Plus size={14} aria-hidden="true" />
+              {t.apuntesHub.addNote}
+            </button>
+          )}
+        </div>
+
+        {createMode.kind === 'picker' && (
+          <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-[color:var(--color-text-muted)]">
+                {t.notes.picker.title}
+              </p>
+              <button
+                type="button"
+                onClick={backToIdle}
+                aria-label={t.common.cancel}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-[color:var(--color-text-muted)] transition-colors hover:bg-cream hover:text-charcoal"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <KindTile
+                icon={<StickyNote size={18} aria-hidden="true" />}
+                label={t.notes.picker.text}
+                onClick={() => setCreateMode({ kind: 'editor', noteKind: 'text' })}
+              />
+              <KindTile
+                icon={<Mic size={18} aria-hidden="true" />}
+                label={t.notes.picker.voice}
+                onClick={() => setCreateMode({ kind: 'editor', noteKind: 'voice' })}
+              />
+              <KindTile
+                icon={<ImagePlus size={18} aria-hidden="true" />}
+                label={t.notes.picker.image}
+                onClick={() => setCreateMode({ kind: 'editor', noteKind: 'image' })}
+              />
+              <KindTile
+                icon={<FileText size={18} aria-hidden="true" />}
+                label={t.notes.picker.document}
+                onClick={() => setCreateMode({ kind: 'editor', noteKind: 'document' })}
+              />
+            </div>
+          </div>
+        )}
+
+        {createMode.kind === 'editor' && (
+          <div className="rounded-2xl bg-surface p-4">
+            <NoteEditor
+              goalIds={[]}
+              createKind={createMode.noteKind}
+              onDone={backToIdle}
+              onCancel={backToIdle}
+            />
+          </div>
+        )}
       </section>
 
-      {notes.length === 0 ? (
+      {notes.length === 0 && createMode.kind === 'idle' ? (
         <EmptyState
           title={t.notasAll.emptyNoNotesTitle}
           description={t.notasAll.emptyNoNotesDescription}
         />
-      ) : (
+      ) : notes.length > 0 ? (
         <>
           <section
             aria-label={t.notasAll.filtersLabel}
@@ -198,7 +273,7 @@ function NotasAllPage() {
             )}
           </section>
         </>
-      )}
+      ) : null}
 
       {editingNote && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-charcoal/40 p-3 sm:items-center">
@@ -252,6 +327,27 @@ function PresetChip({
         {children}
       </button>
     </li>
+  )
+}
+
+type KindTileProps = {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+}
+
+function KindTile({ icon, label, onClick }: KindTileProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-col items-center gap-1.5 rounded-xl bg-cream px-2 py-3 text-charcoal ring-1 ring-[color:var(--color-border)] transition active:scale-[0.98] hover:bg-peach"
+    >
+      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-peach text-charcoal">
+        {icon}
+      </span>
+      <span className="text-xs font-semibold">{label}</span>
+    </button>
   )
 }
 

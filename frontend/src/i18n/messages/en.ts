@@ -81,7 +81,6 @@ export const en: Messages = {
   notasAll: {
     title: 'All notes',
     subtitle: 'Every note with filters by date, goal and origin.',
-    browseByGoal: 'Browse by goal',
     filtersLabel: 'Filters',
     dateLabel: 'Date',
     dateAll: 'All',
