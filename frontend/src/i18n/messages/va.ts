@@ -16,6 +16,9 @@ export const va: Messages = {
     estudio: 'Estudi',
     more: 'Més',
     mainNav: 'Navegació principal',
+    openMenu: 'MENÚ',
+    closeMenu: 'Tancar menú',
+    menuTitle: 'Menú',
   },
   estudio: {
     title: 'Estudi',

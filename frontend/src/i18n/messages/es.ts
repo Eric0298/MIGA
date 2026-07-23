@@ -14,6 +14,9 @@ export const es = {
     estudio: 'Estudio',
     more: 'Más',
     mainNav: 'Navegación principal',
+    openMenu: 'MENU',
+    closeMenu: 'Cerrar menú',
+    menuTitle: 'Menú',
   },
   estudio: {
     title: 'Estudio',

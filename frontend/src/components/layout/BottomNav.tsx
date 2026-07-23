@@ -1,32 +1,17 @@
 import { NavLink } from 'react-router'
-import { BookOpen, House, MoreHorizontal, Target, Timer } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useT } from '@/i18n/i18n-context'
-
-type Item = {
-  to: string
-  labelKey: 'home' | 'timer' | 'goals' | 'estudio' | 'more'
-  icon: typeof House
-  end?: boolean
-}
-
-const items: Item[] = [
-  { to: '/app', labelKey: 'home', icon: House, end: true },
-  { to: '/app/timer', labelKey: 'timer', icon: Timer },
-  { to: '/app/metas', labelKey: 'goals', icon: Target },
-  { to: '/app/estudio', labelKey: 'estudio', icon: BookOpen },
-  { to: '/app/mas', labelKey: 'more', icon: MoreHorizontal },
-]
+import { mainNavItems } from './nav-items'
 
 function BottomNav() {
   const { t } = useT()
   return (
     <nav
       aria-label={t.nav.mainNav}
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-[color:var(--color-border)] bg-surface pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-[color:var(--color-border)] bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
       <ul className="mx-auto flex w-full max-w-md items-stretch">
-        {items.map(({ to, labelKey, icon: Icon, end }) => (
+        {mainNavItems.map(({ to, labelKey, icon: Icon, end }) => (
           <li key={to} className="flex-1">
             <NavLink
               to={to}

@@ -16,6 +16,9 @@ export const en: Messages = {
     estudio: 'Study',
     more: 'More',
     mainNav: 'Main navigation',
+    openMenu: 'MENU',
+    closeMenu: 'Close menu',
+    menuTitle: 'Menu',
   },
   estudio: {
     title: 'Study',
