@@ -222,123 +222,129 @@ function QuestionsExamSessionPage() {
         </Link>
       </header>
 
-      <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-[color:var(--color-text-muted)]">
-              {t.examenes.questionsSession.header}
-            </p>
-            <p className="mt-1 truncate text-base font-bold text-charcoal">
-              {attempt.title}
-            </p>
-            <p className="mt-0.5 text-xs text-[color:var(--color-text-muted)]">
-              {tpl(t.examenes.questionsSession.progress, {
-                current: questionNumber,
-                total,
-              })}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <p
-              className="text-xl font-bold text-charcoal tabular-nums"
-              aria-live="polite"
-            >
-              {formatDuration(elapsed)}
-            </p>
-            {remainingMs !== null && (
-              <p
-                className={clsx(
-                  'text-[11px] font-semibold tabular-nums',
-                  remainingMs < 60_000
-                    ? 'text-apricot'
-                    : 'text-[color:var(--color-text-muted)]',
-                )}
-              >
-                {formatDuration(remainingMs)} {t.examenes.session.remaining}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
+        {/* Progress + timer card: mobile on top, desktop sticky right sidebar. */}
+        <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-20 lg:p-5">
+          <div className="flex items-start justify-between gap-3 lg:flex-col lg:items-start lg:gap-2">
+            <div className="min-w-0 lg:w-full">
+              <p className="text-xs font-medium uppercase tracking-wide text-[color:var(--color-text-muted)]">
+                {t.examenes.questionsSession.header}
               </p>
-            )}
-          </div>
-        </div>
-        <div className="h-1.5 w-full rounded-full bg-cream">
-          <div
-            className="h-full rounded-full bg-apricot transition-all"
-            style={{ width: `${(questionNumber / total) * 100}%` }}
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={total}
-            aria-valuenow={questionNumber}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowDiscardConfirm(true)}
-          className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-[color:var(--color-text-muted)] transition-colors hover:text-charcoal"
-        >
-          <Trash2 size={12} aria-hidden="true" />
-          {t.examenes.questionsSession.discard}
-        </button>
-      </div>
-
-      <section className="flex flex-col gap-3 rounded-2xl bg-surface p-4">
-        <p className="whitespace-pre-wrap text-base font-semibold text-charcoal">
-          {currentQuestion.prompt}
-        </p>
-        <QuestionMediaViewer
-          imageBlobKey={currentQuestion.imageBlobKey}
-          audioBlobKey={currentQuestion.audioBlobKey}
-        />
-      </section>
-
-      <ul className="flex flex-col gap-2">
-        {currentQuestion.answers.map((answer) => {
-          const chosen = chosenIds.includes(answer.id)
-          return (
-            <li key={answer.id}>
-              <button
-                type="button"
-                onClick={() => toggleAnswer(answer.id)}
-                aria-pressed={chosen}
-                className={clsx(
-                  'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition',
-                  chosen
-                    ? 'bg-charcoal text-white'
-                    : 'bg-surface text-charcoal ring-1 ring-[color:var(--color-border)]',
-                )}
+              <p className="mt-1 truncate text-base font-bold text-charcoal">
+                {attempt.title}
+              </p>
+              <p className="mt-0.5 text-xs text-[color:var(--color-text-muted)]">
+                {tpl(t.examenes.questionsSession.progress, {
+                  current: questionNumber,
+                  total,
+                })}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1 lg:w-full lg:items-start">
+              <p
+                className="text-xl font-bold text-charcoal tabular-nums lg:text-4xl"
+                aria-live="polite"
               >
-                <span
+                {formatDuration(elapsed)}
+              </p>
+              {remainingMs !== null && (
+                <p
                   className={clsx(
-                    'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
-                    chosen
-                      ? 'bg-white text-charcoal'
-                      : 'bg-cream text-[color:var(--color-text-muted)]',
+                    'text-[11px] font-semibold tabular-nums',
+                    remainingMs < 60_000
+                      ? 'text-apricot'
+                      : 'text-[color:var(--color-text-muted)]',
                   )}
                 >
-                  {chosen ? <Check size={14} aria-hidden="true" /> : null}
-                </span>
-                <span className="min-w-0 flex-1 break-words">{answer.text}</span>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
+                  {formatDuration(remainingMs)} {t.examenes.session.remaining}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-cream">
+            <div
+              className="h-full rounded-full bg-apricot transition-all"
+              style={{ width: `${(questionNumber / total) * 100}%` }}
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={total}
+              aria-valuenow={questionNumber}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDiscardConfirm(true)}
+            className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-[color:var(--color-text-muted)] transition-colors hover:text-charcoal"
+          >
+            <Trash2 size={12} aria-hidden="true" />
+            {t.examenes.questionsSession.discard}
+          </button>
+        </div>
 
-      <button
-        type="button"
-        onClick={handleConfirm}
-        className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-apricot px-5 py-3 text-base font-semibold text-white transition active:scale-[0.98]"
-      >
-        {currentIndex + 1 >= total ? (
-          <>
-            <Square size={16} aria-hidden="true" />
-            {t.examenes.questionsSession.finish}
-          </>
-        ) : (
-          <>
-            {t.examenes.questionsSession.next}
-            <ChevronRight size={16} aria-hidden="true" />
-          </>
-        )}
-      </button>
+        {/* Question + answers + confirm: mobile stacked, desktop left column. */}
+        <div className="flex flex-col gap-4 lg:col-start-1 lg:row-start-1 lg:max-w-2xl">
+          <section className="flex flex-col gap-3 rounded-2xl bg-surface p-4 lg:p-6">
+            <p className="whitespace-pre-wrap text-base font-semibold text-charcoal lg:text-lg">
+              {currentQuestion.prompt}
+            </p>
+            <QuestionMediaViewer
+              imageBlobKey={currentQuestion.imageBlobKey}
+              audioBlobKey={currentQuestion.audioBlobKey}
+            />
+          </section>
+
+          <ul className="flex flex-col gap-2">
+            {currentQuestion.answers.map((answer) => {
+              const chosen = chosenIds.includes(answer.id)
+              return (
+                <li key={answer.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggleAnswer(answer.id)}
+                    aria-pressed={chosen}
+                    className={clsx(
+                      'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition',
+                      chosen
+                        ? 'bg-charcoal text-white'
+                        : 'bg-surface text-charcoal ring-1 ring-[color:var(--color-border)]',
+                    )}
+                  >
+                    <span
+                      className={clsx(
+                        'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
+                        chosen
+                          ? 'bg-white text-charcoal'
+                          : 'bg-cream text-[color:var(--color-text-muted)]',
+                      )}
+                    >
+                      {chosen ? <Check size={14} aria-hidden="true" /> : null}
+                    </span>
+                    <span className="min-w-0 flex-1 break-words">{answer.text}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+
+          <button
+            type="button"
+            onClick={handleConfirm}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-apricot px-5 py-3 text-base font-semibold text-white transition active:scale-[0.98]"
+          >
+            {currentIndex + 1 >= total ? (
+              <>
+                <Square size={16} aria-hidden="true" />
+                {t.examenes.questionsSession.finish}
+              </>
+            ) : (
+              <>
+                {t.examenes.questionsSession.next}
+                <ChevronRight size={16} aria-hidden="true" />
+              </>
+            )}
+          </button>
+        </div>
+      </div>
 
       {showDiscardConfirm && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-charcoal/40 p-3 sm:items-center">
@@ -449,7 +455,7 @@ function QuestionsExamResults({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       <header>
         <Link
           to={`/app/examenes/${goalId}`}
@@ -460,12 +466,12 @@ function QuestionsExamResults({
         </Link>
       </header>
 
-      <section className="flex flex-col gap-3 rounded-2xl bg-surface p-6 text-center">
+      <section className="flex flex-col gap-3 rounded-2xl bg-surface p-6 text-center lg:p-8">
         <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-text-muted)]">
           {t.examenes.questionsResult.summaryLabel}
         </p>
         <p className="truncate text-sm font-semibold text-charcoal">{attempt.title}</p>
-        <h1 className="text-3xl font-bold text-charcoal">
+        <h1 className="text-3xl font-bold text-charcoal lg:text-4xl">
           {tpl(t.examenes.questionsResult.summaryScore, { correct: score, total: maxScore })}
         </h1>
         <p className="text-sm font-medium text-[color:var(--color-text-muted)]">

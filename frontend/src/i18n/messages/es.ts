@@ -179,6 +179,11 @@ export const es = {
         'Esta meta aún no tiene PDFs. Súbelo como material o como nota y vuelve aquí.',
       fromMaterial: 'Desde materiales',
       fromNote: 'Desde notas',
+      uploadPdf: 'Subir PDF ahora',
+      uploadPdfHint: 'Se guardará como material de esta meta y quedará listo para el simulacro.',
+      uploading: 'Subiendo…',
+      uploadSuccess: 'PDF añadido',
+      uploadError: 'No se pudo subir el PDF',
       timeLimitLabel: 'Tiempo límite (min)',
       timeLimitPlaceholder: 'Opcional',
       timeLimitHint:

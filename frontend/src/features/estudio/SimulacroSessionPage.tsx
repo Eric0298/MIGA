@@ -140,114 +140,117 @@ function SimulacroSessionPage() {
         </Link>
       </header>
 
-      <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-[color:var(--color-text-muted)]">
-              {t.examenes.session.header}
-            </p>
-            <p className="mt-1 truncate text-base font-bold text-charcoal">{attempt.title}</p>
-            {isPaused && (
-              <p className="mt-0.5 text-xs font-medium text-apricot">
-                {t.examenes.session.pausedLabel}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6">
+        {/* Control panel: mobile above PDF, desktop sticky right sidebar. */}
+        <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-20 lg:p-5">
+          <div className="flex items-start justify-between gap-3 lg:flex-col lg:items-start lg:gap-2">
+            <div className="min-w-0 lg:w-full">
+              <p className="text-xs font-medium uppercase tracking-wide text-[color:var(--color-text-muted)]">
+                {t.examenes.session.header}
               </p>
-            )}
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <p
-              className="text-xl font-bold text-charcoal tabular-nums"
-              aria-live="polite"
-            >
-              {formatDuration(elapsed)}
-            </p>
-            {remainingMs !== null && (
+              <p className="mt-1 truncate text-base font-bold text-charcoal">{attempt.title}</p>
+              {isPaused && (
+                <p className="mt-0.5 text-xs font-medium text-apricot">
+                  {t.examenes.session.pausedLabel}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col items-end gap-1 lg:w-full lg:items-start">
               <p
-                className={clsx(
-                  'text-[11px] font-semibold tabular-nums',
-                  remainingMs < 60_000 ? 'text-apricot' : 'text-[color:var(--color-text-muted)]',
-                )}
+                className="text-xl font-bold text-charcoal tabular-nums lg:text-4xl"
+                aria-live="polite"
               >
-                {formatDuration(remainingMs)} {t.examenes.session.remaining}
+                {formatDuration(elapsed)}
               </p>
-            )}
+              {remainingMs !== null && (
+                <p
+                  className={clsx(
+                    'text-[11px] font-semibold tabular-nums',
+                    remainingMs < 60_000 ? 'text-apricot' : 'text-[color:var(--color-text-muted)]',
+                  )}
+                >
+                  {formatDuration(remainingMs)} {t.examenes.session.remaining}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
 
-        {isActive && (
-          <div className="flex flex-wrap gap-2">
-            {isPaused ? (
+          {isActive && (
+            <div className="flex flex-wrap gap-2 lg:flex-col">
+              {isPaused ? (
+                <button
+                  type="button"
+                  onClick={handleResume}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-apricot px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98] lg:py-3"
+                >
+                  <Play size={16} aria-hidden="true" />
+                  {t.examenes.session.resume}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handlePause}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-cream px-4 py-2.5 text-sm font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] transition active:scale-[0.98] lg:py-3"
+                >
+                  <Pause size={16} aria-hidden="true" />
+                  {t.examenes.session.pause}
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleResume}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-apricot px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98]"
+                onClick={() => setFinishMode('ask')}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-charcoal px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98] lg:py-3"
               >
-                <Play size={16} aria-hidden="true" />
-                {t.examenes.session.resume}
+                <Square size={16} aria-hidden="true" />
+                {t.examenes.session.finish}
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handlePause}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-cream px-4 py-2.5 text-sm font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] transition active:scale-[0.98]"
-              >
-                <Pause size={16} aria-hidden="true" />
-                {t.examenes.session.pause}
-              </button>
-            )}
+            </div>
+          )}
+          {isActive && (
             <button
               type="button"
-              onClick={() => setFinishMode('ask')}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-charcoal px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98]"
+              onClick={() => setShowDiscardConfirm(true)}
+              className="inline-flex w-full items-center justify-center gap-1.5 text-xs font-medium text-[color:var(--color-text-muted)] transition-colors hover:text-charcoal"
             >
-              <Square size={16} aria-hidden="true" />
-              {t.examenes.session.finish}
+              <Trash2 size={12} aria-hidden="true" />
+              {t.examenes.session.discard}
             </button>
-          </div>
-        )}
-        {isActive && (
+          )}
+        </div>
+
+        {/* --------- PDF viewer --------- */}
+        <div
+          ref={wrapperRef}
+          className={clsx(
+            'relative flex flex-col gap-2 rounded-2xl bg-charcoal p-2 lg:col-start-1 lg:row-start-1',
+            document.fullscreenElement === wrapperRef.current && 'h-screen w-screen',
+          )}
+        >
+          {pdf.status === 'loading' && (
+            <p className="p-6 text-center text-xs text-white/80">{t.common.loading}</p>
+          )}
+          {pdf.status === 'error' && (
+            <p className="p-6 text-center text-xs text-white/80">
+              {t.examenes.session.pdfUnavailable}
+            </p>
+          )}
+          {pdf.url && (
+            <iframe
+              src={pdf.url}
+              title={attempt.title}
+              className="h-[70vh] w-full rounded-xl bg-white lg:h-[calc(100dvh-9rem)]"
+            />
+          )}
           <button
             type="button"
-            onClick={() => setShowDiscardConfirm(true)}
-            className="inline-flex w-full items-center justify-center gap-1.5 text-xs font-medium text-[color:var(--color-text-muted)] transition-colors hover:text-charcoal"
+            onClick={handleFullscreen}
+            aria-label={t.examenes.session.fullscreen}
+            title={t.examenes.session.fullscreen}
+            className="absolute top-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-black/60 text-white transition-colors hover:bg-black/80"
           >
-            <Trash2 size={12} aria-hidden="true" />
-            {t.examenes.session.discard}
+            <Maximize2 size={16} aria-hidden="true" />
           </button>
-        )}
-      </div>
-
-      {/* --------- PDF viewer --------- */}
-      <div
-        ref={wrapperRef}
-        className={clsx(
-          'relative flex flex-col gap-2 rounded-2xl bg-charcoal p-2',
-          document.fullscreenElement === wrapperRef.current && 'h-screen w-screen',
-        )}
-      >
-        {pdf.status === 'loading' && (
-          <p className="p-6 text-center text-xs text-white/80">{t.common.loading}</p>
-        )}
-        {pdf.status === 'error' && (
-          <p className="p-6 text-center text-xs text-white/80">
-            {t.examenes.session.pdfUnavailable}
-          </p>
-        )}
-        {pdf.url && (
-          <iframe
-            src={pdf.url}
-            title={attempt.title}
-            className="h-[70vh] w-full rounded-xl bg-white"
-          />
-        )}
-        <button
-          type="button"
-          onClick={handleFullscreen}
-          aria-label={t.examenes.session.fullscreen}
-          title={t.examenes.session.fullscreen}
-          className="absolute top-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-black/60 text-white transition-colors hover:bg-black/80"
-        >
-          <Maximize2 size={16} aria-hidden="true" />
-        </button>
+        </div>
       </div>
 
       {/* --------- Finish dialog --------- */}

@@ -181,6 +181,11 @@ export const va: Messages = {
         'Esta meta encara no té PDFs. Puja’n un com a material o com a nota i torna ací.',
       fromMaterial: 'Des dels materials',
       fromNote: 'Des de les notes',
+      uploadPdf: 'Pujar PDF ara',
+      uploadPdfHint: 'Es guardarà com a material d’esta meta i quedarà llest per al simulacre.',
+      uploading: 'Pujant…',
+      uploadSuccess: 'PDF afegit',
+      uploadError: 'No s’ha pogut pujar el PDF',
       timeLimitLabel: 'Temps límit (min)',
       timeLimitPlaceholder: 'Opcional',
       timeLimitHint:

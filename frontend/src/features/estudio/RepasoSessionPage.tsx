@@ -217,8 +217,8 @@ function RepasoSessionPage() {
     const total = stats.correct + stats.incorrect
     const percentage = total > 0 ? Math.round((stats.correct / total) * 100) : 0
     return (
-      <div className="flex flex-col gap-4">
-        <section className="flex flex-col gap-3 rounded-2xl bg-surface p-6 text-center">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+        <section className="flex flex-col gap-3 rounded-2xl bg-surface p-6 text-center lg:p-8">
           <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-text-muted)]">
             {t.repasoSession.summaryLabel}
           </p>
@@ -263,10 +263,11 @@ function RepasoSessionPage() {
   const isCorrect = phase.kind === 'feedback' ? phase.isCorrect : false
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
+      {/* Header + stats + finish: mobile on top, desktop sticky right sidebar. */}
+      <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-20 lg:p-5">
+        <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-start lg:gap-2">
+          <div className="min-w-0 lg:w-full">
             <p className="truncate text-xs font-medium text-[color:var(--color-text-muted)]">
               {goal.name}
             </p>
@@ -275,14 +276,14 @@ function RepasoSessionPage() {
             </p>
           </div>
           <p
-            className="text-xl font-bold text-charcoal tabular-nums"
+            className="text-xl font-bold text-charcoal tabular-nums lg:text-4xl"
             aria-live="polite"
           >
             {formatDuration(elapsed)}
           </p>
         </div>
-        <div className="flex items-center justify-between gap-2 text-xs font-semibold">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 text-xs font-semibold lg:flex-col lg:items-stretch lg:gap-2">
+          <div className="flex items-center gap-2 lg:justify-between">
             <span className="inline-flex items-center gap-1 rounded-full bg-pistachio/40 px-2 py-0.5 text-charcoal">
               <Check size={12} aria-hidden="true" />
               {stats.correct}
@@ -295,7 +296,7 @@ function RepasoSessionPage() {
           <button
             type="button"
             onClick={handleEnd}
-            className="inline-flex items-center gap-1 rounded-xl bg-charcoal px-3 py-1.5 text-xs font-semibold text-white transition active:scale-[0.98]"
+            className="inline-flex items-center justify-center gap-1 rounded-xl bg-charcoal px-3 py-1.5 text-xs font-semibold text-white transition active:scale-[0.98] lg:py-2"
           >
             <Square size={12} aria-hidden="true" />
             {t.repasoSession.finish}
@@ -303,96 +304,99 @@ function RepasoSessionPage() {
         </div>
       </div>
 
-      <section className="flex flex-col gap-3 rounded-2xl bg-surface p-4">
-        <p className="whitespace-pre-wrap text-base font-semibold text-charcoal">
-          {question.prompt}
-        </p>
-        <QuestionMediaViewer
-          imageBlobKey={question.imageBlobKey}
-          audioBlobKey={question.audioBlobKey}
-        />
-      </section>
+      {/* Question + answers + confirm: mobile stacked, desktop left column. */}
+      <div className="flex flex-col gap-4 lg:col-start-1 lg:row-start-1 lg:max-w-2xl">
+        <section className="flex flex-col gap-3 rounded-2xl bg-surface p-4 lg:p-6">
+          <p className="whitespace-pre-wrap text-base font-semibold text-charcoal lg:text-lg">
+            {question.prompt}
+          </p>
+          <QuestionMediaViewer
+            imageBlobKey={question.imageBlobKey}
+            audioBlobKey={question.audioBlobKey}
+          />
+        </section>
 
-      <ul className="flex flex-col gap-2">
-        {question.answers.map((answer) => {
-          const chosen = chosenIds.includes(answer.id)
-          const showAsCorrect = isFeedback && answer.isCorrect
-          const showAsWrongPick = isFeedback && chosen && !answer.isCorrect
-          return (
-            <li key={answer.id}>
-              <button
-                type="button"
-                onClick={() => toggleAnswer(answer.id)}
-                disabled={isFeedback}
-                aria-pressed={chosen}
-                className={clsx(
-                  'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition',
-                  isFeedback && showAsCorrect
-                    ? 'bg-pistachio/70 text-charcoal ring-1 ring-pistachio'
-                    : isFeedback && showAsWrongPick
-                      ? 'bg-apricot/20 text-charcoal ring-1 ring-apricot'
-                      : chosen
-                        ? 'bg-charcoal text-white'
-                        : 'bg-surface text-charcoal ring-1 ring-[color:var(--color-border)]',
-                )}
-              >
-                <span
+        <ul className="flex flex-col gap-2">
+          {question.answers.map((answer) => {
+            const chosen = chosenIds.includes(answer.id)
+            const showAsCorrect = isFeedback && answer.isCorrect
+            const showAsWrongPick = isFeedback && chosen && !answer.isCorrect
+            return (
+              <li key={answer.id}>
+                <button
+                  type="button"
+                  onClick={() => toggleAnswer(answer.id)}
+                  disabled={isFeedback}
+                  aria-pressed={chosen}
                   className={clsx(
-                    'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
+                    'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition',
                     isFeedback && showAsCorrect
-                      ? 'bg-charcoal text-white'
+                      ? 'bg-pistachio/70 text-charcoal ring-1 ring-pistachio'
                       : isFeedback && showAsWrongPick
-                        ? 'bg-apricot text-white'
+                        ? 'bg-apricot/20 text-charcoal ring-1 ring-apricot'
                         : chosen
-                          ? 'bg-white text-charcoal'
-                          : 'bg-cream text-[color:var(--color-text-muted)]',
+                          ? 'bg-charcoal text-white'
+                          : 'bg-surface text-charcoal ring-1 ring-[color:var(--color-border)]',
                   )}
                 >
-                  {isFeedback && showAsCorrect ? (
-                    <Check size={14} aria-hidden="true" />
-                  ) : isFeedback && showAsWrongPick ? (
-                    <X size={14} aria-hidden="true" />
-                  ) : chosen ? (
-                    <Check size={14} aria-hidden="true" />
-                  ) : null}
-                </span>
-                <span className="min-w-0 flex-1 break-words">{answer.text}</span>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
+                  <span
+                    className={clsx(
+                      'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
+                      isFeedback && showAsCorrect
+                        ? 'bg-charcoal text-white'
+                        : isFeedback && showAsWrongPick
+                          ? 'bg-apricot text-white'
+                          : chosen
+                            ? 'bg-white text-charcoal'
+                            : 'bg-cream text-[color:var(--color-text-muted)]',
+                    )}
+                  >
+                    {isFeedback && showAsCorrect ? (
+                      <Check size={14} aria-hidden="true" />
+                    ) : isFeedback && showAsWrongPick ? (
+                      <X size={14} aria-hidden="true" />
+                    ) : chosen ? (
+                      <Check size={14} aria-hidden="true" />
+                    ) : null}
+                  </span>
+                  <span className="min-w-0 flex-1 break-words">{answer.text}</span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
 
-      {isFeedback ? (
-        <div
-          className={clsx(
-            'flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm font-semibold',
-            isCorrect
-              ? 'bg-pistachio/60 text-charcoal'
-              : 'bg-apricot/20 text-apricot',
-          )}
-        >
-          <span>
-            {isCorrect ? t.repasoSession.feedbackCorrect : t.repasoSession.feedbackIncorrect}
-          </span>
+        {isFeedback ? (
+          <div
+            className={clsx(
+              'flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm font-semibold',
+              isCorrect
+                ? 'bg-pistachio/60 text-charcoal'
+                : 'bg-apricot/20 text-apricot',
+            )}
+          >
+            <span>
+              {isCorrect ? t.repasoSession.feedbackCorrect : t.repasoSession.feedbackIncorrect}
+            </span>
+            <button
+              type="button"
+              onClick={handleNext}
+              className="inline-flex items-center gap-1 rounded-xl bg-charcoal px-3 py-1.5 text-xs font-semibold text-white transition active:scale-[0.98]"
+            >
+              {t.repasoSession.nextQuestion}
+              <ChevronRight size={14} aria-hidden="true" />
+            </button>
+          </div>
+        ) : (
           <button
             type="button"
-            onClick={handleNext}
-            className="inline-flex items-center gap-1 rounded-xl bg-charcoal px-3 py-1.5 text-xs font-semibold text-white transition active:scale-[0.98]"
+            onClick={handleConfirm}
+            className="w-full rounded-2xl bg-apricot px-5 py-3 text-base font-semibold text-white transition active:scale-[0.98]"
           >
-            {t.repasoSession.nextQuestion}
-            <ChevronRight size={14} aria-hidden="true" />
+            {t.repasoSession.confirm}
           </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={handleConfirm}
-          className="w-full rounded-2xl bg-apricot px-5 py-3 text-base font-semibold text-white transition active:scale-[0.98]"
-        >
-          {t.repasoSession.confirm}
-        </button>
-      )}
+        )}
+      </div>
     </div>
   )
 }

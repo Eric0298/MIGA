@@ -180,6 +180,11 @@ export const en: Messages = {
         'This goal has no PDFs yet. Upload one as a material or as a note and come back.',
       fromMaterial: 'From materials',
       fromNote: 'From notes',
+      uploadPdf: 'Upload a PDF now',
+      uploadPdfHint: 'It will be saved as a material of this goal and ready to use for the exam.',
+      uploading: 'Uploading…',
+      uploadSuccess: 'PDF added',
+      uploadError: 'Could not upload the PDF',
       timeLimitLabel: 'Time limit (min)',
       timeLimitPlaceholder: 'Optional',
       timeLimitHint:

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft, FileText, StickyNote } from 'lucide-react'
+import { ArrowLeft, FileText, Loader2, StickyNote, Upload } from 'lucide-react'
 import { clsx } from 'clsx'
 import { toast } from 'sonner'
 import { useLiveGoal } from '@/features/goals/hooks/use-goal'
@@ -9,6 +9,11 @@ import {
   type PdfSource,
 } from '@/features/exams/hooks/use-pdf-sources-for-goal'
 import { startPdfExamAttempt } from '@/lib/db/exam-attempts.repository'
+import { createMaterial } from '@/lib/db/materials.repository'
+import { deleteBlob, putBlob, setBlobMaterial } from '@/lib/db/blobs.repository'
+import { MATERIAL_LIMITS } from '@/lib/db/schema'
+import { formatBytes } from '@/lib/format-bytes'
+import { tpl } from '@/i18n/tpl'
 import { useT } from '@/i18n/i18n-context'
 import EmptyState from '@/components/ui/EmptyState'
 import Loading from '@/components/ui/Loading'
@@ -21,13 +26,59 @@ function SimulacroCreatePage() {
   const sources = usePdfSourcesForGoal(goal?.id)
 
   const [title, setTitle] = useState('')
+  const [titleTouched, setTitleTouched] = useState(false)
   const [pickedKey, setPickedKey] = useState<string | null>(null)
   const [timeLimitMinutes, setTimeLimitMinutes] = useState<string>('')
   const [creating, setCreating] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const picked = sources.find(
     (s) => `${s.kind}:${s.id}` === pickedKey,
   ) ?? null
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChosen = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    // Reset the input so re-picking the same file still triggers change.
+    event.target.value = ''
+    if (!file || !goal) return
+    if (!MATERIAL_LIMITS.pdf.mimeTypes.includes(file.type as 'application/pdf')) {
+      toast.error(t.materials.errors.fileInvalidType)
+      return
+    }
+    if (file.size > MATERIAL_LIMITS.pdf.maxBytes) {
+      toast.error(t.materials.errors.fileTooLarge)
+      return
+    }
+    let blobId: string | null = null
+    try {
+      setUploading(true)
+      const record = await putBlob({ blob: file, mimeType: file.type })
+      blobId = record.id
+      const fallbackTitle = file.name.replace(/\.[^.]+$/, '').slice(0, 80) || 'PDF'
+      const material = await createMaterial(
+        { kind: 'pdf', title: fallbackTitle, fileBlobKey: blobId },
+        [goal.id],
+      )
+      await setBlobMaterial(blobId, material.id)
+      setPickedKey(`material:${material.id}`)
+      if (!titleTouched && title.trim().length === 0) {
+        setTitle(fallbackTitle)
+      }
+      toast.success(t.examenes.create.uploadSuccess)
+    } catch {
+      if (blobId) {
+        await deleteBlob(blobId).catch(() => undefined)
+      }
+      toast.error(t.examenes.create.uploadError)
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const handleStart = async () => {
     if (!goal) return
@@ -84,8 +135,10 @@ function SimulacroCreatePage() {
     )
   }
 
+  const pdfMaxLabel = formatBytes(MATERIAL_LIMITS.pdf.maxBytes)
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <header>
         <Link
           to={`/app/examenes/${goal.id}`}
@@ -97,7 +150,9 @@ function SimulacroCreatePage() {
       </header>
 
       <section className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold text-charcoal">{t.examenes.create.title}</h1>
+        <h1 className="text-2xl font-bold text-charcoal lg:text-3xl">
+          {t.examenes.create.title}
+        </h1>
         <p className="text-sm text-[color:var(--color-text-muted)]">
           {t.examenes.create.subtitle}
         </p>
@@ -111,7 +166,10 @@ function SimulacroCreatePage() {
           id="simulacro-title"
           type="text"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            setTitle(e.target.value)
+            setTitleTouched(true)
+          }}
           placeholder={t.examenes.create.titlePlaceholder}
           maxLength={80}
           className="rounded-xl bg-cream px-3 py-2 text-sm text-charcoal ring-1 ring-[color:var(--color-border)] focus:ring-2 focus:ring-apricot focus:outline-none"
@@ -169,6 +227,38 @@ function SimulacroCreatePage() {
             })}
           </ul>
         )}
+
+        <div className="mt-1 flex flex-col gap-1.5">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={handleFileChosen}
+          />
+          <button
+            type="button"
+            onClick={handleUploadClick}
+            disabled={uploading}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[color:var(--color-border)] bg-cream/60 px-3 py-3 text-sm font-semibold text-charcoal transition hover:bg-peach disabled:opacity-60"
+          >
+            {uploading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                {t.examenes.create.uploading}
+              </>
+            ) : (
+              <>
+                <Upload size={16} aria-hidden="true" />
+                {t.examenes.create.uploadPdf}
+              </>
+            )}
+          </button>
+          <p className="text-[11px] text-[color:var(--color-text-muted)]">
+            {t.examenes.create.uploadPdfHint}{' '}
+            {tpl(t.materials.fileHintPdf, { max: pdfMaxLabel })}
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -192,7 +282,7 @@ function SimulacroCreatePage() {
       <button
         type="button"
         onClick={handleStart}
-        disabled={creating || sources.length === 0}
+        disabled={creating || !picked}
         className="w-full rounded-2xl bg-apricot px-5 py-3 text-base font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
       >
         {t.examenes.create.start}
