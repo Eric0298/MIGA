@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { resetApp, seedGoal, seedQuestions } from './helpers/seed'
+import { navigateInApp, resetApp, seedGoal, seedQuestions } from './helpers/seed'
 
 test.beforeEach(async ({ page }) => {
   await resetApp(page)
@@ -9,7 +9,7 @@ test('runs a questions exam end-to-end with mixed answers', async ({ page }) => 
   const goal = await seedGoal(page, 'Meta preguntas')
   await seedQuestions(page, goal.id)
 
-  await page.goto(`/app/examenes/${goal.id}/preguntas/nuevo`)
+  await navigateInApp(page, `/app/examenes/${goal.id}/preguntas/nuevo`)
 
   await page.locator('#questions-exam-title').fill('Examen E2E')
   // Fixed order so we can rely on Pregunta 1 / Pregunta 2 succession.

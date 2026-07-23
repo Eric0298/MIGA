@@ -1,10 +1,5 @@
 import { db } from './miga-db'
-import {
-  noteInputSchema,
-  type Note,
-  type NoteInput,
-  type NoteSource,
-} from './schema'
+import { noteInputSchema, type Note, type NoteInput, type NoteSource } from './schema'
 import { deleteNoteBlobsByNote } from './note-blobs.repository'
 
 export type UpdateNotePatch = {
@@ -18,8 +13,7 @@ export type UpdateNotePatch = {
 export async function createNote(input: NoteInput): Promise<Note> {
   const parsed = noteInputSchema.parse(input)
   const now = Date.now()
-  const source: NoteSource =
-    parsed.source ?? (parsed.sourceSessionId ? 'session' : 'manual')
+  const source: NoteSource = parsed.source ?? (parsed.sourceSessionId ? 'session' : 'manual')
   const note: Note = {
     id: crypto.randomUUID(),
     goalIds: parsed.goalIds,
@@ -62,16 +56,23 @@ export async function updateNote(id: string, patch: UpdateNotePatch): Promise<vo
   if (immutable && (patch.text !== undefined || patch.fileBlobKey !== undefined)) {
     throw new Error('Este tipo de apunte solo permite editar el título')
   }
-  const next: Partial<Note> = { updatedAt: Date.now() }
-  if (patch.title !== undefined) next.title = patch.title
-  if (patch.text !== undefined) next.text = patch.text
-  if (patch.fileBlobKey !== undefined) next.fileBlobKey = patch.fileBlobKey
-  if (patch.metadata !== undefined) next.metadata = patch.metadata
-  if (patch.goalIds !== undefined) {
-    if (patch.goalIds.length === 0) {
-      throw new Error('Una nota debe pertenecer al menos a una meta')
-    }
-    next.goalIds = patch.goalIds
+  const parsed = noteInputSchema.parse({
+    goalIds: patch.goalIds ?? existing.goalIds,
+    kind: existing.kind,
+    title: patch.title ?? existing.title,
+    text: patch.text ?? existing.text,
+    fileBlobKey: patch.fileBlobKey ?? existing.fileBlobKey,
+    metadata: patch.metadata ?? existing.metadata,
+    sourceSessionId: existing.sourceSessionId,
+    source: existing.source,
+  })
+  const next: Partial<Note> = {
+    goalIds: parsed.goalIds,
+    title: parsed.title,
+    text: parsed.text,
+    fileBlobKey: parsed.fileBlobKey,
+    metadata: parsed.metadata ?? {},
+    updatedAt: Date.now(),
   }
   await db.notes.update(id, next)
 }

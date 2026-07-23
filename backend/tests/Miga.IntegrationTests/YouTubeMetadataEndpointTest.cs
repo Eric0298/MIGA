@@ -5,15 +5,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Miga.Application.Materials;
 using Miga.Contracts.Materials;
+using Miga.IntegrationTests.Infrastructure;
 using Shouldly;
 
 namespace Miga.IntegrationTests;
 
-public sealed class YouTubeMetadataEndpointTest : IClassFixture<WebApplicationFactory<Program>>
+public sealed class YouTubeMetadataEndpointTest : IClassFixture<MigaWebApplicationFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly MigaWebApplicationFactory _factory;
 
-    public YouTubeMetadataEndpointTest(WebApplicationFactory<Program> factory)
+    public YouTubeMetadataEndpointTest(MigaWebApplicationFactory factory)
     {
         _factory = factory;
     }
@@ -21,8 +22,9 @@ public sealed class YouTubeMetadataEndpointTest : IClassFixture<WebApplicationFa
     [Fact]
     public async Task GetYouTubeMetadata_ShouldReturn400_WhenUrlMissing()
     {
-        using var client = CreateClient(new FakeMetadataService(_ =>
+        using var owned = await CreateClientAsync(new FakeMetadataService(_ =>
             throw new InvalidOperationException("no service call expected")));
+        var client = owned.Client;
 
         var response = await client.GetAsync("/api/materials/youtube-metadata");
 
@@ -32,8 +34,9 @@ public sealed class YouTubeMetadataEndpointTest : IClassFixture<WebApplicationFa
     [Fact]
     public async Task GetYouTubeMetadata_ShouldReturn400_WhenServiceReportsInvalidUrl()
     {
-        using var client = CreateClient(new FakeMetadataService(_ =>
+        using var owned = await CreateClientAsync(new FakeMetadataService(_ =>
             new YouTubeMetadataResult.Failure(YouTubeMetadataErrorCode.InvalidUrl, "invalid_url")));
+        var client = owned.Client;
 
         var response = await client.GetAsync("/api/materials/youtube-metadata?url=not-a-url");
 
@@ -54,7 +57,9 @@ public sealed class YouTubeMetadataEndpointTest : IClassFixture<WebApplicationFa
             ThumbnailUrl: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
             DurationSeconds: 212);
 
-        using var client = CreateClient(new FakeMetadataService(_ => new YouTubeMetadataResult.Success(dto)));
+        using var owned = await CreateClientAsync(
+            new FakeMetadataService(_ => new YouTubeMetadataResult.Success(dto)));
+        var client = owned.Client;
 
         var response = await client.GetAsync(
             "/api/materials/youtube-metadata?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ");
@@ -70,8 +75,9 @@ public sealed class YouTubeMetadataEndpointTest : IClassFixture<WebApplicationFa
     [Fact]
     public async Task GetYouTubeMetadata_ShouldReturn404_WhenServiceReportsNotFound()
     {
-        using var client = CreateClient(new FakeMetadataService(_ =>
+        using var owned = await CreateClientAsync(new FakeMetadataService(_ =>
             new YouTubeMetadataResult.Failure(YouTubeMetadataErrorCode.VideoNotFound, "video_not_found")));
+        var client = owned.Client;
 
         var response = await client.GetAsync(
             "/api/materials/youtube-metadata?url=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ");
@@ -82,8 +88,9 @@ public sealed class YouTubeMetadataEndpointTest : IClassFixture<WebApplicationFa
     [Fact]
     public async Task GetYouTubeMetadata_ShouldReturn503_WhenQuotaExceeded()
     {
-        using var client = CreateClient(new FakeMetadataService(_ =>
+        using var owned = await CreateClientAsync(new FakeMetadataService(_ =>
             new YouTubeMetadataResult.Failure(YouTubeMetadataErrorCode.QuotaExceeded, "quota_exceeded")));
+        var client = owned.Client;
 
         var response = await client.GetAsync(
             "/api/materials/youtube-metadata?url=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ");
@@ -95,7 +102,9 @@ public sealed class YouTubeMetadataEndpointTest : IClassFixture<WebApplicationFa
     public async Task Response_ShouldIncludeSecurityHeaders()
     {
         var dto = new YouTubeMetadataResponse("youtube", "dQw4w9WgXcQ", "t", "a", "url", 0);
-        using var client = CreateClient(new FakeMetadataService(_ => new YouTubeMetadataResult.Success(dto)));
+        using var owned = await CreateClientAsync(
+            new FakeMetadataService(_ => new YouTubeMetadataResult.Success(dto)));
+        var client = owned.Client;
 
         var response = await client.GetAsync(
             "/api/materials/youtube-metadata?url=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ");
@@ -107,9 +116,11 @@ public sealed class YouTubeMetadataEndpointTest : IClassFixture<WebApplicationFa
         xfo!.ShouldContain("DENY");
 
         response.Headers.TryGetValues("Referrer-Policy", out _).ShouldBeTrue();
+        response.Headers.CacheControl.ShouldNotBeNull();
+        response.Headers.CacheControl!.NoStore.ShouldBeTrue();
     }
 
-    private HttpClient CreateClient(IYouTubeMetadataService fakeService)
+    private async Task<OwnedClient> CreateClientAsync(IYouTubeMetadataService fakeService)
     {
         var factory = _factory.WithWebHostBuilder(builder =>
         {
@@ -119,7 +130,12 @@ public sealed class YouTubeMetadataEndpointTest : IClassFixture<WebApplicationFa
                 services.AddSingleton(fakeService);
             });
         });
-        return factory.CreateClient();
+        var client = factory.CreateClient();
+        var registration = await client.RegisterAsync(
+            $"youtube-{Guid.NewGuid():N}@example.test");
+        registration.EnsureSuccessStatusCode();
+        registration.Dispose();
+        return new OwnedClient(factory, client);
     }
 
     private sealed class FakeMetadataService : IYouTubeMetadataService
@@ -134,6 +150,25 @@ public sealed class YouTubeMetadataEndpointTest : IClassFixture<WebApplicationFa
         public Task<YouTubeMetadataResult> GetMetadataAsync(string url, CancellationToken cancellationToken)
         {
             return Task.FromResult(_responder(url));
+        }
+    }
+
+    private sealed class OwnedClient : IDisposable
+    {
+        private readonly WebApplicationFactory<Program> _factory;
+
+        public OwnedClient(WebApplicationFactory<Program> factory, HttpClient client)
+        {
+            _factory = factory;
+            Client = client;
+        }
+
+        public HttpClient Client { get; }
+
+        public void Dispose()
+        {
+            Client.Dispose();
+            _factory.Dispose();
         }
     }
 }

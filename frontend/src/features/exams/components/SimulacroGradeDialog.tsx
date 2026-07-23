@@ -1,10 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { X } from 'lucide-react'
-import {
-  finishPdfExamAttempt,
-  gradePdfExamAttempt,
-} from '@/lib/db/exam-attempts.repository'
+import { finishPdfExamAttempt, gradePdfExamAttempt } from '@/lib/db/exam-attempts.repository'
 import type { ExamAttempt } from '@/lib/db/schema'
 import { useT } from '@/i18n/i18n-context'
 
@@ -21,17 +18,10 @@ type SimulacroGradeDialogProps = {
  * when finishing a live attempt ("Calificar ahora") and when grading a
  * previously-pending attempt from the list.
  */
-function SimulacroGradeDialog({
-  attempt,
-  mode,
-  onDone,
-  onCancel,
-}: SimulacroGradeDialogProps) {
+function SimulacroGradeDialog({ attempt, mode, onDone, onCancel }: SimulacroGradeDialogProps) {
   const { t } = useT()
   const initialMax = attempt.maxScore ?? 10
-  const [score, setScore] = useState<string>(
-    attempt.score !== null ? String(attempt.score) : '',
-  )
+  const [score, setScore] = useState<string>(attempt.score !== null ? String(attempt.score) : '')
   const [maxScore, setMaxScore] = useState<string>(String(initialMax))
   const [notes, setNotes] = useState<string>(attempt.notes ?? '')
   const [saving, setSaving] = useState(false)
@@ -73,7 +63,9 @@ function SimulacroGradeDialog({
 
   const percentage =
     Number.isFinite(parseFloat(score)) && parseFloat(maxScore) > 0
-      ? Math.round((parseFloat(score.replace(',', '.')) / parseFloat(maxScore.replace(',', '.'))) * 100)
+      ? Math.round(
+          (parseFloat(score.replace(',', '.')) / parseFloat(maxScore.replace(',', '.'))) * 100,
+        )
       : null
 
   return (
@@ -102,10 +94,7 @@ function SimulacroGradeDialog({
 
         <div className="flex items-end gap-2">
           <div className="flex flex-1 flex-col gap-1">
-            <label
-              htmlFor="grade-score"
-              className="text-xs font-semibold text-charcoal"
-            >
+            <label htmlFor="grade-score" className="text-xs font-semibold text-charcoal">
               {t.examenes.grade.score}
             </label>
             <input
@@ -120,10 +109,7 @@ function SimulacroGradeDialog({
           </div>
           <span className="pb-2 text-lg font-semibold text-charcoal">/</span>
           <div className="flex flex-1 flex-col gap-1">
-            <label
-              htmlFor="grade-max"
-              className="text-xs font-semibold text-charcoal"
-            >
+            <label htmlFor="grade-max" className="text-xs font-semibold text-charcoal">
               {t.examenes.grade.maxScore}
             </label>
             <input
@@ -140,7 +126,8 @@ function SimulacroGradeDialog({
 
         {percentage !== null && (
           <p className="text-xs font-medium text-[color:var(--color-text-muted)]">
-            {t.examenes.grade.percentageHint} <span className="font-bold text-charcoal">{percentage}%</span>
+            {t.examenes.grade.percentageHint}{' '}
+            <span className="font-bold text-charcoal">{percentage}%</span>
           </p>
         )}
 
@@ -153,6 +140,7 @@ function SimulacroGradeDialog({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder={t.examenes.grade.notesPlaceholder}
+            maxLength={10_000}
             rows={4}
             className="resize-none rounded-xl bg-cream px-3 py-2 text-sm text-charcoal ring-1 ring-[color:var(--color-border)] focus:ring-2 focus:ring-apricot focus:outline-none"
           />

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { resetApp, seedGoal } from './helpers/seed'
+import { DEXIE_DB_NAME, navigateInApp, resetApp, seedGoal } from './helpers/seed'
 
 test.beforeEach(async ({ page }) => {
   await resetApp(page)
@@ -12,7 +12,7 @@ test('filters the global notes hub by goal and origin', async ({ page }) => {
   // Seed one manual note per goal directly into Dexie so we can assert filter
   // behavior without going through the create UI (already covered elsewhere).
   await page.evaluate(
-    async ({ ids }: { ids: { a: string; b: string } }) => {
+    async ({ ids, dbName }: { ids: { a: string; b: string }; dbName: string }) => {
       const now = Date.now()
       const makeNote = (goalId: string, index: number, title: string) => ({
         id: crypto.randomUUID(),
@@ -26,12 +26,9 @@ test('filters the global notes hub by goal and origin', async ({ page }) => {
         createdAt: now + index,
         updatedAt: now + index,
       })
-      const rows = [
-        makeNote(ids.a, 1, 'Nota A'),
-        makeNote(ids.b, 2, 'Nota B'),
-      ]
+      const rows = [makeNote(ids.a, 1, 'Nota A'), makeNote(ids.b, 2, 'Nota B')]
       await new Promise<void>((resolve, reject) => {
-        const req = indexedDB.open('miga')
+        const req = indexedDB.open(dbName)
         req.onsuccess = () => {
           const idb = req.result
           const tx = idb.transaction('notes', 'readwrite')
@@ -48,10 +45,10 @@ test('filters the global notes hub by goal and origin', async ({ page }) => {
         req.onerror = () => reject(req.error)
       })
     },
-    { ids: { a: goalA.id, b: goalB.id } },
+    { ids: { a: goalA.id, b: goalB.id }, dbName: DEXIE_DB_NAME },
   )
 
-  await page.goto('/app/notas')
+  await navigateInApp(page, '/app/notas')
 
   // No filters → both notes visible.
   await expect(page.getByText('Nota A')).toBeVisible()

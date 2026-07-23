@@ -1,15 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import {
-  AlertTriangle,
-  Check,
-  ImagePlus,
-  Mic,
-  Plus,
-  Square,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { AlertTriangle, Check, ImagePlus, Mic, Plus, Square, Trash2, X } from 'lucide-react'
 import { clsx } from 'clsx'
 import {
   createQuestion,
@@ -23,11 +14,7 @@ import {
   putQuestionBlob,
   setQuestionBlobOwner,
 } from '@/lib/db/question-blobs.repository'
-import {
-  QUESTION_LIMITS,
-  type Question,
-  type QuestionAnswerInput,
-} from '@/lib/db/schema'
+import { QUESTION_LIMITS, type Question, type QuestionAnswerInput } from '@/lib/db/schema'
 import { formatBytes } from '@/lib/format-bytes'
 import { useT } from '@/i18n/i18n-context'
 import { tpl } from '@/i18n/tpl'
@@ -92,10 +79,7 @@ function formatMs(ms: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-function validateImageFile(
-  file: File,
-  errors: Messages['materials']['errors'],
-): string | null {
+function validateImageFile(file: File, errors: Messages['materials']['errors']): string | null {
   if (
     !QUESTION_LIMITS.image.mimeTypes.includes(
       file.type as (typeof QUESTION_LIMITS.image.mimeTypes)[number],
@@ -107,12 +91,7 @@ function validateImageFile(
   return null
 }
 
-function QuestionEditor({
-  goalId,
-  existingQuestionId,
-  onDone,
-  onCancel,
-}: QuestionEditorProps) {
+function QuestionEditor({ goalId, existingQuestionId, onDone, onCancel }: QuestionEditorProps) {
   const { t } = useT()
   const [prompt, setPrompt] = useState('')
   const [answers, setAnswers] = useState<QuestionAnswerInput[]>([
@@ -292,6 +271,14 @@ function QuestionEditor({
       recorder.onstop = () => {
         const type = recorder.mimeType || mimeType || 'audio/webm'
         const blob = new Blob(chunksRef.current, { type })
+        if (blob.size > QUESTION_LIMITS.audio.maxBytes) {
+          toast.error(t.materials.errors.fileTooLarge)
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => track.stop())
+            streamRef.current = null
+          }
+          return
+        }
         setAudio((prev) => {
           if (prev.pendingUrl) URL.revokeObjectURL(prev.pendingUrl)
           return {
@@ -346,14 +333,10 @@ function QuestionEditor({
     setAnswers((prev) => prev.filter((_, i) => i !== index))
   }
   const setAnswerText = (index: number, text: string) => {
-    setAnswers((prev) =>
-      prev.map((a, i) => (i === index ? { ...a, text } : a)),
-    )
+    setAnswers((prev) => prev.map((a, i) => (i === index ? { ...a, text } : a)))
   }
   const toggleAnswerCorrect = (index: number) => {
-    setAnswers((prev) =>
-      prev.map((a, i) => (i === index ? { ...a, isCorrect: !a.isCorrect } : a)),
-    )
+    setAnswers((prev) => prev.map((a, i) => (i === index ? { ...a, isCorrect: !a.isCorrect } : a)))
   }
 
   // ---------------- Save ----------------
@@ -380,6 +363,10 @@ function QuestionEditor({
     }
     if (!cleanAnswers.some((a) => a.isCorrect)) {
       toast.error(t.questions.errors.needCorrect)
+      return
+    }
+    if (audio.pendingBlob && audio.pendingBlob.size > QUESTION_LIMITS.audio.maxBytes) {
+      toast.error(t.materials.errors.fileTooLarge)
       return
     }
 
@@ -409,8 +396,10 @@ function QuestionEditor({
       }
 
       // Effective keys after this save:
-      const effectiveImageKey = newImageKey ?? (image.removed ? undefined : image.currentKey ?? undefined)
-      const effectiveAudioKey = newAudioKey ?? (audio.removed ? undefined : audio.currentKey ?? undefined)
+      const effectiveImageKey =
+        newImageKey ?? (image.removed ? undefined : (image.currentKey ?? undefined))
+      const effectiveAudioKey =
+        newAudioKey ?? (audio.removed ? undefined : (audio.currentKey ?? undefined))
 
       if (loaded) {
         await updateQuestion(loaded.id, {
@@ -482,9 +471,7 @@ function QuestionEditor({
   }
 
   if (loading) {
-    return (
-      <p className="text-sm text-[color:var(--color-text-muted)]">{t.common.loading}</p>
-    )
+    return <p className="text-sm text-[color:var(--color-text-muted)]">{t.common.loading}</p>
   }
 
   // Derived UI state
@@ -553,12 +540,7 @@ function QuestionEditor({
         <p className="text-xs font-semibold text-charcoal">{t.questions.audioLabel}</p>
         {audioPreview ? (
           <div className="flex items-start gap-2">
-            <audio
-              src={audioPreview}
-              controls
-              preload="metadata"
-              className="w-full max-w-xs"
-            />
+            <audio src={audioPreview} controls preload="metadata" className="w-full max-w-xs" />
             <button
               type="button"
               onClick={handleAudioRemove}
@@ -625,11 +607,7 @@ function QuestionEditor({
                 type="button"
                 onClick={() => toggleAnswerCorrect(index)}
                 aria-pressed={answer.isCorrect}
-                aria-label={
-                  answer.isCorrect
-                    ? t.questions.markIncorrect
-                    : t.questions.markCorrect
-                }
+                aria-label={answer.isCorrect ? t.questions.markIncorrect : t.questions.markCorrect}
                 className={clsx(
                   'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition active:scale-[0.98]',
                   answer.isCorrect

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { resetApp, seedGoal } from './helpers/seed'
+import { navigateInApp, resetApp, seedGoal } from './helpers/seed'
 
 test.beforeEach(async ({ page }) => {
   await resetApp(page)
@@ -9,7 +9,7 @@ test('adds a text note pinned to multiple goals from the apuntes hub', async ({ 
   const goalA = await seedGoal(page, 'Meta A')
   const goalB = await seedGoal(page, 'Meta B')
 
-  await page.goto('/app/notas')
+  await navigateInApp(page, '/app/notas')
 
   await page.getByRole('button', { name: 'Añadir nota' }).click()
 

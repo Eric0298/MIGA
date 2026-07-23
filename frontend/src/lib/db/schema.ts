@@ -1,6 +1,17 @@
 import { z } from 'zod'
 
-const dayIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'invalidDayFormat')
+const dayIso = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'invalidDayFormat')
+  .refine((raw) => {
+    const [year, month, day] = raw.split('-').map(Number)
+    const date = new Date(Date.UTC(year, month - 1, day))
+    return (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    )
+  }, 'invalidDayFormat')
 
 export const goalInputSchema = z.object({
   name: z.string().trim().min(2, 'nameMin').max(60, 'nameMax'),
@@ -63,8 +74,13 @@ export const MATERIAL_LIMITS = {
 const httpUrl = z.string().refine(
   (raw) => {
     try {
+      if (raw.includes('\\')) return false
       const parsed = new URL(raw)
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      return (
+        (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+        parsed.username === '' &&
+        parsed.password === ''
+      )
     } catch {
       return false
     }
@@ -125,7 +141,10 @@ export const materialInputSchema = z
     if (data.kind === 'pdf' && data.metadata) {
       const mime = data.metadata.mimeType
       const size = data.metadata.fileSizeBytes
-      if (mime !== undefined && !MATERIAL_LIMITS.pdf.mimeTypes.includes(mime as 'application/pdf')) {
+      if (
+        mime !== undefined &&
+        !MATERIAL_LIMITS.pdf.mimeTypes.includes(mime as 'application/pdf')
+      ) {
         ctx.addIssue({ code: 'custom', message: 'fileInvalidType', path: ['fileBlobKey'] })
       }
       if (size !== undefined && size > MATERIAL_LIMITS.pdf.maxBytes) {
@@ -298,9 +317,7 @@ export const noteInputSchema = z
       const mime = data.metadata.mimeType
       if (
         mime !== undefined &&
-        !NOTE_LIMITS.image.mimeTypes.includes(
-          mime as (typeof NOTE_LIMITS.image.mimeTypes)[number],
-        )
+        !NOTE_LIMITS.image.mimeTypes.includes(mime as (typeof NOTE_LIMITS.image.mimeTypes)[number])
       ) {
         ctx.addIssue({ code: 'custom', message: 'fileInvalidType', path: ['fileBlobKey'] })
       }
@@ -354,7 +371,11 @@ export const QUESTION_LIMITS = {
 
 export const questionAnswerInputSchema = z.object({
   id: z.string().optional(),
-  text: z.string().trim().min(1, 'answerRequired').max(QUESTION_LIMITS.answer.maxChars, 'answerMax'),
+  text: z
+    .string()
+    .trim()
+    .min(1, 'answerRequired')
+    .max(QUESTION_LIMITS.answer.maxChars, 'answerMax'),
   isCorrect: z.boolean(),
 })
 
@@ -442,6 +463,12 @@ export const examStatus = z.enum([
 ])
 export type ExamStatus = z.infer<typeof examStatus>
 
+export const EXAM_LIMITS = {
+  notes: { maxChars: 10_000 },
+  questions: { maxCount: 500 },
+  timeLimitMs: { max: 7 * 24 * 60 * 60 * 1_000 },
+} as const
+
 export type ExamResponse = {
   questionId: string
   chosenAnswerIds: string[]
@@ -455,9 +482,9 @@ export const pdfExamInputSchema = z
   .object({
     goalId: z.uuid(),
     title: z.string().trim().min(1, 'titleRequired').max(80, 'titleMax'),
-    pdfMaterialId: z.string().optional(),
-    pdfNoteId: z.string().optional(),
-    timeLimitMs: z.number().int().positive().nullable().optional(),
+    pdfMaterialId: z.uuid().optional(),
+    pdfNoteId: z.uuid().optional(),
+    timeLimitMs: z.number().int().positive().max(EXAM_LIMITS.timeLimitMs.max).nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (!data.pdfMaterialId && !data.pdfNoteId) {
@@ -476,8 +503,8 @@ export type PdfExamInput = z.infer<typeof pdfExamInputSchema>
 export const questionsExamInputSchema = z.object({
   goalId: z.uuid(),
   title: z.string().trim().min(1, 'titleRequired').max(80, 'titleMax'),
-  questionIds: z.array(z.string()).min(1, 'questionsRequired'),
-  timeLimitMs: z.number().int().positive().nullable().optional(),
+  questionIds: z.array(z.uuid()).min(1, 'questionsRequired').max(EXAM_LIMITS.questions.maxCount),
+  timeLimitMs: z.number().int().positive().max(EXAM_LIMITS.timeLimitMs.max).nullable().optional(),
 })
 
 export type QuestionsExamInput = z.infer<typeof questionsExamInputSchema>

@@ -17,6 +17,8 @@ import { useT } from '@/i18n/i18n-context'
 import { tpl } from '@/i18n/tpl'
 import type { Language } from '@/i18n/types'
 import { useSyncTimerVideo } from '@/lib/settings/player-prefs'
+import { AccountPanel } from '@/features/auth/AccountPanel'
+import { assertImportFileSize } from '@/lib/db/import-file'
 
 function MorePage() {
   const { t, lang, setLang } = useT()
@@ -74,6 +76,7 @@ function MorePage() {
 
     try {
       setBusy('import')
+      assertImportFileSize(file.size)
       const text = await file.text()
       const parsed = parseImportPayload(JSON.parse(text))
       const result = await importAllData(parsed)
@@ -92,8 +95,12 @@ function MorePage() {
           extras,
         }),
       })
-    } catch {
-      toast.error(t.more.importInvalid)
+    } catch (cause) {
+      toast.error(
+        cause instanceof Error && cause.message.includes('5 MiB')
+          ? t.more.importTooLarge
+          : t.more.importInvalid,
+      )
     } finally {
       setBusy(null)
     }
@@ -167,6 +174,8 @@ function MorePage() {
           ))}
         </div>
       </section>
+
+      <AccountPanel />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-charcoal">{t.more.playerSection}</h2>
@@ -329,6 +338,12 @@ function MorePage() {
             className="rounded-2xl bg-surface px-5 py-4 text-base font-semibold text-charcoal"
           >
             {t.more.architecture}
+          </Link>
+          <Link
+            to="/privacidad"
+            className="rounded-2xl bg-surface px-5 py-4 text-base font-semibold text-charcoal"
+          >
+            {t.more.privacy}
           </Link>
           <Link
             to="/"

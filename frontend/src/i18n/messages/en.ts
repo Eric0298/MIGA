@@ -174,8 +174,7 @@ export const en: Messages = {
       titleLabel: 'Simulation name',
       titlePlaceholder: 'Model 2024 · Block 1',
       sourceLabel: 'PDF to time',
-      sourceHint:
-        'Pick a PDF material or a document note whose file is a PDF.',
+      sourceHint: 'Pick a PDF material or a document note whose file is a PDF.',
       sourceEmpty:
         'This goal has no PDFs yet. Upload one as a material or as a note and come back.',
       fromMaterial: 'From materials',
@@ -206,8 +205,7 @@ export const en: Messages = {
       finish: 'Finish',
       discard: 'Discard simulation',
       finishTitle: 'Finish simulation',
-      finishDescription:
-        'Do you want to grade it now or leave it pending to grade later?',
+      finishDescription: 'Do you want to grade it now or leave it pending to grade later?',
       gradeNow: 'Grade now',
       leavePending: 'Leave pending',
       savedPending: 'Simulation saved as pending.',
@@ -257,12 +255,10 @@ export const en: Messages = {
       orderOriginal: 'Original order',
       timeLimitLabel: 'Time limit (min)',
       timeLimitPlaceholder: 'Optional',
-      timeLimitHint:
-        'If set, MIGA will end the exam automatically when it reaches 0.',
+      timeLimitHint: 'If set, MIGA will end the exam automatically when it reaches 0.',
       start: 'Start exam',
       noQuestionsTitle: 'No questions yet',
-      noQuestionsDescription:
-        'Create questions in this goal’s review section to run an exam.',
+      noQuestionsDescription: 'Create questions in this goal’s review section to run an exam.',
       goToRepaso: 'Go to questions',
       errors: {
         titleRequired: 'Give the exam a name.',
@@ -284,15 +280,13 @@ export const en: Messages = {
       cannotDiscard: 'Could not discard the exam.',
       discarded: 'Exam discarded.',
       discardTitle: 'Discard this exam?',
-      discardDescription:
-        'You will lose the answered questions and the elapsed time.',
+      discardDescription: 'You will lose the answered questions and the elapsed time.',
       discardYes: 'Yes, discard',
       discardedTitle: 'Exam discarded',
       discardedDescription: 'This attempt was discarded.',
       timeUpToast: 'Time is up. The exam was graded with the current answers.',
       noQuestionsTitle: 'No questions',
-      noQuestionsDescription:
-        'This exam has no questions attached. You may have deleted them.',
+      noQuestionsDescription: 'This exam has no questions attached. You may have deleted them.',
     },
     questionsResult: {
       summaryLabel: 'Result',
@@ -329,7 +323,7 @@ export const en: Messages = {
     tagline2: 'Big progress.',
     description:
       'Miga helps you turn small daily actions into real progress. No endless lists, no artificial pressure. Just well-spent time and visible progress.',
-    tryGuest: 'Try as guest',
+    tryGuest: 'Try MIGA',
     seeArchitecture: 'View architecture',
     whyMiga: 'Why Miga',
     feature1Title: 'Real time, not promises',
@@ -339,7 +333,7 @@ export const en: Messages = {
       'Set weekly time targets. Miga tells you if you are on track without drama.',
     feature3Title: 'Visible progress',
     feature3Description: 'Every session counts. You will see real progress, not empty streaks.',
-    footer: 'Local guest mode. No account required.',
+    footer: 'You can try a temporary demo without creating an account.',
   },
   architecture: {
     title: 'Architecture',
@@ -573,9 +567,9 @@ export const en: Messages = {
     subtitle: 'Data settings, language and project info.',
     dataSection: 'Data',
     dataHint:
-      'Everything is stored on your device. Use export as a backup and import to restore on another device.',
+      'The JSON backup includes structured data but excludes PDF, video, audio, and images. Those files remain on this device only.',
     export: 'Export backup',
-    exportBadge: '.json',
+    exportBadge: 'JSON, no files',
     exportSuccess: 'Backup downloaded',
     exportError: 'Could not export',
     import: 'Import backup',
@@ -585,6 +579,7 @@ export const en: Messages = {
       '{goals} goals · {sessions} sessions · {materials} materials · {notes} notes · {questions} questions · {exams} exams{extras}',
     importActiveCleared: ' ({count} active session closed)',
     importInvalid: 'Invalid file',
+    importTooLarge: 'The file exceeds the 5 MiB limit',
     importBlocked: 'Stop the active session before importing',
     clear: 'Delete all data',
     clearBadge: 'Local',
@@ -601,6 +596,7 @@ export const en: Messages = {
     clearError: 'Could not delete',
     infoSection: 'Info',
     architecture: 'View architecture',
+    privacy: 'Privacy policy',
     landing: 'Back to landing',
     languageSection: 'Language',
     languageHint: 'Choose the interface language.',
@@ -717,7 +713,8 @@ export const en: Messages = {
       startRecording: 'Record',
       stopRecording: 'Stop',
       recording: 'Recording',
-      estimatedMax: 'Estimated max duration: {minutes} min. Recording will stop automatically when reached and we will save everything captured until then.',
+      estimatedMax:
+        'Estimated max duration: {minutes} min. Recording will stop automatically when reached and we will save everything captured until then.',
       autoCutoffMessage: 'Stopped automatically after reaching the {minutes} min limit.',
       recordedDuration: 'Recorded duration: {time}',
       discardAndRetry: 'Discard and record again',

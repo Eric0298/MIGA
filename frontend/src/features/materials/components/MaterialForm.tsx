@@ -3,16 +3,8 @@ import { clsx } from 'clsx'
 import { Loader2, Paperclip } from 'lucide-react'
 import { toast } from 'sonner'
 import { createMaterial } from '@/lib/db/materials.repository'
-import {
-  deleteBlob,
-  putBlob,
-  setBlobMaterial,
-} from '@/lib/db/blobs.repository'
-import {
-  MATERIAL_LIMITS,
-  materialInputSchema,
-  type MaterialKind,
-} from '@/lib/db/schema'
+import { deleteBlob, putBlob, setBlobMaterial } from '@/lib/db/blobs.repository'
+import { MATERIAL_LIMITS, materialInputSchema, type MaterialKind } from '@/lib/db/schema'
 import { useT } from '@/i18n/i18n-context'
 import type { Messages } from '@/i18n/messages/es'
 import { tpl } from '@/i18n/tpl'
@@ -127,12 +119,16 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
     const error = validateFile(kind, picked)
     if (error) {
       setFile(null)
-      setErrors((prev) => ({ ...prev, fileBlobKey: t.materials.errors[error as 'fileInvalidType'] }))
+      setErrors((prev) => ({
+        ...prev,
+        fileBlobKey: t.materials.errors[error as 'fileInvalidType'],
+      }))
       e.target.value = ''
       return
     }
     setErrors((prev) => {
-      const { fileBlobKey: _drop, ...rest } = prev
+      const rest = { ...prev }
+      delete rest.fileBlobKey
       return rest
     })
     setFile(picked)
@@ -191,10 +187,9 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
         const record = await putBlob({ blob: file, mimeType: file.type })
         blobId = record.id
       }
-      const material = await createMaterial(
-        { ...parsed.data, fileBlobKey: blobId ?? undefined },
-        [goalId],
-      )
+      const material = await createMaterial({ ...parsed.data, fileBlobKey: blobId ?? undefined }, [
+        goalId,
+      ])
       if (blobId) {
         await setBlobMaterial(blobId, material.id)
       }
@@ -344,7 +339,9 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
             className="inline-flex items-center gap-2 rounded-xl bg-cream px-4 py-3 text-sm font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] cursor-pointer transition active:scale-[0.98]"
           >
             <Paperclip size={16} aria-hidden="true" />
-            {file ? tpl(t.materials.fileSelected, { name: file.name, size: formatBytes(file.size) }) : t.materials.filePick}
+            {file
+              ? tpl(t.materials.fileSelected, { name: file.name, size: formatBytes(file.size) })
+              : t.materials.filePick}
           </label>
           <input
             ref={fileInputRef}
@@ -355,9 +352,7 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
             onChange={handleFileChange}
           />
           <p className="text-xs text-[color:var(--color-text-muted)]">{fileHint}</p>
-          {errors.fileBlobKey && (
-            <p className="text-xs text-apricot">{errors.fileBlobKey}</p>
-          )}
+          {errors.fileBlobKey && <p className="text-xs text-apricot">{errors.fileBlobKey}</p>}
         </div>
       )}
 

@@ -66,8 +66,7 @@ export const es = {
       'Termina la sesión del Timer antes de iniciar un repaso, para que el tiempo se registre bien.',
     goToTimer: 'Ir al Timer',
     noQuestionsTitle: 'Esta meta no tiene preguntas',
-    noQuestionsDescription:
-      'Crea alguna pregunta en Repaso y vuelve para empezar a practicar.',
+    noQuestionsDescription: 'Crea alguna pregunta en Repaso y vuelve para empezar a practicar.',
     cannotStartTitle: 'No se pudo iniciar el repaso',
     cannotStartDescription: 'Ha habido un problema al arrancar la sesión. Inténtalo de nuevo.',
     summaryLabel: 'Repaso terminado',
@@ -173,10 +172,8 @@ export const es = {
       titleLabel: 'Nombre del simulacro',
       titlePlaceholder: 'Modelo 2024 · Bloque 1',
       sourceLabel: 'PDF a cronometrar',
-      sourceHint:
-        'Elige un material tipo PDF o una nota tipo documento en formato PDF.',
-      sourceEmpty:
-        'Esta meta aún no tiene PDFs. Súbelo como material o como nota y vuelve aquí.',
+      sourceHint: 'Elige un material tipo PDF o una nota tipo documento en formato PDF.',
+      sourceEmpty: 'Esta meta aún no tiene PDFs. Súbelo como material o como nota y vuelve aquí.',
       fromMaterial: 'Desde materiales',
       fromNote: 'Desde notas',
       uploadPdf: 'Subir PDF ahora',
@@ -256,8 +253,7 @@ export const es = {
       orderOriginal: 'Orden original',
       timeLimitLabel: 'Tiempo límite (min)',
       timeLimitPlaceholder: 'Opcional',
-      timeLimitHint:
-        'Si lo indicas, MIGA terminará el examen automáticamente al llegar a 0.',
+      timeLimitHint: 'Si lo indicas, MIGA terminará el examen automáticamente al llegar a 0.',
       start: 'Empezar examen',
       noQuestionsTitle: 'Aún no tienes preguntas',
       noQuestionsDescription:
@@ -283,13 +279,11 @@ export const es = {
       cannotDiscard: 'No se pudo descartar el examen.',
       discarded: 'Examen descartado.',
       discardTitle: '¿Descartar este examen?',
-      discardDescription:
-        'Perderás las respuestas contestadas y el tiempo cronometrado.',
+      discardDescription: 'Perderás las respuestas contestadas y el tiempo cronometrado.',
       discardYes: 'Sí, descartar',
       discardedTitle: 'Examen descartado',
       discardedDescription: 'Este intento fue descartado.',
-      timeUpToast:
-        'Se acabó el tiempo. El examen se ha corregido con las respuestas actuales.',
+      timeUpToast: 'Se acabó el tiempo. El examen se ha corregido con las respuestas actuales.',
       noQuestionsTitle: 'No hay preguntas',
       noQuestionsDescription:
         'Este examen no tiene preguntas asociadas. Puede que las hayas borrado.',
@@ -329,7 +323,7 @@ export const es = {
     tagline2: 'Big progress.',
     description:
       'Miga te ayuda a convertir pequeñas acciones diarias en progreso real. Nada de listas infinitas, ni presión artificial. Solo tiempo bien usado y avance visible.',
-    tryGuest: 'Probar como invitado',
+    tryGuest: 'Probar MIGA',
     seeArchitecture: 'Ver arquitectura',
     whyMiga: 'Por qué Miga',
     feature1Title: 'Tiempo real, no promesas',
@@ -340,7 +334,7 @@ export const es = {
       'Fija objetivos por tiempo semanal. Miga te dice si vas al día sin dramatizar.',
     feature3Title: 'Progreso visible',
     feature3Description: 'Cada sesión suma. Verás avance real, no rachas vacías.',
-    footer: 'Modo invitado local. Sin cuenta obligatoria.',
+    footer: 'Puedes probar una demo temporal sin crear una cuenta.',
   },
   architecture: {
     title: 'Arquitectura',
@@ -574,9 +568,9 @@ export const es = {
     subtitle: 'Ajustes de datos, idioma e información del proyecto.',
     dataSection: 'Datos',
     dataHint:
-      'Todo se guarda en tu dispositivo. Usa exportar como copia de seguridad e importar para restaurar en otro dispositivo.',
+      'La copia JSON incluye datos estructurados, pero no incluye PDF, vídeo, audio ni imágenes. Esos archivos permanecen solo en este dispositivo.',
     export: 'Exportar copia',
-    exportBadge: '.json',
+    exportBadge: 'JSON sin archivos',
     exportSuccess: 'Copia descargada',
     exportError: 'No se pudo exportar',
     import: 'Importar copia',
@@ -586,6 +580,7 @@ export const es = {
       '{goals} metas · {sessions} sesiones · {materials} materiales · {notes} notas · {questions} preguntas · {exams} exámenes{extras}',
     importActiveCleared: ' ({count} sesión activa cerrada)',
     importInvalid: 'Archivo inválido',
+    importTooLarge: 'El archivo supera el límite de 5 MiB',
     importBlocked: 'Detén la sesión activa antes de importar',
     clear: 'Borrar todos los datos',
     clearBadge: 'Local',
@@ -602,6 +597,7 @@ export const es = {
     clearError: 'No se pudo borrar',
     infoSection: 'Información',
     architecture: 'Ver arquitectura',
+    privacy: 'Política de privacidad',
     landing: 'Volver a la landing',
     languageSection: 'Idioma',
     languageHint: 'Elige el idioma de la interfaz.',
@@ -719,7 +715,8 @@ export const es = {
       startRecording: 'Grabar',
       stopRecording: 'Detener',
       recording: 'Grabando',
-      estimatedMax: 'Duración máxima estimada: {minutes} min. La grabación se cortará automáticamente al alcanzarla y guardaremos todo lo grabado hasta ese momento.',
+      estimatedMax:
+        'Duración máxima estimada: {minutes} min. La grabación se cortará automáticamente al alcanzarla y guardaremos todo lo grabado hasta ese momento.',
       autoCutoffMessage: 'Se cortó automáticamente al alcanzar el límite de {minutes} min.',
       recordedDuration: 'Duración grabada: {time}',
       discardAndRetry: 'Descartar y grabar de nuevo',

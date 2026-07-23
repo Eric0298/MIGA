@@ -22,8 +22,8 @@ describe('LandingPage', () => {
 
   it('has a link to the guest app', () => {
     renderLanding()
-    const cta = screen.getByRole('link', { name: /Probar como invitado/i })
-    expect(cta).toHaveAttribute('href', '/app')
+    const cta = screen.getByRole('link', { name: /Probar MIGA/i })
+    expect(cta).toHaveAttribute('href', '/demo')
   })
 
   it('has a link to the architecture page', () => {

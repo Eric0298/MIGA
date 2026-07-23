@@ -1,22 +1,26 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Miga.Infrastructure.Persistence;
+using Miga.Infrastructure.Security;
 
 namespace Miga.Api.Controllers;
 
 [ApiController]
+[AllowAnonymous]
 [Route("api/health")]
 public sealed class HealthController : ControllerBase
 {
-    private readonly IHostEnvironment _environment;
     private readonly MigaDbContext _dbContext;
+    private readonly DatabaseHealthOptions _healthOptions;
 
     public HealthController(
-        IHostEnvironment environment,
-        MigaDbContext dbContext)
+        MigaDbContext dbContext,
+        IOptions<DatabaseHealthOptions> healthOptions)
     {
-        _environment = environment;
         _dbContext = dbContext;
+        _healthOptions = healthOptions.Value;
     }
 
     [HttpGet]
@@ -26,7 +30,6 @@ public sealed class HealthController : ControllerBase
         var response = new HealthResponse(
             Status: "healthy",
             Service: "Miga.Api",
-            Environment: _environment.EnvironmentName,
             UtcNow: DateTimeOffset.UtcNow
         );
 
@@ -39,11 +42,15 @@ public sealed class HealthController : ControllerBase
     public async Task<ActionResult<DatabaseHealthResponse>> GetDatabaseHealth(
         CancellationToken cancellationToken)
     {
+        if (!_healthOptions.ExposeDatabaseEndpoint)
+        {
+            return NotFound();
+        }
+
         var canConnect = await _dbContext.Database.CanConnectAsync(cancellationToken);
 
         var response = new DatabaseHealthResponse(
             Status: canConnect ? "healthy" : "unhealthy",
-            Database: "PostgreSQL",
             CanConnect: canConnect,
             UtcNow: DateTimeOffset.UtcNow
         );
@@ -60,13 +67,11 @@ public sealed class HealthController : ControllerBase
 public sealed record HealthResponse(
     string Status,
     string Service,
-    string Environment,
     DateTimeOffset UtcNow
 );
 
 public sealed record DatabaseHealthResponse(
     string Status,
-    string Database,
     bool CanConnect,
     DateTimeOffset UtcNow
 );

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,7 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
     private const string Provider = "youtube";
     private const string CacheKeyPrefix = "yt-meta:";
     private const string BaseAddress = "https://www.googleapis.com/youtube/v3/";
+    private const int MaxResponseBytes = 256 * 1024;
 
     private readonly HttpClient _httpClient;
     private readonly IMemoryCache _cache;
@@ -54,7 +56,7 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
             return new YouTubeMetadataResult.Success(cached);
         }
 
-        if (string.IsNullOrWhiteSpace(_options.ApiKey))
+        if (!_options.Enabled || string.IsNullOrWhiteSpace(_options.ApiKey))
         {
             _logger.LogError("YouTube API key is not configured");
             return new YouTubeMetadataResult.Failure(
@@ -63,11 +65,16 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
         }
 
         var requestUri =
-            $"videos?id={Uri.EscapeDataString(videoId)}&part=snippet,contentDetails&key={Uri.EscapeDataString(_options.ApiKey)}";
+            $"videos?id={Uri.EscapeDataString(videoId)}&part=snippet,contentDetails";
 
         try
         {
-            using var response = await _httpClient.GetAsync(requestUri, cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+            request.Headers.Add("X-Goog-Api-Key", _options.ApiKey);
+            using var response = await _httpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
 
             if (response.StatusCode == HttpStatusCode.Forbidden)
             {
@@ -88,6 +95,15 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
                     "upstream_error");
             }
 
+            if (response.Content.Headers.ContentLength > MaxResponseBytes)
+            {
+                _logger.LogWarning("YouTube API response exceeded the allowed size for {VideoId}", videoId);
+                return new YouTubeMetadataResult.Failure(
+                    YouTubeMetadataErrorCode.UpstreamError,
+                    "upstream_response_too_large");
+            }
+
+            await response.Content.LoadIntoBufferAsync(MaxResponseBytes, cancellationToken);
             var payload = await response.Content.ReadFromJsonAsync<YouTubeVideoListPayload>(
                 cancellationToken: cancellationToken);
 
@@ -108,7 +124,14 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
                 ThumbnailUrl: $"https://i.ytimg.com/vi/{videoId}/hqdefault.jpg",
                 DurationSeconds: duration);
 
-            _cache.Set(cacheKey, metadata, _options.CacheTtl);
+            _cache.Set(
+                cacheKey,
+                metadata,
+                new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = _options.CacheTtl,
+                    Size = 1
+                });
             return new YouTubeMetadataResult.Success(metadata);
         }
         catch (HttpRequestException ex)
@@ -124,6 +147,27 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
             return new YouTubeMetadataResult.Failure(
                 YouTubeMetadataErrorCode.UpstreamError,
                 "timeout");
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Invalid YouTube API payload for {VideoId}", videoId);
+            return new YouTubeMetadataResult.Failure(
+                YouTubeMetadataErrorCode.UpstreamError,
+                "invalid_upstream_response");
+        }
+        catch (OverflowException ex)
+        {
+            _logger.LogWarning(ex, "Invalid YouTube duration for {VideoId}", videoId);
+            return new YouTubeMetadataResult.Failure(
+                YouTubeMetadataErrorCode.UpstreamError,
+                "invalid_upstream_response");
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogWarning(ex, "Invalid YouTube duration for {VideoId}", videoId);
+            return new YouTubeMetadataResult.Failure(
+                YouTubeMetadataErrorCode.UpstreamError,
+                "invalid_upstream_response");
         }
     }
 

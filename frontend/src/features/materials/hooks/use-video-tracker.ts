@@ -75,7 +75,9 @@ export function useVideoTracker(playerRef: { current: MediaPlayer | null }) {
   // Kept for API compatibility (TimerVideoSession forwards state changes
   // through this for the timer/video sync). Tracking no longer depends on
   // it firing.
-  const handleStateChange = useCallback((_state: number) => {}, [])
+  const handleStateChange = useCallback((_state: number) => {
+    void _state
+  }, [])
 
   const snapshot = useCallback((): VideoTrackerSnapshot => {
     const closed = closedRangesRef.current.slice()

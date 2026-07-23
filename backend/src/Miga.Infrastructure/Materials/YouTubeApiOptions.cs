@@ -15,4 +15,6 @@ public sealed class YouTubeApiOptions
     /// TTL for successful metadata lookups. Defaults to 24h to minimise quota usage.
     /// </summary>
     public TimeSpan CacheTtl { get; init; } = TimeSpan.FromHours(24);
+
+    public bool Enabled { get; init; }
 }

@@ -62,11 +62,22 @@ export function listQuestionsByGoal(goalId: string): Promise<Question[]> {
 export async function updateQuestion(id: string, patch: UpdateQuestionPatch): Promise<void> {
   const existing = await db.questions.get(id)
   if (!existing) throw new Error('Pregunta no encontrada')
-  const next: Partial<Question> = { updatedAt: Date.now() }
-  if (patch.prompt !== undefined) next.prompt = patch.prompt
-  if (patch.imageBlobKey !== undefined) next.imageBlobKey = patch.imageBlobKey ?? undefined
-  if (patch.audioBlobKey !== undefined) next.audioBlobKey = patch.audioBlobKey ?? undefined
-  if (patch.answers !== undefined) next.answers = withAnswerIds(patch.answers)
+  const parsed = questionInputSchema.parse({
+    goalId: existing.goalId,
+    prompt: patch.prompt ?? existing.prompt,
+    imageBlobKey:
+      patch.imageBlobKey === null ? undefined : (patch.imageBlobKey ?? existing.imageBlobKey),
+    audioBlobKey:
+      patch.audioBlobKey === null ? undefined : (patch.audioBlobKey ?? existing.audioBlobKey),
+    answers: patch.answers ?? existing.answers,
+  })
+  const next: Partial<Question> = {
+    prompt: parsed.prompt,
+    imageBlobKey: parsed.imageBlobKey,
+    audioBlobKey: parsed.audioBlobKey,
+    answers: withAnswerIds(parsed.answers),
+    updatedAt: Date.now(),
+  }
   await db.questions.update(id, next)
 }
 

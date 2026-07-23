@@ -1,8 +1,8 @@
 {
   "name": "miga",
+  "private": true,
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
     "dev:db": "docker compose up -d",
     "dev:db:down": "docker compose down",
@@ -15,7 +15,6 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "concurrently": "^10.0.3",
     "prettier": "^3.9.4"
   }
 }

@@ -20,6 +20,9 @@ import {
 
 const GOAL_A = crypto.randomUUID()
 const GOAL_B = crypto.randomUUID()
+const PDF_MATERIAL_ID = crypto.randomUUID()
+const QUESTION_IDS = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()]
+const ANSWER_IDS = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()]
 
 afterEach(async () => {
   await db.examAttempts.clear()
@@ -30,25 +33,23 @@ describe('exam attempts — pdf', () => {
     const attempt = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'Modelo 2024',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     expect(attempt.kind).toBe('pdf')
     expect(attempt.status).toBe('in-progress')
-    expect(attempt.pdfMaterialId).toBe('mat-1')
+    expect(attempt.pdfMaterialId).toBe(PDF_MATERIAL_ID)
     expect(attempt.score).toBeNull()
   })
 
   it('rejects a pdf attempt without any pdf source', async () => {
-    await expect(
-      startPdfExamAttempt({ goalId: GOAL_A, title: 'x' }),
-    ).rejects.toThrow()
+    await expect(startPdfExamAttempt({ goalId: GOAL_A, title: 'x' })).rejects.toThrow()
   })
 
   it('finishes with a score → status graded and stores the score', async () => {
     const a = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'x',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await finishPdfExamAttempt(a.id, { score: 7.5, maxScore: 10, notes: 'meh' })
     const reloaded = await getExamAttempt(a.id)
@@ -63,7 +64,7 @@ describe('exam attempts — pdf', () => {
     const a = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'x',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await finishPdfExamAttempt(a.id, { score: null, maxScore: null })
     const reloaded = await getExamAttempt(a.id)
@@ -75,7 +76,7 @@ describe('exam attempts — pdf', () => {
     const a = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'x',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await finishPdfExamAttempt(a.id, { score: null, maxScore: null })
     await gradePdfExamAttempt(a.id, 8, 10)
@@ -88,7 +89,7 @@ describe('exam attempts — pdf', () => {
     const a = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'x',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await pauseExamAttempt(a.id)
     await new Promise((r) => setTimeout(r, 15))
@@ -104,16 +105,31 @@ describe('exam attempts — questions', () => {
     const a = await startQuestionsExamAttempt({
       goalId: GOAL_A,
       title: 'test1',
-      questionIds: ['q1', 'q2', 'q3'],
+      questionIds: QUESTION_IDS,
     })
     expect(a.kind).toBe('questions')
     expect(a.maxScore).toBe(3)
 
     await finishQuestionsExamAttempt(a.id, {
       responses: [
-        { questionId: 'q1', chosenAnswerIds: ['a1'], isCorrect: true, answeredAt: 1 },
-        { questionId: 'q2', chosenAnswerIds: ['b1'], isCorrect: false, answeredAt: 2 },
-        { questionId: 'q3', chosenAnswerIds: ['c1'], isCorrect: true, answeredAt: 3 },
+        {
+          questionId: QUESTION_IDS[0],
+          chosenAnswerIds: [ANSWER_IDS[0]],
+          isCorrect: true,
+          answeredAt: 1,
+        },
+        {
+          questionId: QUESTION_IDS[1],
+          chosenAnswerIds: [ANSWER_IDS[1]],
+          isCorrect: false,
+          answeredAt: 2,
+        },
+        {
+          questionId: QUESTION_IDS[2],
+          chosenAnswerIds: [ANSWER_IDS[2]],
+          isCorrect: true,
+          answeredAt: 3,
+        },
       ],
       notes: 'quick',
     })
@@ -137,18 +153,18 @@ describe('exam attempts — housekeeping', () => {
     const a = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'A',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await new Promise((r) => setTimeout(r, 5))
     const b = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'B',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await startPdfExamAttempt({
       goalId: GOAL_B,
       title: 'other',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     const list = await listExamAttemptsByGoal(GOAL_A)
     expect(list.map((x) => x.id)).toEqual([b.id, a.id])
@@ -158,7 +174,7 @@ describe('exam attempts — housekeeping', () => {
     const a = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'x',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await discardExamAttempt(a.id)
     const reloaded = await getExamAttempt(a.id)
@@ -169,17 +185,17 @@ describe('exam attempts — housekeeping', () => {
     await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'A',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'B',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await startPdfExamAttempt({
       goalId: GOAL_B,
       title: 'C',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await deleteExamAttemptsByGoal(GOAL_A)
     expect((await listExamAttemptsByGoal(GOAL_A)).length).toBe(0)
@@ -190,7 +206,7 @@ describe('exam attempts — housekeeping', () => {
     const a = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'x',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await deleteExamAttempt(a.id)
     expect(await getExamAttempt(a.id)).toBeNull()
@@ -200,26 +216,26 @@ describe('exam attempts — housekeeping', () => {
     const a = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'A',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await new Promise((r) => setTimeout(r, 5))
     const b = await startQuestionsExamAttempt({
       goalId: GOAL_B,
       title: 'B',
-      questionIds: ['q1'],
+      questionIds: [QUESTION_IDS[0]],
     })
     await pauseExamAttempt(b.id)
     const c = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'C',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     // c is finished (graded) — excluded from active list.
     await finishPdfExamAttempt(c.id, { score: 5, maxScore: 10 })
     const d = await startPdfExamAttempt({
       goalId: GOAL_B,
       title: 'D',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     // d is discarded — excluded from active list.
     await discardExamAttempt(d.id)
@@ -234,24 +250,28 @@ describe('exam attempts — housekeeping', () => {
     const a = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'A',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await finishPdfExamAttempt(a.id, { score: null, maxScore: null })
     await new Promise((r) => setTimeout(r, 5))
     const b = await startPdfExamAttempt({
       goalId: GOAL_B,
       title: 'B',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await finishPdfExamAttempt(b.id, { score: null, maxScore: null })
 
     // In progress → excluded
-    await startPdfExamAttempt({ goalId: GOAL_A, title: 'C', pdfMaterialId: 'mat-1' })
+    await startPdfExamAttempt({
+      goalId: GOAL_A,
+      title: 'C',
+      pdfMaterialId: PDF_MATERIAL_ID,
+    })
     // Graded → excluded
     const d = await startPdfExamAttempt({
       goalId: GOAL_A,
       title: 'D',
-      pdfMaterialId: 'mat-1',
+      pdfMaterialId: PDF_MATERIAL_ID,
     })
     await finishPdfExamAttempt(d.id, { score: 6, maxScore: 10 })
 

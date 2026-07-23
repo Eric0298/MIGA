@@ -1,11 +1,15 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Miga.Api.Security;
 using Miga.Application.Materials;
 using Miga.Contracts.Materials;
+using Miga.Infrastructure.Auth;
 
 namespace Miga.Api.Controllers;
 
 [ApiController]
+[Authorize(Policy = MigaAuthenticationConstants.RegisteredPolicy)]
 [Route("api/materials")]
 public sealed class MaterialsController : ControllerBase
 {
@@ -19,7 +23,7 @@ public sealed class MaterialsController : ControllerBase
     }
 
     [HttpGet("youtube-metadata")]
-    [EnableRateLimiting("youtube-metadata")]
+    [EnableRateLimiting(ApiSecurityConstants.YouTubeMetadataRatePolicy)]
     [ProducesResponseType(typeof(YouTubeMetadataResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(YouTubeMetadataErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(YouTubeMetadataErrorResponse), StatusCodes.Status404NotFound)]
@@ -46,26 +50,26 @@ public sealed class MaterialsController : ControllerBase
         {
             YouTubeMetadataResult.Success success => Ok(success.Data),
 
-            YouTubeMetadataResult.Failure { Code: YouTubeMetadataErrorCode.InvalidUrl } failure =>
-                BadRequest(new YouTubeMetadataErrorResponse("invalid_url", failure.Message)),
+            YouTubeMetadataResult.Failure { Code: YouTubeMetadataErrorCode.InvalidUrl } =>
+                BadRequest(new YouTubeMetadataErrorResponse("invalid_url", "Invalid YouTube URL")),
 
-            YouTubeMetadataResult.Failure { Code: YouTubeMetadataErrorCode.VideoNotFound } failure =>
-                NotFound(new YouTubeMetadataErrorResponse("video_not_found", failure.Message)),
+            YouTubeMetadataResult.Failure { Code: YouTubeMetadataErrorCode.VideoNotFound } =>
+                NotFound(new YouTubeMetadataErrorResponse("video_not_found", "Video not found")),
 
-            YouTubeMetadataResult.Failure { Code: YouTubeMetadataErrorCode.QuotaExceeded } failure =>
+            YouTubeMetadataResult.Failure { Code: YouTubeMetadataErrorCode.QuotaExceeded } =>
                 StatusCode(
                     StatusCodes.Status503ServiceUnavailable,
-                    new YouTubeMetadataErrorResponse("quota_exceeded", failure.Message)),
+                    new YouTubeMetadataErrorResponse("quota_exceeded", "Metadata service is unavailable")),
 
-            YouTubeMetadataResult.Failure { Code: YouTubeMetadataErrorCode.ConfigurationError } failure =>
+            YouTubeMetadataResult.Failure { Code: YouTubeMetadataErrorCode.ConfigurationError } =>
                 StatusCode(
                     StatusCodes.Status503ServiceUnavailable,
-                    new YouTubeMetadataErrorResponse("configuration_error", failure.Message)),
+                    new YouTubeMetadataErrorResponse("service_unavailable", "Metadata service is unavailable")),
 
-            YouTubeMetadataResult.Failure failure =>
+            YouTubeMetadataResult.Failure =>
                 StatusCode(
                     StatusCodes.Status502BadGateway,
-                    new YouTubeMetadataErrorResponse("upstream_error", failure.Message)),
+                    new YouTubeMetadataErrorResponse("upstream_error", "Metadata service failed")),
 
             _ => StatusCode(
                 StatusCodes.Status500InternalServerError,

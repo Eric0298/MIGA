@@ -1,3 +1,6 @@
+import { z } from 'zod'
+import { ApiError, apiRequest } from './http'
+
 export type YouTubeMetadata = {
   provider: string
   videoId: string
@@ -16,26 +19,50 @@ export type YouTubeMetadataResult =
   { success: true; data: YouTubeMetadata } | { success: false; error: YouTubeMetadataError }
 
 const YOUTUBE_HOSTNAME_REGEX = /(?:^|\.)(?:youtube(?:-nocookie)?\.com|youtu\.be)$/i
+const httpUrl = z
+  .string()
+  .max(2_048)
+  .refine((raw) => {
+    try {
+      if (raw.includes('\\')) return false
+      const parsed = new URL(raw)
+      return (
+        (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+        parsed.username === '' &&
+        parsed.password === ''
+      )
+    } catch {
+      return false
+    }
+  })
+const youtubeMetadataSchema = z
+  .object({
+    provider: z.literal('youtube'),
+    videoId: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
+    title: z.string().min(1).max(500),
+    author: z.string().max(200),
+    thumbnailUrl: httpUrl,
+    durationSeconds: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(60 * 60 * 24 * 365),
+  })
+  .strict()
 
 export function isProbablyYouTubeUrl(raw: string): boolean {
   if (!raw) return false
   const trimmed = raw.trim()
   if (trimmed.length === 0 || trimmed.length > 2048) return false
   try {
+    if (trimmed.includes('\\')) return false
     const parsed = new URL(trimmed)
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+    if (parsed.username || parsed.password) return false
     return YOUTUBE_HOSTNAME_REGEX.test(parsed.host)
   } catch {
     return false
   }
-}
-
-function getApiBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_URL
-  if (typeof configured === 'string' && configured.length > 0) {
-    return configured.replace(/\/$/, '')
-  }
-  return 'http://localhost:5161'
 }
 
 export async function fetchYouTubeMetadata(
@@ -43,43 +70,37 @@ export async function fetchYouTubeMetadata(
   signal?: AbortSignal,
 ): Promise<YouTubeMetadataResult> {
   const params = new URLSearchParams({ url })
-  const endpoint = `${getApiBaseUrl()}/api/materials/youtube-metadata?${params.toString()}`
-
-  let response: Response
   try {
-    response = await fetch(endpoint, {
+    const raw = await apiRequest<unknown>(`/api/materials/youtube-metadata?${params.toString()}`, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      csrf: false,
       signal,
-      credentials: 'omit',
-      mode: 'cors',
     })
+    const parsed = youtubeMetadataSchema.safeParse(raw)
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: { code: 'invalid_response', message: 'invalid_response' },
+      }
+    }
+    return { success: true, data: parsed.data }
   } catch (cause) {
-    if (cause instanceof DOMException && cause.name === 'AbortError') {
-      throw cause
+    if (cause instanceof DOMException && cause.name === 'AbortError') throw cause
+    if (cause instanceof ApiError) {
+      const fallbackCode = mapStatusToCode(cause.status)
+      const code = cause.problem?.code ?? fallbackCode
+      return {
+        success: false,
+        error: {
+          code,
+          message: cause.problem?.detail ?? cause.problem?.title ?? code,
+        },
+      }
     }
     return {
       success: false,
       error: { code: 'network_error', message: 'network_error' },
     }
-  }
-
-  if (response.ok) {
-    const data = (await response.json()) as YouTubeMetadata
-    return { success: true, data }
-  }
-
-  let errorPayload: YouTubeMetadataError | null = null
-  try {
-    errorPayload = (await response.json()) as YouTubeMetadataError
-  } catch {
-    errorPayload = null
-  }
-
-  const fallbackCode = mapStatusToCode(response.status)
-  return {
-    success: false,
-    error: errorPayload ?? { code: fallbackCode, message: fallbackCode },
   }
 }
 

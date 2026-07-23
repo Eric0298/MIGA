@@ -426,7 +426,7 @@ Development/local connection string:
 
 ```json
 "ConnectionStrings": {
-  "MigaDatabase": "Host=localhost;Port=5432;Database=miga_dev;Username=miga_user;Password=miga_password_dev"
+  "MigaDatabase": "Host=localhost;Port=5432;Database=miga_dev;Username=miga_user;Password=<redacted-historical-development-password>"
 }
 ```
 
@@ -495,7 +495,7 @@ services:
     environment:
       POSTGRES_DB: miga_dev
       POSTGRES_USER: miga_user
-      POSTGRES_PASSWORD: miga_password_dev
+      POSTGRES_PASSWORD: <redacted-historical-development-password>
     ports:
       - '5432:5432'
     volumes:

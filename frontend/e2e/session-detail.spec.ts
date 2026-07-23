@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { resetApp, seedGoal } from './helpers/seed'
+import { DEXIE_DB_NAME, navigateInApp, resetApp, seedGoal } from './helpers/seed'
 
 test.beforeEach(async ({ page }) => {
   await resetApp(page)
@@ -10,7 +10,7 @@ test('opens the session detail from the sessions list', async ({ page }) => {
 
   // Seed a completed session tied to the goal and a note taken during it.
   await page.evaluate(
-    async ({ goalId }: { goalId: string }) => {
+    async ({ goalId, dbName }: { goalId: string; dbName: string }) => {
       const now = Date.now()
       const sessionId = crypto.randomUUID()
       const startedAt = now - 30 * 60_000
@@ -40,7 +40,7 @@ test('opens the session detail from the sessions list', async ({ page }) => {
         updatedAt: now,
       }
       await new Promise<void>((resolve, reject) => {
-        const req = indexedDB.open('miga')
+        const req = indexedDB.open(dbName)
         req.onsuccess = () => {
           const idb = req.result
           const tx = idb.transaction(['sessions', 'notes'], 'readwrite')
@@ -58,10 +58,10 @@ test('opens the session detail from the sessions list', async ({ page }) => {
         req.onerror = () => reject(req.error)
       })
     },
-    { goalId: goal.id },
+    { goalId: goal.id, dbName: DEXIE_DB_NAME },
   )
 
-  await page.goto('/app/sesiones')
+  await navigateInApp(page, '/app/sesiones')
 
   await page.getByRole('link', { name: 'Ver detalle de la sesión' }).click()
 

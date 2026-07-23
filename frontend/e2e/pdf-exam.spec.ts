@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { resetApp, seedGoal, seedPdfMaterial } from './helpers/seed'
+import { navigateInApp, resetApp, seedGoal, seedPdfMaterial } from './helpers/seed'
 
 test.beforeEach(async ({ page }) => {
   await resetApp(page)
@@ -9,7 +9,7 @@ test('creates a PDF simulacro and leaves it pending grade', async ({ page }) => 
   const goal = await seedGoal(page, 'Meta simulacro')
   await seedPdfMaterial(page, goal.id, 'Modelo PDF')
 
-  await page.goto(`/app/examenes/${goal.id}/simulacro/nuevo`)
+  await navigateInApp(page, `/app/examenes/${goal.id}/simulacro/nuevo`)
 
   await page.locator('#simulacro-title').fill('Simulacro E2E')
 

@@ -60,6 +60,28 @@ public sealed class YouTubeMetadataServiceTests
     }
 
     [Fact]
+    public async Task GetMetadataAsync_ShouldSendApiKeyInHeader_NotInRequestUri()
+    {
+        const string apiKey = "secret-test-key";
+        Uri? capturedUri = null;
+        string? capturedHeader = null;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            capturedUri = request.RequestUri;
+            capturedHeader = request.Headers.GetValues("X-Goog-Api-Key").Single();
+            return Ok(BuildOkResponse("Title", "Author", "PT1M"));
+        });
+        var service = CreateService(handler, apiKey);
+
+        await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        capturedUri.ShouldNotBeNull();
+        capturedUri.Query.ShouldNotContain(apiKey);
+        capturedUri.Query.ShouldNotContain("key=", Case.Insensitive);
+        capturedHeader.ShouldBe(apiKey);
+    }
+
+    [Fact]
     public async Task GetMetadataAsync_ShouldCacheSuccessfulResponse()
     {
         var callCount = 0;
@@ -114,6 +136,27 @@ public sealed class YouTubeMetadataServiceTests
     }
 
     [Fact]
+    public async Task GetMetadataAsync_ShouldNotFollowRedirectResponse()
+    {
+        var callCount = 0;
+        var handler = new StubHttpMessageHandler(_ =>
+        {
+            callCount++;
+            return new HttpResponseMessage(HttpStatusCode.Redirect)
+            {
+                Headers = { Location = new Uri("https://attacker.example/") }
+            };
+        });
+        var service = CreateService(handler);
+
+        var result = await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        var failure = result.ShouldBeOfType<YouTubeMetadataResult.Failure>();
+        failure.Code.ShouldBe(YouTubeMetadataErrorCode.UpstreamError);
+        callCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task GetMetadataAsync_ShouldReturnUpstreamError_OnNetworkError()
     {
         var handler = new StubHttpMessageHandler(_ => throw new HttpRequestException("network down"));
@@ -134,7 +177,11 @@ public sealed class YouTubeMetadataServiceTests
             BaseAddress = new Uri("https://www.googleapis.com/youtube/v3/")
         };
         var cache = new MemoryCache(new MemoryCacheOptions());
-        var options = Options.Create(new YouTubeApiOptions { ApiKey = apiKey });
+        var options = Options.Create(new YouTubeApiOptions
+        {
+            Enabled = true,
+            ApiKey = apiKey
+        });
         var logger = NullLogger<YouTubeMetadataService>.Instance;
         return new YouTubeMetadataService(httpClient, cache, options, logger);
     }
