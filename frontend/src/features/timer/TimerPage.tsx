@@ -33,7 +33,7 @@ function TimerPage() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-bold text-charcoal">{t.timer.title}</h1>
+        <h1 className="text-2xl font-bold text-charcoal lg:text-3xl">{t.timer.title}</h1>
       </header>
 
       {isLoading && (
@@ -44,16 +44,18 @@ function TimerPage() {
       {!isLoading && active && !hasMaterialSession && <TimerDisplay session={active} />}
 
       {!isLoading && !active && showStart && (
-        <StartSessionPanel
-          onStarted={() => setShowStart(false)}
-          onCancel={() => setShowStart(false)}
-          initialGoalId={state?.goalId ?? null}
-          initialMaterialIds={state?.materialIds ?? []}
-        />
+        <div className="mx-auto w-full max-w-md">
+          <StartSessionPanel
+            onStarted={() => setShowStart(false)}
+            onCancel={() => setShowStart(false)}
+            initialGoalId={state?.goalId ?? null}
+            initialMaterialIds={state?.materialIds ?? []}
+          />
+        </div>
       )}
 
       {!isLoading && !active && !showStart && (
-        <>
+        <div className="mx-auto flex w-full max-w-md flex-col gap-6">
           <EmptyState
             icon={<TimerIcon size={20} aria-hidden="true" />}
             title={t.timer.noActiveTitle}
@@ -66,7 +68,7 @@ function TimerPage() {
           >
             {t.timer.startSession}
           </button>
-        </>
+        </div>
       )}
     </div>
   )

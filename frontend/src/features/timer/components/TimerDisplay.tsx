@@ -60,7 +60,7 @@ function TimerDisplay({ session }: TimerDisplayProps) {
   const isPaused = session.status === 'paused'
 
   return (
-    <div className="flex flex-col items-center gap-6 rounded-2xl bg-surface p-6">
+    <div className="mx-auto flex w-full max-w-md flex-col items-center gap-6 rounded-2xl bg-surface p-6 lg:p-8">
       <div className="text-center">
         <p className="text-sm font-medium text-charcoal">
           {goal ? goal.name : t.common.freeSession}

@@ -135,11 +135,15 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
     }
   }
 
+  const canAddMaterial =
+    (session.goalId !== null && notYetAttached.length > 0) || attachedMaterials.length === 0
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-2xl bg-surface p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6">
+      {/* Timer + controls card. Mobile: first row. Desktop: right sidebar, sticky. */}
+      <div className="rounded-2xl bg-surface p-4 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-20 lg:p-5">
+        <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-start lg:gap-1">
+          <div className="min-w-0 lg:w-full">
             <p className="truncate text-xs font-medium text-[color:var(--color-text-muted)]">
               {goal ? goal.name : t.common.freeSession}
             </p>
@@ -152,16 +156,19 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
               <p className="mt-0.5 text-xs font-medium text-apricot">{t.timer.paused}</p>
             )}
           </div>
-          <p className="text-2xl font-bold text-charcoal tabular-nums" aria-live="polite">
+          <p
+            className="text-2xl font-bold text-charcoal tabular-nums lg:mt-3 lg:text-5xl"
+            aria-live="polite"
+          >
             {formatDuration(elapsed)}
           </p>
         </div>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex gap-2 lg:mt-5">
           {isPaused ? (
             <button
               type="button"
               onClick={handleResume}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-apricot px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98]"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-apricot px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98] lg:py-3"
             >
               <Play size={16} aria-hidden="true" />
               {t.timer.resume}
@@ -170,7 +177,7 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
             <button
               type="button"
               onClick={handlePause}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-cream px-4 py-2.5 text-sm font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] transition active:scale-[0.98]"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-cream px-4 py-2.5 text-sm font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] transition active:scale-[0.98] lg:py-3"
             >
               <Pause size={16} aria-hidden="true" />
               {t.timer.pause}
@@ -179,7 +186,7 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
           <button
             type="button"
             onClick={handleStop}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-charcoal px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98]"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-2xl bg-charcoal px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98] lg:py-3"
           >
             <Square size={16} aria-hidden="true" />
             {t.timer.stop}
@@ -195,7 +202,8 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
         </button>
       </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+      {/* Material selector chips. Mobile: row after timer. Desktop: top of left column. */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:col-start-1 lg:row-start-1">
         {attachedMaterials.map((m) => (
           <button
             key={m.id}
@@ -213,7 +221,7 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
             <span className="max-w-[10rem] truncate">{m.title}</span>
           </button>
         ))}
-        {(session.goalId !== null && notYetAttached.length > 0) || attachedMaterials.length === 0 ? (
+        {canAddMaterial && (
           <button
             type="button"
             onClick={() => setShowAdd((v) => !v)}
@@ -223,11 +231,12 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
             <Plus size={14} aria-hidden="true" />
             {t.timer.addMaterial}
           </button>
-        ) : null}
+        )}
       </div>
 
+      {/* Attach material panel. Mobile: after chips. Desktop: below timer in the sidebar. */}
       {showAdd && (
-        <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4">
+        <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4 lg:col-start-2 lg:row-start-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-charcoal">
               {t.timer.attachMaterialTitle}
@@ -272,18 +281,24 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
         </div>
       )}
 
+      {/* Player. Mobile: below chips (or add panel). Desktop: left column, main area. */}
       {activeMaterial && (
-        <TimerActiveMaterial
-          ref={activeMaterialRef}
-          key={activeMaterial.id}
-          session={session}
-          material={activeMaterial}
-          onPlayerStateChange={handlePlayerStateChange}
-        />
+        <div className="lg:col-start-1 lg:row-start-2">
+          <TimerActiveMaterial
+            ref={activeMaterialRef}
+            key={activeMaterial.id}
+            session={session}
+            material={activeMaterial}
+            onPlayerStateChange={handlePlayerStateChange}
+          />
+        </div>
       )}
 
+      {/* Notes. Mobile: last row. Desktop: left column, below player. */}
       {session.goalId && (
-        <NotesPanel goalId={session.goalId} sourceSessionId={session.id} />
+        <div className="lg:col-start-1 lg:row-start-3">
+          <NotesPanel goalId={session.goalId} sourceSessionId={session.id} />
+        </div>
       )}
     </div>
   )
