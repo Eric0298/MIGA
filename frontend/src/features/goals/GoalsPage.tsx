@@ -21,7 +21,7 @@ function GoalsPage() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-charcoal">{t.goals.title}</h1>
+        <h1 className="text-2xl font-bold text-charcoal lg:text-3xl">{t.goals.title}</h1>
         {!showForm && (
           <button
             type="button"
@@ -51,7 +51,7 @@ function GoalsPage() {
       )}
 
       {!isLoading && goals.length > 0 && (
-        <ul className="flex flex-col gap-3">
+        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 lg:gap-4">
           {goals.map((goal) => (
             <GoalCard
               key={goal.id}

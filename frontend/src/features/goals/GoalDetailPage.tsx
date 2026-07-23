@@ -126,7 +126,7 @@ function GoalDetailPage() {
       {!isLoading && goal && (
         <>
           <section className="flex flex-col gap-3">
-            <h1 className="text-2xl font-bold text-charcoal">{goal.name}</h1>
+            <h1 className="text-2xl font-bold text-charcoal lg:text-3xl">{goal.name}</h1>
             <p className="text-sm text-[color:var(--color-text-muted)]">
               {goal.scheduledDays.length === 1
                 ? tpl(t.goalDetail.plannedDayOne, { count: goal.scheduledDays.length })
@@ -139,6 +139,8 @@ function GoalDetailPage() {
             <GoalProgress currentMs={currentMs} targetMinutes={goal.targetMinutes} />
           </section>
 
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start lg:gap-8">
+            <div className="flex flex-col gap-6">
           <section className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm font-medium text-charcoal">{t.goalDetail.progress}</h2>
@@ -232,7 +234,9 @@ function GoalDetailPage() {
               </ul>
             )}
           </section>
+            </div>
 
+            <div className="flex flex-col gap-6">
           {goalExams.length > 0 && (
             <section className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3">
@@ -322,6 +326,8 @@ function GoalDetailPage() {
           </section>
 
           <NotesPanel goalId={goal.id} />
+            </div>
+          </div>
         </>
       )}
     </div>
