@@ -499,6 +499,13 @@ export const va: Messages = {
     tabList: 'Llista',
     tabStats: 'Estadístiques',
     viewLabel: 'Vista de sessions',
+    table: {
+      goal: 'Meta',
+      duration: 'Duració',
+      date: 'Data',
+      time: 'Hora',
+      actions: 'Accions',
+    },
     detail: {
       backToSessions: 'Tornar a sessions',
       notFoundTitle: 'Sessió no trobada',

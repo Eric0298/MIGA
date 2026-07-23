@@ -497,6 +497,13 @@ export const en: Messages = {
     tabList: 'List',
     tabStats: 'Stats',
     viewLabel: 'Sessions view',
+    table: {
+      goal: 'Goal',
+      duration: 'Duration',
+      date: 'Date',
+      time: 'Time',
+      actions: 'Actions',
+    },
     detail: {
       backToSessions: 'Back to sessions',
       notFoundTitle: 'Session not found',

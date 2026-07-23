@@ -498,6 +498,13 @@ export const es = {
     tabList: 'Lista',
     tabStats: 'Estadísticas',
     viewLabel: 'Vista de sesiones',
+    table: {
+      goal: 'Meta',
+      duration: 'Duración',
+      date: 'Fecha',
+      time: 'Hora',
+      actions: 'Acciones',
+    },
     detail: {
       backToSessions: 'Volver a sesiones',
       notFoundTitle: 'Sesión no encontrada',

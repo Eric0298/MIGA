@@ -68,6 +68,64 @@ function SessionDetailPage() {
     ? (notes ?? []).find((n) => n.id === editingNoteId) ?? null
     : null
 
+  const materialsSection = (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-sm font-semibold text-charcoal">
+        {t.sessions.detail.materialsSection}
+      </h2>
+      {materials === undefined ? (
+        <p className="text-xs text-[color:var(--color-text-muted)]">
+          {t.common.loading}
+        </p>
+      ) : materials.length === 0 ? (
+        <p className="rounded-2xl bg-surface px-4 py-3 text-xs text-[color:var(--color-text-muted)]">
+          {t.sessions.detail.materialsEmpty}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {materials.map((m) => (
+            <li
+              key={m.id}
+              className="flex items-center justify-between gap-2 rounded-xl bg-surface px-4 py-3 ring-1 ring-[color:var(--color-border)]"
+            >
+              <span className="truncate text-sm font-semibold text-charcoal">
+                {m.title}
+              </span>
+              <span className="shrink-0 rounded-full bg-peach px-2 py-0.5 text-[11px] font-semibold text-charcoal">
+                {m.kind}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+
+  const notesList = (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-sm font-semibold text-charcoal">
+        {t.sessions.detail.notesSection}
+      </h2>
+      {notes === undefined ? (
+        <p className="text-xs text-[color:var(--color-text-muted)]">
+          {t.common.loading}
+        </p>
+      ) : notes.length === 0 ? (
+        <p className="rounded-2xl bg-surface px-4 py-3 text-xs text-[color:var(--color-text-muted)]">
+          {t.sessions.detail.notesEmpty}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {notes.map((n) => (
+            <li key={n.id}>
+              <NoteCard note={n} onClick={() => setEditingNoteId(n.id)} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+
   return (
     <div className="flex flex-col gap-6">
       <header>
@@ -80,14 +138,14 @@ function SessionDetailPage() {
         </Link>
       </header>
 
-      <section className="flex flex-col gap-3 rounded-2xl bg-surface p-5">
+      <section className="flex flex-col gap-3 rounded-2xl bg-surface p-5 lg:p-6">
         <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-text-muted)]">
           {t.sessions.detail.summaryLabel}
         </p>
-        <h1 className="text-2xl font-bold text-charcoal">
+        <h1 className="text-2xl font-bold text-charcoal lg:text-3xl">
           {goal ? goal.name : t.common.freeSession}
         </h1>
-        <dl className="grid grid-cols-2 gap-3 text-sm">
+        <dl className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
           <SummaryStat
             label={t.sessions.detail.durationLabel}
             value={formatDuration(duration)}
@@ -104,62 +162,25 @@ function SessionDetailPage() {
         </dl>
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-charcoal">
-          {t.sessions.detail.materialsSection}
-        </h2>
-        {materials === undefined ? (
-          <p className="text-xs text-[color:var(--color-text-muted)]">
-            {t.common.loading}
-          </p>
-        ) : materials.length === 0 ? (
-          <p className="rounded-2xl bg-surface px-4 py-3 text-xs text-[color:var(--color-text-muted)]">
-            {t.sessions.detail.materialsEmpty}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {materials.map((m) => (
-              <li
-                key={m.id}
-                className="flex items-center justify-between gap-2 rounded-xl bg-surface px-4 py-3 ring-1 ring-[color:var(--color-border)]"
-              >
-                <span className="truncate text-sm font-semibold text-charcoal">
-                  {m.title}
-                </span>
-                <span className="shrink-0 rounded-full bg-peach px-2 py-0.5 text-[11px] font-semibold text-charcoal">
-                  {m.kind}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-charcoal">
-          {t.sessions.detail.notesSection}
-        </h2>
-        {notes === undefined ? (
-          <p className="text-xs text-[color:var(--color-text-muted)]">
-            {t.common.loading}
-          </p>
-        ) : notes.length === 0 ? (
-          <p className="rounded-2xl bg-surface px-4 py-3 text-xs text-[color:var(--color-text-muted)]">
-            {t.sessions.detail.notesEmpty}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {notes.map((n) => (
-              <li key={n.id}>
-                <NoteCard note={n} onClick={() => setEditingNoteId(n.id)} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        {materialsSection}
+        <div className="flex flex-col gap-4">
+          {notesList}
+          {editingNote && (
+            <div className="hidden rounded-2xl bg-surface p-5 lg:block">
+              <NoteEditor
+                goalIds={editingNote.goalIds}
+                existingNoteId={editingNote.id}
+                onDone={() => setEditingNoteId(null)}
+                onCancel={() => setEditingNoteId(null)}
+              />
+            </div>
+          )}
+        </div>
+      </div>
 
       {editingNote && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-charcoal/40 p-3 sm:items-center">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-charcoal/40 p-3 sm:items-center lg:hidden">
           <div className="flex max-h-[90vh] w-full max-w-lg flex-col gap-3 overflow-y-auto rounded-2xl bg-surface p-4">
             <NoteEditor
               goalIds={editingNote.goalIds}
