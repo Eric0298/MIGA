@@ -13,5 +13,7 @@ public sealed class TrustedProxyOptions
 
     public string[] Addresses { get; init; } = [];
 
+    public string[] Networks { get; init; } = [];
+
     public int ForwardLimit { get; init; } = 1;
 }

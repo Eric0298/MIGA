@@ -279,7 +279,11 @@ builder.Services.AddOpenApi();
 var trustedProxyAddresses = builder.Configuration
     .GetSection($"{TrustedProxyOptions.SectionName}:Addresses")
     .Get<string[]>() ?? [];
-var useForwardedHeaders = trustedProxyAddresses.Length > 0;
+var trustedProxyNetworks = builder.Configuration
+    .GetSection($"{TrustedProxyOptions.SectionName}:Networks")
+    .Get<string[]>() ?? [];
+var useForwardedHeaders =
+    trustedProxyAddresses.Length > 0 || trustedProxyNetworks.Length > 0;
 if (useForwardedHeaders)
 {
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -301,6 +305,17 @@ if (useForwardedHeaders)
             }
 
             options.KnownProxies.Add(parsedAddress);
+        }
+
+        foreach (var network in trustedProxyNetworks)
+        {
+            if (!System.Net.IPNetwork.TryParse(network, out var parsedNetwork))
+            {
+                throw new InvalidOperationException(
+                    "TrustedProxies contains an invalid CIDR network.");
+            }
+
+            options.KnownIPNetworks.Add(parsedNetwork);
         }
     });
 }
