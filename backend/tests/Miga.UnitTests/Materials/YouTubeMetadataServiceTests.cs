@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Miga.Application.Materials;
@@ -307,9 +308,104 @@ public sealed class YouTubeMetadataServiceTests
         failure.Code.ShouldBe(YouTubeMetadataErrorCode.UpstreamError);
     }
 
+    // ---- Log injection regression tests ----
+
+    [Fact]
+    public async Task GetMetadataAsync_ShouldNeverLogRawVideoIdOrUrl()
+    {
+        var logger = new CapturingLogger<YouTubeMetadataService>();
+        var handler = new StubHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        var service = CreateService(handler, logger: logger);
+
+        var result = await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        result.ShouldBeOfType<YouTubeMetadataResult.Failure>();
+        logger.Entries.ShouldNotBeEmpty();
+        foreach (var rendered in logger.Entries)
+        {
+            rendered.ShouldNotContain(ValidVideoId);
+            rendered.ShouldNotContain(ValidUrl);
+        }
+    }
+
+    [Theory]
+    [InlineData("network boom\r\n[FAKE] level=critical\r\n")]
+    [InlineData("network boom\ntrailing")]
+    [InlineData("network boom\rreturn")]
+    [InlineData("network boom\ttabbed")]
+    [InlineData("network boombell")]
+    public async Task GetMetadataAsync_ShouldNotLeakControlCharacters_FromNetworkExceptionMessage(
+        string maliciousMessage)
+    {
+        var logger = new CapturingLogger<YouTubeMetadataService>();
+        var handler = new StubHttpMessageHandler(
+            _ => throw new HttpRequestException(maliciousMessage));
+        var service = CreateService(handler, logger: logger);
+
+        await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        logger.Entries.ShouldNotBeEmpty();
+        foreach (var rendered in logger.Entries)
+        {
+            rendered.ShouldNotContain('\r');
+            rendered.ShouldNotContain('\n');
+            rendered.ShouldNotContain(maliciousMessage);
+        }
+    }
+
+    [Fact]
+    public async Task GetMetadataAsync_ShouldRejectMaliciousChannelMetadata()
+    {
+        // Upstream cannot smuggle CRLF into logs: the payload is validated by
+        // length and the videoId is never echoed verbatim.
+        var maliciousChannel = "Rick\r\n[FAKE] admin=true";
+        var payload = BuildOkResponse(
+            title: "Never Gonna Give You Up",
+            channel: maliciousChannel,
+            duration: "PT3M32S");
+        var logger = new CapturingLogger<YouTubeMetadataService>();
+        var handler = new StubHttpMessageHandler(_ => Ok(payload));
+        var service = CreateService(handler, logger: logger);
+
+        var result = await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        // The metadata is returned as-is to the caller (that layer is responsible
+        // for encoding) but nothing must have been logged with control chars.
+        result.ShouldBeOfType<YouTubeMetadataResult.Success>();
+        foreach (var rendered in logger.Entries)
+        {
+            rendered.ShouldNotContain('\r');
+            rendered.ShouldNotContain('\n');
+        }
+    }
+
+    [Fact]
+    public async Task GetMetadataAsync_ShouldNotLogRawResponseBody_OnJsonParseFailure()
+    {
+        var maliciousBody = "not-json\r\n{\"items\":[\r\n\"crlf\"]}";
+        var logger = new CapturingLogger<YouTubeMetadataService>();
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(maliciousBody, Encoding.UTF8, "application/json")
+        });
+        var service = CreateService(handler, logger: logger);
+
+        var result = await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        result.ShouldBeOfType<YouTubeMetadataResult.Failure>();
+        foreach (var rendered in logger.Entries)
+        {
+            rendered.ShouldNotContain('\r');
+            rendered.ShouldNotContain('\n');
+            rendered.ShouldNotContain("not-json");
+        }
+    }
+
     private static YouTubeMetadataService CreateService(
         StubHttpMessageHandler handler,
-        string apiKey = "test-key")
+        string apiKey = "test-key",
+        ILogger<YouTubeMetadataService>? logger = null)
     {
         var httpClient = new HttpClient(handler)
         {
@@ -321,8 +417,11 @@ public sealed class YouTubeMetadataServiceTests
             Enabled = true,
             ApiKey = apiKey
         });
-        var logger = NullLogger<YouTubeMetadataService>.Instance;
-        return new YouTubeMetadataService(httpClient, cache, options, logger);
+        return new YouTubeMetadataService(
+            httpClient,
+            cache,
+            options,
+            logger ?? NullLogger<YouTubeMetadataService>.Instance);
     }
 
     private static HttpResponseMessage Ok(string json) => new(HttpStatusCode.OK)
@@ -362,6 +461,32 @@ public sealed class YouTubeMetadataServiceTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult(_responder(request));
+        }
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<string> Entries { get; } = new();
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull =>
+            NullScope.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add(formatter(state, exception));
+        }
+
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+            public void Dispose() { }
         }
     }
 }

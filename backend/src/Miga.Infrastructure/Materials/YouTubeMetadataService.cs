@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Miga.Application.Common.Security;
 using Miga.Application.Materials;
 using Miga.Contracts.Materials;
 
@@ -78,6 +79,12 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
         var requestUri =
             $"videos?id={Uri.EscapeDataString(videoId)}&part=snippet,contentDetails";
 
+        // videoId is already validated to match ^[A-Za-z0-9_-]{11}$ upstream, but
+        // logs never receive the raw identifier: we correlate via a non-reversible
+        // fingerprint so no user-controlled bytes reach a log sink and no
+        // watch-history leaks through operational logs.
+        var videoFingerprint = LogSanitizer.Fingerprint(videoId);
+
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
@@ -89,7 +96,9 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
 
             if (response.StatusCode == HttpStatusCode.Forbidden)
             {
-                _logger.LogWarning("YouTube API returned 403 for {VideoId}", videoId);
+                _logger.LogWarning(
+                    "YouTube API returned 403 for {VideoFingerprint}",
+                    videoFingerprint);
                 return new YouTubeMetadataResult.Failure(
                     YouTubeMetadataErrorCode.QuotaExceeded,
                     "quota_exceeded");
@@ -98,9 +107,9 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning(
-                    "YouTube API returned {StatusCode} for {VideoId}",
+                    "YouTube API returned {StatusCode} for {VideoFingerprint}",
                     (int)response.StatusCode,
-                    videoId);
+                    videoFingerprint);
                 return new YouTubeMetadataResult.Failure(
                     YouTubeMetadataErrorCode.UpstreamError,
                     "upstream_error");
@@ -108,7 +117,9 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
 
             if (response.Content.Headers.ContentLength > MaxResponseBytes)
             {
-                _logger.LogWarning("YouTube API response exceeded the allowed size for {VideoId}", videoId);
+                _logger.LogWarning(
+                    "YouTube API response exceeded the allowed size for {VideoFingerprint}",
+                    videoFingerprint);
                 return new YouTubeMetadataResult.Failure(
                     YouTubeMetadataErrorCode.UpstreamError,
                     "upstream_response_too_large");
@@ -174,35 +185,51 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning(ex, "Network error fetching metadata for {VideoId}", videoId);
+            // We do not attach the exception object because its message can echo
+            // arbitrary bytes from the upstream response; only the type is safe.
+            _logger.LogWarning(
+                "Network error fetching metadata for {VideoFingerprint}. ExceptionType={ExceptionType}",
+                videoFingerprint,
+                ex.GetType().FullName);
             return new YouTubeMetadataResult.Failure(
                 YouTubeMetadataErrorCode.UpstreamError,
                 "network_error");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning("Timeout fetching metadata for {VideoId}", videoId);
+            _logger.LogWarning(
+                "Timeout fetching metadata for {VideoFingerprint}",
+                videoFingerprint);
             return new YouTubeMetadataResult.Failure(
                 YouTubeMetadataErrorCode.UpstreamError,
                 "timeout");
         }
         catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "Invalid YouTube API payload for {VideoId}", videoId);
+            _logger.LogWarning(
+                "Invalid YouTube API payload for {VideoFingerprint}. ExceptionType={ExceptionType}",
+                videoFingerprint,
+                ex.GetType().FullName);
             return new YouTubeMetadataResult.Failure(
                 YouTubeMetadataErrorCode.UpstreamError,
                 "invalid_upstream_response");
         }
         catch (OverflowException ex)
         {
-            _logger.LogWarning(ex, "Invalid YouTube duration for {VideoId}", videoId);
+            _logger.LogWarning(
+                "Invalid YouTube duration for {VideoFingerprint}. ExceptionType={ExceptionType}",
+                videoFingerprint,
+                ex.GetType().FullName);
             return new YouTubeMetadataResult.Failure(
                 YouTubeMetadataErrorCode.UpstreamError,
                 "invalid_upstream_response");
         }
         catch (FormatException ex)
         {
-            _logger.LogWarning(ex, "Invalid YouTube duration for {VideoId}", videoId);
+            _logger.LogWarning(
+                "Invalid YouTube duration for {VideoFingerprint}. ExceptionType={ExceptionType}",
+                videoFingerprint,
+                ex.GetType().FullName);
             return new YouTubeMetadataResult.Failure(
                 YouTubeMetadataErrorCode.UpstreamError,
                 "invalid_upstream_response");

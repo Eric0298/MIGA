@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { AlertTriangle, Mic, Square } from 'lucide-react'
-import {
-  deleteNoteBlob,
-  putNoteBlob,
-  setNoteBlobOwner,
-} from '@/lib/db/note-blobs.repository'
+import { deleteNoteBlob, putNoteBlob, setNoteBlobOwner } from '@/lib/db/note-blobs.repository'
 import { createNote, deleteNote, updateNote } from '@/lib/db/notes.repository'
 import { NOTE_LIMITS, type Note } from '@/lib/db/schema'
 import { useT } from '@/i18n/i18n-context'
@@ -61,9 +57,7 @@ function VoiceNoteEditor({
 }: VoiceNoteEditorProps) {
   const { t } = useT()
   const [title, setTitle] = useState(existing?.title ?? '')
-  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>(
-    existing?.goalIds ?? goalIds,
-  )
+  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>(existing?.goalIds ?? goalIds)
   const [goalsError, setGoalsError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -113,24 +107,21 @@ function VoiceNoteEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const stopRecording = useCallback(
-    (reason: 'user' | 'limit') => {
-      if (intervalRef.current !== null) {
-        window.clearInterval(intervalRef.current)
-        intervalRef.current = null
+  const stopRecording = useCallback((reason: 'user' | 'limit') => {
+    if (intervalRef.current !== null) {
+      window.clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+    setCutoffReason(reason)
+    const recorder = recorderRef.current
+    if (recorder && recorder.state === 'recording') {
+      try {
+        recorder.stop()
+      } catch {
+        // ignore
       }
-      setCutoffReason(reason)
-      const recorder = recorderRef.current
-      if (recorder && recorder.state === 'recording') {
-        try {
-          recorder.stop()
-        } catch {
-          // ignore
-        }
-      }
-    },
-    [],
-  )
+    }
+  }, [])
 
   const startRecording = async () => {
     if (!supported) {
@@ -286,9 +277,7 @@ function VoiceNoteEditor({
           className="rounded-xl bg-cream px-3 py-2 text-sm font-semibold text-charcoal ring-1 ring-[color:var(--color-border)] focus:ring-2 focus:ring-apricot focus:outline-none"
         />
         {existing.fileBlobKey && <AudioPlayer blobId={existing.fileBlobKey} />}
-        <p className="text-xs text-[color:var(--color-text-muted)]">
-          {t.notes.voice.notEditable}
-        </p>
+        <p className="text-xs text-[color:var(--color-text-muted)]">{t.notes.voice.notEditable}</p>
         <div className="flex gap-2">
           <button
             type="button"

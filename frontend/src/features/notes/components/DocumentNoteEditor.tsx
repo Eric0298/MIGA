@@ -7,12 +7,7 @@ import {
   putNoteBlob,
   setNoteBlobOwner,
 } from '@/lib/db/note-blobs.repository'
-import {
-  createNote,
-  deleteNote,
-  updateNote,
-  type UpdateNotePatch,
-} from '@/lib/db/notes.repository'
+import { createNote, deleteNote, updateNote, type UpdateNotePatch } from '@/lib/db/notes.repository'
 import { NOTE_LIMITS, type Note } from '@/lib/db/schema'
 import { formatBytes } from '@/lib/format-bytes'
 import { useT } from '@/i18n/i18n-context'
@@ -76,9 +71,7 @@ function DocumentNoteEditor({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [existingUrl, setExistingUrl] = useState<string | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
-  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>(
-    existing?.goalIds ?? goalIds,
-  )
+  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>(existing?.goalIds ?? goalIds)
   const [goalsError, setGoalsError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)

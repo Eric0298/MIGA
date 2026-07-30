@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Miga.Application.Common.Security;
 
 namespace Miga.Api.Middleware;
 
@@ -21,11 +22,18 @@ public sealed class ApiExceptionHandler : IExceptionHandler
         Exception exception,
         CancellationToken cancellationToken)
     {
+        // Never log the raw request path or method — both can contain attacker
+        // controlled bytes (CR/LF, PII, secrets in query strings). We keep the
+        // method as a whitelisted token, the path as a non-reversible fingerprint
+        // for correlation, and the exception type as safe technical context.
+        // The exception object itself is not attached to the log entry because
+        // its Message may echo user-supplied bytes from parsers.
         _logger.LogError(
-            exception,
-            "Unhandled API exception for {RequestMethod} {RequestPath}",
-            httpContext.Request.Method,
-            httpContext.Request.Path);
+            "Unhandled API exception. Method={RequestMethod} PathFingerprint={RequestPathFingerprint} ExceptionType={ExceptionType} TraceId={TraceId}",
+            LogSanitizer.SanitizeHttpMethod(httpContext.Request.Method),
+            LogSanitizer.Fingerprint(httpContext.Request.Path.Value),
+            exception.GetType().FullName ?? exception.GetType().Name,
+            httpContext.TraceIdentifier);
 
         httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
         return await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
