@@ -48,6 +48,7 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_gcServer=1 \
     DOTNET_EnableDiagnostics=0 \
+    DOTNET_BUNDLE_EXTRACT_BASE_DIR=/tmp \
     ASPNETCORE_URLS=http://0.0.0.0:8080 \
     TZ=UTC
 
