@@ -1,4 +1,3 @@
-using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -127,17 +126,22 @@ public static class InfrastructureServiceCollectionExtensions
             .AddDataProtection()
             .SetApplicationName("Miga")
             .PersistKeysToDbContext<MigaDbContext>();
-        var certificatePath = configuration[
-            $"{DataProtectionSecurityOptions.SectionName}:CertificatePath"];
-        if (!string.IsNullOrWhiteSpace(certificatePath) && File.Exists(certificatePath))
+        var dataProtectionOptions = new DataProtectionSecurityOptions
         {
-            var certificatePassword = configuration[
-                $"{DataProtectionSecurityOptions.SectionName}:CertificatePassword"];
-            dataProtection.ProtectKeysWithCertificate(
-                X509CertificateLoader.LoadPkcs12FromFile(
-                    certificatePath,
-                    certificatePassword,
-                    X509KeyStorageFlags.EphemeralKeySet));
+            CertificatePath = configuration[
+                $"{DataProtectionSecurityOptions.SectionName}:CertificatePath"] ?? string.Empty,
+            CertificateBase64 = configuration[
+                $"{DataProtectionSecurityOptions.SectionName}:CertificateBase64"] ?? string.Empty,
+            CertificatePassword = configuration[
+                $"{DataProtectionSecurityOptions.SectionName}:CertificatePassword"] ?? string.Empty
+        };
+        var certificateSource =
+            DataProtectionCertificateLoader.ResolveSource(dataProtectionOptions);
+        if (certificateSource is DataProtectionCertificateLoader.SourceKind.File
+            or DataProtectionCertificateLoader.SourceKind.Base64)
+        {
+            var certificate = DataProtectionCertificateLoader.Load(dataProtectionOptions);
+            dataProtection.ProtectKeysWithCertificate(certificate);
         }
 
         services.AddScoped<IPasswordPolicy, CommonPasswordPolicy>();

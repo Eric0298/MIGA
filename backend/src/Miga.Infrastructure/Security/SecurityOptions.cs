@@ -48,6 +48,8 @@ public sealed class DataProtectionSecurityOptions
 
     public string CertificatePath { get; init; } = string.Empty;
 
+    public string CertificateBase64 { get; init; } = string.Empty;
+
     public string CertificatePassword { get; init; } = string.Empty;
 }
 

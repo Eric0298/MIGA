@@ -149,16 +149,34 @@ public sealed class DataProtectionSecurityOptionsValidator
 
     public ValidateOptionsResult Validate(string? name, DataProtectionSecurityOptions options)
     {
+        var source = DataProtectionCertificateLoader.ResolveSource(options);
+
+        if (source == DataProtectionCertificateLoader.SourceKind.Both)
+        {
+            return ValidateOptionsResult.Fail(
+                "DataProtection: set exactly one of CertificatePath or CertificateBase64.");
+        }
+
         if (!_environment.IsProduction())
         {
             return ValidateOptionsResult.Success;
         }
 
-        if (string.IsNullOrWhiteSpace(options.CertificatePath) ||
-            !File.Exists(options.CertificatePath))
+        if (source == DataProtectionCertificateLoader.SourceKind.None)
         {
             return ValidateOptionsResult.Fail(
-                "A Data Protection certificate is required in production.");
+                "DataProtection: a certificate is required in production. " +
+                "Configure DataProtection:CertificatePath or DataProtection:CertificateBase64.");
+        }
+
+        try
+        {
+            using var certificate = DataProtectionCertificateLoader.Load(options);
+            _ = certificate;
+        }
+        catch (Exception ex)
+        {
+            return ValidateOptionsResult.Fail(ex.Message);
         }
 
         return ValidateOptionsResult.Success;
