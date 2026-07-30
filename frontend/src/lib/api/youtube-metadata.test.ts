@@ -22,6 +22,8 @@ describe('isProbablyYouTubeUrl', () => {
     expect(isProbablyYouTubeUrl('https://vimeo.com/12345')).toBe(false)
     expect(isProbablyYouTubeUrl('https://evil.example.com/youtube.com')).toBe(false)
     expect(isProbablyYouTubeUrl('javascript:alert(1)')).toBe(false)
+    expect(isProbablyYouTubeUrl('https://user:password@youtube.com/watch?v=abc')).toBe(false)
+    expect(isProbablyYouTubeUrl('https://youtube.com\\@attacker.invalid/watch?v=abc')).toBe(false)
     expect(isProbablyYouTubeUrl('')).toBe(false)
     expect(isProbablyYouTubeUrl('not a url')).toBe(false)
   })
@@ -37,7 +39,7 @@ describe('fetchYouTubeMetadata', () => {
       thumbnailUrl: 'https://i.ytimg.com/vi/abc12345678/hqdefault.jpg',
       durationSeconds: 90,
     }
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify(dto), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -50,6 +52,36 @@ describe('fetchYouTubeMetadata', () => {
       expect(result.data.videoId).toBe('abc12345678')
       expect(result.data.durationSeconds).toBe(90)
     }
+    const [requestUrl, requestInit] = fetchMock.mock.calls[0]
+    const parsedRequestUrl = new URL(String(requestUrl))
+    expect(parsedRequestUrl.origin).toBe(window.location.origin)
+    expect(parsedRequestUrl.pathname).toBe('/api/materials/youtube-metadata')
+    expect(requestInit?.credentials).toBe('include')
+    expect(requestInit?.cache).toBe('no-store')
+  })
+
+  it('rejects a malformed success DTO', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          provider: 'youtube',
+          videoId: 'not-valid',
+          title: 'Test',
+          author: 'Ch',
+          thumbnailUrl: 'javascript:alert(1)',
+          durationSeconds: 90,
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    )
+
+    await expect(fetchYouTubeMetadata('https://youtu.be/abc12345678')).resolves.toEqual({
+      success: false,
+      error: { code: 'invalid_response', message: 'invalid_response' },
+    })
   })
 
   it('returns the backend error body when non-2xx', async () => {

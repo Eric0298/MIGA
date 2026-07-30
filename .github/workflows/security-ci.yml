@@ -1,0 +1,639 @@
+name: Security CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.22.0
+          package-manager-cache: false
+
+      - name: Verify Node.js and npm versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node --version)" = "v22.22.0"
+          npm_version="$(npm --version)"
+          test "$(
+            printf '%s\n' "10.9.4" "$npm_version" |
+              sort --version-sort |
+              head --lines=1
+          )" = "10.9.4"
+
+      - name: Install root tooling from lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Install frontend from lockfile
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+
+      - name: Audit root dependencies
+        run: npm audit --audit-level=high
+
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type-check
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Test
+        working-directory: frontend
+        run: npm test
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx --no-install playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        id: e2e
+        working-directory: frontend
+        run: npm run e2e
+
+      - name: Upload Playwright report after an E2E failure
+        if: ${{ failure() && steps.e2e.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-${{ github.sha }}
+          path: frontend/playwright-report/
+          if-no-files-found: warn
+          retention-days: 7
+
+  backend:
+    name: Backend checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      CI_DB_PASSWORD: miga-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      ConnectionStrings__MigaDatabase: Host=localhost;Port=5432;Database=miga_ci;Username=miga_ci;Password=miga-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      POSTGRES_CONTAINER_NAME: miga-postgres-${{ github.run_id }}-${{ github.run_attempt }}
+      POSTGRES_IMAGE: miga-postgres-ci:${{ github.sha }}
+      POSTGRES_VOLUME_NAME: miga-postgres-data-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build and start hardened PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --network=none \
+            --tag "$POSTGRES_IMAGE" \
+            docker/postgres
+
+          test "$(
+            docker image inspect \
+              --format '{{.Config.User}}' \
+              "$POSTGRES_IMAGE"
+          )" = "postgres"
+          runtime_uid="$(
+            docker run \
+              --rm \
+              --pull=never \
+              --entrypoint /usr/bin/id \
+              "$POSTGRES_IMAGE" \
+              -u
+          )"
+          test "$runtime_uid" -ne 0
+          docker run \
+            --rm \
+            --pull=never \
+            --entrypoint /bin/sh \
+            "$POSTGRES_IMAGE" \
+            -ceu 'test ! -e /usr/local/bin/gosu'
+
+          docker volume create "$POSTGRES_VOLUME_NAME" >/dev/null
+          docker run \
+            --detach \
+            --name "$POSTGRES_CONTAINER_NAME" \
+            --pull=never \
+            --user postgres \
+            --init \
+            --security-opt no-new-privileges:true \
+            --publish 127.0.0.1:5432:5432 \
+            --mount "type=volume,src=$POSTGRES_VOLUME_NAME,dst=/var/lib/postgresql/data" \
+            --env POSTGRES_DB=miga_ci \
+            --env POSTGRES_USER=miga_ci \
+            --env POSTGRES_PASSWORD="$CI_DB_PASSWORD" \
+            --health-cmd 'pg_isready -U miga_ci -d miga_ci' \
+            --health-interval 2s \
+            --health-timeout 5s \
+            --health-retries 30 \
+            "$POSTGRES_IMAGE" \
+            >/dev/null
+
+          postgres_ready=false
+          for attempt in $(seq 1 60); do
+            health_status="$(
+              docker inspect \
+                --format '{{.State.Health.Status}}' \
+                "$POSTGRES_CONTAINER_NAME"
+            )"
+            case "$health_status" in
+              healthy)
+                postgres_ready=true
+                break
+                ;;
+              unhealthy)
+                echo "::error::Hardened PostgreSQL became unhealthy during initialization."
+                docker logs "$POSTGRES_CONTAINER_NAME" >&2
+                exit 1
+                ;;
+            esac
+            sleep 1
+          done
+          if test "$postgres_ready" != "true"; then
+            echo "::error::Hardened PostgreSQL did not initialize its fresh volume in time."
+            docker logs "$POSTGRES_CONTAINER_NAME" >&2
+            exit 1
+          fi
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore local .NET tools
+        run: dotnet tool restore
+
+      - name: Restore locked dependencies
+        run: dotnet restore backend/Miga.slnx --locked-mode
+
+      - name: Audit NuGet dependencies
+        run: dotnet list backend/Miga.slnx package --vulnerable --include-transitive --no-restore
+
+      - name: Check formatting
+        run: dotnet format backend/Miga.slnx --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build backend/Miga.slnx --configuration Release --no-restore
+
+      - name: Verify migration snapshot matches the model
+        run: >-
+          dotnet ef migrations has-pending-model-changes
+          --project backend/src/Miga.Infrastructure
+          --startup-project backend/src/Miga.Api
+          --configuration Release
+          --no-build
+
+      - name: Apply migrations twice to ephemeral PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2; do
+            dotnet ef database update \
+              --project backend/src/Miga.Infrastructure \
+              --startup-project backend/src/Miga.Api \
+              --configuration Release \
+              --no-build
+          done
+
+      - name: Generate and inspect idempotent migration candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          migration_script="$RUNNER_TEMP/miga-migrations.sql"
+          dotnet ef migrations script \
+            --idempotent \
+            --project backend/src/Miga.Infrastructure \
+            --startup-project backend/src/Miga.Api \
+            --configuration Release \
+            --no-build \
+            --output "$migration_script"
+          test -s "$migration_script"
+          if grep -Fq "$CI_DB_PASSWORD" "$migration_script"; then
+            echo "::error::The generated migration contains its ephemeral database credential."
+            exit 1
+          fi
+          if awk '
+            toupper($0) ~ /^[[:space:]]*(INSERT|UPDATE|DELETE|MERGE|COPY)[[:space:]]/ &&
+            $0 !~ /__EFMigrationsHistory/ { found = 1 }
+            END { exit !found }
+          ' "$migration_script"; then
+            echo "::error::The generated migration candidate contains data statements outside EF migration history."
+            exit 1
+          fi
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum miga-migrations.sql > miga-migrations.sql.sha256
+          )
+
+      - name: Apply migration candidate twice to a second clean database
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_database="miga_migration_candidate"
+          migration_script="$RUNNER_TEMP/miga-migrations.sql"
+
+          test -n "$POSTGRES_CONTAINER_NAME"
+          test -s "$migration_script"
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum --check miga-migrations.sql.sha256
+          )
+
+          docker exec "$POSTGRES_CONTAINER_NAME" \
+            createdb --username=miga_ci --owner=miga_ci "$candidate_database"
+          history_count_after_first_apply=""
+          for attempt in 1 2; do
+            docker exec --interactive "$POSTGRES_CONTAINER_NAME" \
+              psql \
+                --username=miga_ci \
+                --dbname="$candidate_database" \
+                --set=ON_ERROR_STOP=1 \
+                --no-psqlrc \
+              < "$migration_script"
+
+            history_count="$(
+              docker exec "$POSTGRES_CONTAINER_NAME" \
+                psql \
+                  --username=miga_ci \
+                  --dbname="$candidate_database" \
+                  --tuples-only \
+                  --no-align \
+                  --no-psqlrc \
+                  --command='SELECT COUNT(*) FROM infra."__EFMigrationsHistory";'
+            )"
+            case "$history_count" in
+              ''|*[!0-9]*)
+                echo "::error::The migration history count is not a non-negative integer."
+                exit 1
+                ;;
+            esac
+            test "$history_count" -gt 0
+            if test "$attempt" -eq 1; then
+              history_count_after_first_apply="$history_count"
+            else
+              test "$history_count" = "$history_count_after_first_apply"
+            fi
+          done
+
+      - name: Smoke-test API against candidate-applied PostgreSQL
+        shell: bash
+        env:
+          Health__ExposeDatabaseEndpoint: 'true'
+        run: |
+          set -euo pipefail
+          command -v curl >/dev/null
+          command -v jq >/dev/null
+
+          base_url="http://127.0.0.1:5080"
+          candidate_database="miga_migration_candidate"
+          candidate_connection="Host=localhost;Port=5432;Database=$candidate_database;Username=miga_ci;Password=$CI_DB_PASSWORD"
+          api_log="$RUNNER_TEMP/miga-api-smoke.log"
+          health_response="$RUNNER_TEMP/miga-health.json"
+          csrf_response="$RUNNER_TEMP/miga-csrf.json"
+          session_response="$RUNNER_TEMP/miga-session.json"
+          snapshot_response="$RUNNER_TEMP/miga-snapshot.json"
+          cookie_jar="$RUNNER_TEMP/miga-cookies.txt"
+          api_directory="backend/src/Miga.Api"
+          api_dll="bin/Release/net10.0/Miga.Api.dll"
+
+          test -f "$api_directory/$api_dll"
+          pushd "$api_directory" >/dev/null
+          ASPNETCORE_URLS="$base_url" \
+            ConnectionStrings__MigaDatabase="$candidate_connection" \
+            dotnet "$api_dll" >"$api_log" 2>&1 &
+          api_pid=$!
+          popd >/dev/null
+
+          cleanup_api() {
+            local exit_code=$?
+            trap - EXIT
+            if kill -0 "$api_pid" 2>/dev/null; then
+              kill "$api_pid" 2>/dev/null || true
+            fi
+            wait "$api_pid" 2>/dev/null || true
+            docker exec "$POSTGRES_CONTAINER_NAME" \
+              dropdb \
+                --if-exists \
+                --force \
+                --username=miga_ci \
+                "$candidate_database" \
+              >/dev/null 2>&1 || true
+            if test "$exit_code" -ne 0; then
+              redact_api_log
+            fi
+            rm -f \
+              "$health_response" \
+              "$csrf_response" \
+              "$session_response" \
+              "$snapshot_response" \
+              "$cookie_jar" \
+              "$api_log"
+            exit "$exit_code"
+          }
+          trap cleanup_api EXIT
+
+          redact_api_log() {
+            if test -s "$api_log"; then
+              awk -v secret="$CI_DB_PASSWORD" \
+                '{ gsub(secret, "[REDACTED]"); print }' "$api_log" >&2
+            fi
+          }
+
+          api_ready=false
+          for attempt in $(seq 1 30); do
+            if curl \
+              --silent \
+              --fail \
+              --max-time 2 \
+              --output "$health_response" \
+              "$base_url/api/health/db" &&
+              jq --exit-status '.canConnect == true' "$health_response" >/dev/null; then
+              api_ready=true
+              break
+            fi
+            if ! kill -0 "$api_pid" 2>/dev/null; then
+              echo "::error::The API exited before the PostgreSQL smoke test became ready."
+              exit 1
+            fi
+            sleep 1
+          done
+          if test "$api_ready" != "true"; then
+            echo "::error::The API did not become ready for the PostgreSQL smoke test."
+            exit 1
+          fi
+
+          curl \
+            --silent \
+            --show-error \
+            --fail \
+            --max-time 10 \
+            --cookie-jar "$cookie_jar" \
+            --output "$csrf_response" \
+            "$base_url/api/auth/csrf"
+          csrf_token="$(
+            jq --exit-status --raw-output \
+              '.requestToken | select(type == "string" and length > 0)' \
+              "$csrf_response"
+          )"
+
+          curl \
+            --silent \
+            --show-error \
+            --fail \
+            --max-time 10 \
+            --request POST \
+            --cookie "$cookie_jar" \
+            --cookie-jar "$cookie_jar" \
+            --header "X-XSRF-TOKEN: $csrf_token" \
+            --output /dev/null \
+            "$base_url/api/auth/demo"
+
+          curl \
+            --silent \
+            --show-error \
+            --fail \
+            --max-time 10 \
+            --cookie "$cookie_jar" \
+            --output "$session_response" \
+            "$base_url/api/auth/session"
+          jq --exit-status \
+            '.authenticated == true and .accountType == "demo"' \
+            "$session_response" \
+            >/dev/null
+
+          curl \
+            --silent \
+            --show-error \
+            --fail \
+            --max-time 10 \
+            --cookie "$cookie_jar" \
+            --output "$snapshot_response" \
+            "$base_url/api/data/snapshot"
+          jq --exit-status \
+            '.revision == 0 and (.data | type == "object")' \
+            "$snapshot_response" \
+            >/dev/null
+
+      - name: Upload migration candidate artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: miga-idempotent-migration-candidate-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/miga-migrations.sql
+            ${{ runner.temp }}/miga-migrations.sql.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Test
+        id: backend-tests
+        run: dotnet test backend/Miga.slnx --configuration Release --no-build --no-restore --collect:"XPlat Code Coverage"
+
+      - name: Upload backend coverage
+        if: ${{ !cancelled() && steps.backend-tests.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-coverage-${{ github.sha }}
+          path: backend/**/TestResults/**/coverage.cobertura.xml
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Stop hardened PostgreSQL
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          docker rm --force "$POSTGRES_CONTAINER_NAME" >/dev/null 2>&1 || true
+          docker volume rm --force "$POSTGRES_VOLUME_NAME" >/dev/null 2>&1 || true
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download and verify Gitleaks
+        shell: bash
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/gitleaks.tar.gz"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          printf '%s  %s\n' "$GITLEAKS_SHA256" "$archive" | sha256sum --check -
+          tar -xzf "$archive" -C "$RUNNER_TEMP" gitleaks
+
+      - name: Scan tracked history
+        shell: bash
+        run: '"$RUNNER_TEMP/gitleaks" git --redact --no-banner --exit-code 1'
+
+  container-image:
+    name: PostgreSQL image scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      POSTGRES_IMAGE: miga-postgres-scan:${{ github.sha }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build and inspect hardened PostgreSQL image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --network=none \
+            --tag "$POSTGRES_IMAGE" \
+            docker/postgres
+          test "$(
+            docker image inspect \
+              --format '{{.Config.User}}' \
+              "$POSTGRES_IMAGE"
+          )" = "postgres"
+          runtime_uid="$(
+            docker run \
+              --rm \
+              --pull=never \
+              --entrypoint /usr/bin/id \
+              "$POSTGRES_IMAGE" \
+              -u
+          )"
+          test "$runtime_uid" -ne 0
+          docker run \
+            --rm \
+            --pull=never \
+            --entrypoint /bin/sh \
+            "$POSTGRES_IMAGE" \
+            -ceu 'test ! -e /usr/local/bin/gosu'
+
+      - name: Download and verify Trivy
+        shell: bash
+        env:
+          TRIVY_VERSION: 0.72.0
+          TRIVY_SHA256: bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/trivy.tar.gz"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output "$archive" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          printf '%s  %s\n' "$TRIVY_SHA256" "$archive" | sha256sum --check -
+          tar -xzf "$archive" -C "$RUNNER_TEMP" trivy
+
+      - name: Scan the hardened PostgreSQL image
+        shell: bash
+        run: |
+          "$RUNNER_TEMP/trivy" image \
+            --image-src docker \
+            --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --no-progress \
+            --timeout 10m \
+            "$POSTGRES_IMAGE"
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@f52b05f4acaaa234e44466e66d29050e135ea9ef # v4.36.0
+        with:
+          languages: csharp,javascript-typescript
+          queries: security-extended
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.22.0
+          package-manager-cache: false
+
+      - name: Verify Node.js and npm versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node --version)" = "v22.22.0"
+          npm_version="$(npm --version)"
+          test "$(
+            printf '%s\n' "10.9.4" "$npm_version" |
+              sort --version-sort |
+              head --lines=1
+          )" = "10.9.4"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Install frontend from lockfile
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Restore backend from lockfile
+        run: dotnet restore backend/Miga.slnx --locked-mode
+
+      - name: Build backend
+        run: dotnet build backend/Miga.slnx --configuration Release --no-restore
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@f52b05f4acaaa234e44466e66d29050e135ea9ef # v4.36.0

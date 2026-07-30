@@ -1,17 +1,24 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import tsconfigPaths from 'vite-tsconfig-paths'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+function getApiProxyTarget(mode: string): string {
+  const raw = loadEnv(mode, process.cwd(), '').VITE_API_PROXY_TARGET?.trim()
+  const target = new URL(raw || 'http://localhost:5161')
+  if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password) {
+    throw new Error('VITE_API_PROXY_TARGET must be an http(s) URL without embedded credentials')
+  }
+  return target.origin
+}
+
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
-    tsconfigPaths(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: [
         'brand/miga_app_icon_180.png',
         'brand/miga_app_icon_192.png',
@@ -51,10 +58,32 @@ export default defineConfig({
       devOptions: {
         enabled: false,
       },
+      workbox: {
+        cleanupOutdatedCaches: true,
+        navigateFallbackDenylist: [/^\/api(?:\/|$)/],
+        runtimeCaching: [
+          {
+            urlPattern: ({ sameOrigin, url }) =>
+              sameOrigin && (url.pathname === '/api' || url.pathname.startsWith('/api/')),
+            handler: 'NetworkOnly',
+            method: 'GET',
+          },
+        ],
+      },
     }),
   ],
+  resolve: {
+    tsconfigPaths: true,
+  },
   server: {
     port: 5173,
+    proxy: {
+      '/api': {
+        target: getApiProxyTarget(mode),
+        changeOrigin: false,
+        secure: false,
+      },
+    },
   },
   test: {
     environment: 'jsdom',
@@ -62,4 +91,4 @@ export default defineConfig({
     css: false,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
-})
+}))

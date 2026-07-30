@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { AlertTriangle } from 'lucide-react'
 import { createNote, deleteNote, updateNote } from '@/lib/db/notes.repository'
-import type { Note } from '@/lib/db/schema'
+import { NOTE_LIMITS, type Note } from '@/lib/db/schema'
 import { useT } from '@/i18n/i18n-context'
 import GoalMultiPicker from './GoalMultiPicker'
 
@@ -24,9 +24,7 @@ function TextNoteEditor({
   const { t } = useT()
   const [title, setTitle] = useState(existing?.title ?? '')
   const [text, setText] = useState(existing?.text ?? '')
-  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>(
-    existing?.goalIds ?? goalIds,
-  )
+  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>(existing?.goalIds ?? goalIds)
   const [goalsError, setGoalsError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -56,6 +54,10 @@ function TextNoteEditor({
     }
     if (text.trim().length === 0) {
       toast.error(t.notes.errors.textRequired)
+      return
+    }
+    if (text.length > NOTE_LIMITS.text.maxChars) {
+      toast.error(t.notes.cannotSave)
       return
     }
     if (selectedGoalIds.length === 0) {
@@ -119,6 +121,7 @@ function TextNoteEditor({
         onChange={(e) => setText(e.target.value)}
         placeholder={t.notes.textPlaceholder}
         rows={8}
+        maxLength={NOTE_LIMITS.text.maxChars}
         className="resize-none rounded-xl bg-cream px-3 py-2 text-sm text-charcoal ring-1 ring-[color:var(--color-border)] focus:ring-2 focus:ring-apricot focus:outline-none"
       />
       <div className="flex gap-2">

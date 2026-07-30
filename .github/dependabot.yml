@@ -1,0 +1,110 @@
+version: 2
+# Groups intentionally contain minor/patch updates only. Major updates remain
+# isolated pull requests so framework, provider and toolchain jumps are reviewed deliberately.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      root-development-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      frontend-production-dependencies:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      frontend-development-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: nuget
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      backend-runtime:
+        patterns:
+          - Microsoft.AspNetCore.DataProtection.EntityFrameworkCore
+          - Microsoft.AspNetCore.Identity.EntityFrameworkCore
+          - Microsoft.AspNetCore.OpenApi
+          - Microsoft.OpenApi
+          - Serilog.*
+        update-types:
+          - minor
+          - patch
+      entity-framework-runtime:
+        patterns:
+          - Microsoft.EntityFrameworkCore
+          - Microsoft.EntityFrameworkCore.Relational
+        update-types:
+          - minor
+          - patch
+      postgresql-provider:
+        patterns:
+          - Npgsql.*
+        update-types:
+          - minor
+          - patch
+      sqlite-test-provider:
+        patterns:
+          - Microsoft.EntityFrameworkCore.Sqlite
+          - SQLitePCLRaw.*
+        update-types:
+          - minor
+          - patch
+      backend-build-tooling:
+        patterns:
+          - Microsoft.EntityFrameworkCore.Design
+        update-types:
+          - minor
+          - patch
+      backend-test-tooling:
+        patterns:
+          - coverlet.*
+          - Microsoft.AspNetCore.Mvc.Testing
+          - Microsoft.NET.Test.Sdk
+          - Shouldly
+          - xunit*
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: docker
+    directory: /docker/postgres
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-maintenance-actions:
+        patterns:
+          - actions/*
+        update-types:
+          - minor
+          - patch
+      github-codeql:
+        patterns:
+          - github/codeql-action
+        update-types:
+          - minor
+          - patch

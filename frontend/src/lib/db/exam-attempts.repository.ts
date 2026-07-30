@@ -1,5 +1,6 @@
 import { db } from './miga-db'
 import {
+  EXAM_LIMITS,
   pdfExamInputSchema,
   questionsExamInputSchema,
   type ExamAttempt,
@@ -7,6 +8,40 @@ import {
   type PdfExamInput,
   type QuestionsExamInput,
 } from './schema'
+import { z } from 'zod'
+
+const notesSchema = z.string().max(EXAM_LIMITS.notes.maxChars)
+const scorePairSchema = z
+  .object({
+    score: z.number().finite().min(0).nullable(),
+    maxScore: z.number().finite().min(0).nullable(),
+    notes: notesSchema.optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (
+      (data.score === null) !== (data.maxScore === null) ||
+      (data.score !== null && data.maxScore !== null && data.score > data.maxScore)
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'invalidScore', path: ['score'] })
+    }
+  })
+
+const responseSchema = z
+  .object({
+    questionId: z.uuid(),
+    chosenAnswerIds: z.array(z.uuid()).max(10),
+    isCorrect: z.boolean(),
+    answeredAt: z.number().int().min(0),
+  })
+  .strict()
+
+const finishQuestionsSchema = z
+  .object({
+    responses: z.array(responseSchema).max(EXAM_LIMITS.questions.maxCount),
+    notes: notesSchema.optional(),
+  })
+  .strict()
 
 /**
  * Creates a new PDF simulacro attempt in 'in-progress' state. The user grades
@@ -43,9 +78,7 @@ export async function startPdfExamAttempt(input: PdfExamInput): Promise<ExamAtte
  * is snapshot at creation time so subsequent question edits do not distort
  * the attempt.
  */
-export async function startQuestionsExamAttempt(
-  input: QuestionsExamInput,
-): Promise<ExamAttempt> {
+export async function startQuestionsExamAttempt(input: QuestionsExamInput): Promise<ExamAttempt> {
   const parsed = questionsExamInputSchema.parse(input)
   const now = Date.now()
   const attempt: ExamAttempt = {
@@ -87,10 +120,7 @@ export function listExamAttemptsByGoal(goalId: string): Promise<ExamAttempt[]> {
  * completed attempts are excluded.
  */
 export function listActiveExamAttempts(): Promise<ExamAttempt[]> {
-  return db.examAttempts
-    .where('status')
-    .anyOf('in-progress', 'paused')
-    .sortBy('startedAt')
+  return db.examAttempts.where('status').anyOf('in-progress', 'paused').sortBy('startedAt')
 }
 
 /**
@@ -144,6 +174,7 @@ export async function finishPdfExamAttempt(
   id: string,
   options: FinishPdfExamOptions,
 ): Promise<void> {
+  const parsedOptions = scorePairSchema.parse(options)
   const attempt = await db.examAttempts.get(id)
   if (!attempt) throw new Error('Intento no encontrado')
   if (attempt.kind !== 'pdf') throw new Error('Solo aplica a simulacros PDF')
@@ -154,10 +185,10 @@ export async function finishPdfExamAttempt(
   const extraPause =
     attempt.status === 'paused' && attempt.pausedAt !== null ? now - attempt.pausedAt : 0
   await db.examAttempts.update(id, {
-    status: options.score === null ? 'pending-grade' : 'graded',
-    score: options.score,
-    maxScore: options.maxScore,
-    notes: options.notes ?? attempt.notes,
+    status: parsedOptions.score === null ? 'pending-grade' : 'graded',
+    score: parsedOptions.score,
+    maxScore: parsedOptions.maxScore,
+    notes: parsedOptions.notes ?? attempt.notes,
     endedAt: now,
     pausedAt: null,
     totalPausedMs: attempt.totalPausedMs + extraPause,
@@ -172,6 +203,7 @@ export async function gradePdfExamAttempt(
   maxScore: number,
   notes?: string,
 ): Promise<void> {
+  scorePairSchema.parse({ score, maxScore, notes })
   const attempt = await db.examAttempts.get(id)
   if (!attempt) throw new Error('Intento no encontrado')
   if (attempt.kind !== 'pdf') throw new Error('Solo aplica a simulacros PDF')
@@ -195,6 +227,7 @@ export async function finishQuestionsExamAttempt(
   id: string,
   options: FinishQuestionsExamOptions,
 ): Promise<void> {
+  const parsedOptions = finishQuestionsSchema.parse(options)
   const attempt = await db.examAttempts.get(id)
   if (!attempt) throw new Error('Intento no encontrado')
   if (attempt.kind !== 'questions') throw new Error('Solo aplica a exámenes con preguntas')
@@ -204,12 +237,16 @@ export async function finishQuestionsExamAttempt(
   const now = Date.now()
   const extraPause =
     attempt.status === 'paused' && attempt.pausedAt !== null ? now - attempt.pausedAt : 0
-  const score = options.responses.filter((r) => r.isCorrect).length
+  const allowedQuestionIds = new Set(attempt.questionIds ?? [])
+  if (parsedOptions.responses.some((response) => !allowedQuestionIds.has(response.questionId))) {
+    throw new Error('La respuesta no pertenece a este examen')
+  }
+  const score = parsedOptions.responses.filter((r) => r.isCorrect).length
   await db.examAttempts.update(id, {
     status: 'completed',
     score,
-    responses: options.responses,
-    notes: options.notes ?? attempt.notes,
+    responses: parsedOptions.responses,
+    notes: parsedOptions.notes ?? attempt.notes,
     endedAt: now,
     pausedAt: null,
     totalPausedMs: attempt.totalPausedMs + extraPause,
@@ -219,7 +256,9 @@ export async function finishQuestionsExamAttempt(
 
 /** Updates only the notes of an exam attempt. Used from the results screen. */
 export async function updateExamAttemptNotes(id: string, notes: string): Promise<void> {
-  await db.examAttempts.update(id, { notes, updatedAt: Date.now() })
+  const parsedNotes = notesSchema.parse(notes)
+  const updated = await db.examAttempts.update(id, { notes: parsedNotes, updatedAt: Date.now() })
+  if (updated === 0) throw new Error('Intento no encontrado')
 }
 
 export async function discardExamAttempt(id: string): Promise<void> {

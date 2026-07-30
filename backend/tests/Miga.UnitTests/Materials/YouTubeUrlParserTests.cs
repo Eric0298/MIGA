@@ -31,6 +31,8 @@ public sealed class YouTubeUrlParserTests
     [InlineData("ftp://youtube.com/watch?v=dQw4w9WgXcQ")]
     [InlineData("javascript:alert(1)")]
     [InlineData("https://evil.example.com/watch?v=dQw4w9WgXcQ")]
+    [InlineData("https://user:pass@youtube.com/watch?v=dQw4w9WgXcQ")]
+    [InlineData("https://youtube.com\\@evil.example/watch?v=dQw4w9WgXcQ")]
     [InlineData("https://vimeo.com/12345")]
     [InlineData("https://www.youtube.com/watch")]
     [InlineData("https://www.youtube.com/watch?v=short")]

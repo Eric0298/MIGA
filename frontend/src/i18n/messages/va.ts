@@ -131,8 +131,7 @@ export const va: Messages = {
     newSimulacro: 'Nou simulacre',
     newQuestionsExam: 'Nou examen',
     emptyPdfAttempts: 'Encara no hi ha simulacres en esta meta.',
-    emptyQuestionAttempts:
-      'Encara no has fet cap examen amb les teues preguntes.',
+    emptyQuestionAttempts: 'Encara no has fet cap examen amb les teues preguntes.',
     continue: 'Continuar',
     viewResults: 'Vore resultats',
     gradeNow: 'Qualificar',
@@ -175,8 +174,7 @@ export const va: Messages = {
       titleLabel: 'Nom del simulacre',
       titlePlaceholder: 'Model 2024 · Bloc 1',
       sourceLabel: 'PDF a cronometrar',
-      sourceHint:
-        'Tria un material tipus PDF o una nota tipus document en format PDF.',
+      sourceHint: 'Tria un material tipus PDF o una nota tipus document en format PDF.',
       sourceEmpty:
         'Esta meta encara no té PDFs. Puja’n un com a material o com a nota i torna ací.',
       fromMaterial: 'Des dels materials',
@@ -207,8 +205,7 @@ export const va: Messages = {
       finish: 'Acabar',
       discard: 'Descartar simulacre',
       finishTitle: 'Acabar simulacre',
-      finishDescription:
-        'Vols qualificar-lo ara o deixar-lo pendent per a qualificar-lo més tard?',
+      finishDescription: 'Vols qualificar-lo ara o deixar-lo pendent per a qualificar-lo més tard?',
       gradeNow: 'Qualificar ara',
       leavePending: 'Deixar pendent',
       savedPending: 'Simulacre guardat com a pendent.',
@@ -218,8 +215,7 @@ export const va: Messages = {
       cannotDiscard: 'No s’ha pogut descartar.',
       discarded: 'Simulacre descartat.',
       discardTitle: 'Descartar este simulacre?',
-      discardDescription:
-        'Perdràs l’intent i el temps cronometrat. Les notes no es guardaran.',
+      discardDescription: 'Perdràs l’intent i el temps cronometrat. Les notes no es guardaran.',
       discardYes: 'Sí, descartar',
       timeUpToast: 'S’ha acabat el temps. Pots acabar o deixar-lo pendent.',
       notFoundTitle: 'Simulacre no trobat',
@@ -258,12 +254,10 @@ export const va: Messages = {
       orderOriginal: 'Orde original',
       timeLimitLabel: 'Temps límit (min)',
       timeLimitPlaceholder: 'Opcional',
-      timeLimitHint:
-        'Si l’indiques, MIGA acabarà l’examen automàticament en arribar a 0.',
+      timeLimitHint: 'Si l’indiques, MIGA acabarà l’examen automàticament en arribar a 0.',
       start: 'Començar examen',
       noQuestionsTitle: 'Encara no tens preguntes',
-      noQuestionsDescription:
-        'Crea preguntes en el repàs d’esta meta per a poder fer un examen.',
+      noQuestionsDescription: 'Crea preguntes en el repàs d’esta meta per a poder fer un examen.',
       goToRepaso: 'Anar a preguntes',
       errors: {
         titleRequired: 'Posa-li un nom a l’examen.',
@@ -285,16 +279,13 @@ export const va: Messages = {
       cannotDiscard: 'No s’ha pogut descartar l’examen.',
       discarded: 'Examen descartat.',
       discardTitle: 'Descartar este examen?',
-      discardDescription:
-        'Perdràs les respostes contestades i el temps cronometrat.',
+      discardDescription: 'Perdràs les respostes contestades i el temps cronometrat.',
       discardYes: 'Sí, descartar',
       discardedTitle: 'Examen descartat',
       discardedDescription: 'Este intent va ser descartat.',
-      timeUpToast:
-        'S’ha acabat el temps. L’examen s’ha corregit amb les respostes actuals.',
+      timeUpToast: 'S’ha acabat el temps. L’examen s’ha corregit amb les respostes actuals.',
       noQuestionsTitle: 'No hi ha preguntes',
-      noQuestionsDescription:
-        'Este examen no té preguntes associades. Potser les has esborrades.',
+      noQuestionsDescription: 'Este examen no té preguntes associades. Potser les has esborrades.',
     },
     questionsResult: {
       summaryLabel: 'Resultat',
@@ -331,7 +322,7 @@ export const va: Messages = {
     tagline2: 'Big progress.',
     description:
       'Miga t’ajuda a convertir xicotetes accions diàries en progrés real. Res de llistes infinites, ni pressió artificial. Només temps ben aprofitat i avanç visible.',
-    tryGuest: 'Provar com a convidat',
+    tryGuest: 'Provar MIGA',
     seeArchitecture: 'Veure arquitectura',
     whyMiga: 'Per què Miga',
     feature1Title: 'Temps real, no promeses',
@@ -342,7 +333,7 @@ export const va: Messages = {
       'Fixa objectius per temps setmanal. Miga et diu si vas al dia sense dramatitzar.',
     feature3Title: 'Progrés visible',
     feature3Description: 'Cada sessió suma. Veuràs avanç real, no ratxes buides.',
-    footer: 'Mode convidat local. Sense compte obligatori.',
+    footer: 'Pots provar una demo temporal sense crear un compte.',
   },
   architecture: {
     title: 'Arquitectura',
@@ -575,9 +566,9 @@ export const va: Messages = {
     subtitle: 'Ajusts de dades, idioma i informació del projecte.',
     dataSection: 'Dades',
     dataHint:
-      'Tot es guarda al teu dispositiu. Usa exportar com a còpia de seguretat i importar per restaurar en un altre dispositiu.',
+      'La còpia JSON inclou dades estructurades, però no PDF, vídeo, àudio ni imatges. Eixos arxius romanen només en este dispositiu.',
     export: 'Exportar còpia',
-    exportBadge: '.json',
+    exportBadge: 'JSON sense arxius',
     exportSuccess: 'Còpia descarregada',
     exportError: 'No s’ha pogut exportar',
     import: 'Importar còpia',
@@ -587,22 +578,24 @@ export const va: Messages = {
       '{goals} metes · {sessions} sessions · {materials} materials · {notes} notes · {questions} preguntes · {exams} exàmens{extras}',
     importActiveCleared: ' ({count} sessió activa tancada)',
     importInvalid: 'Fitxer invàlid',
+    importTooLarge: 'El fitxer supera el límit de 5 MiB',
     importBlocked: 'Detén la sessió activa abans d’importar',
     clear: 'Esborrar totes les dades',
     clearBadge: 'Local',
     clearBlocked: 'Detén la sessió activa abans d’esborrar',
     clearConfirmTitle: 'Esborrar totes les dades locals?',
     clearConfirmDescription:
-      'S’eliminaran {goals} {goalWord}, {sessions} {sessionWord}, {materials} materials, {notes} notes, {questions} preguntes i {exams} exàmens d’este dispositiu. Esta acció no es pot desfer.',
+      'S’eliminaran {goals} {goalWord}, {sessions} {sessionWord}, {materials} materials, {notes} notes, {questions} preguntes i {exams} exàmens d’este dispositiu. Si has iniciat sessió, també es tancarà; les dades sincronitzades continuaran en el servidor. Esta acció no es pot desfer.',
     goalWordOne: 'meta',
     goalWordOther: 'metes',
     sessionWordOne: 'sessió',
     sessionWordOther: 'sessions',
-    clearConfirmYes: 'Sí, esborrar tot',
+    clearConfirmYes: 'Esborrar localment i tancar sessió',
     clearSuccess: 'Totes les dades locals han sigut esborrades',
     clearError: 'No s’ha pogut esborrar',
     infoSection: 'Informació',
     architecture: 'Veure arquitectura',
+    privacy: 'Política de privacitat',
     landing: 'Tornar a la pàgina inicial',
     languageSection: 'Idioma',
     languageHint: 'Tria l’idioma de la interfície.',
@@ -720,7 +713,8 @@ export const va: Messages = {
       startRecording: 'Gravar',
       stopRecording: 'Detindre',
       recording: 'Gravant',
-      estimatedMax: 'Duració màxima estimada: {minutes} min. La gravació es tallarà automàticament en arribar i guardarem tot el gravat fins eixe moment.',
+      estimatedMax:
+        'Duració màxima estimada: {minutes} min. La gravació es tallarà automàticament en arribar i guardarem tot el gravat fins eixe moment.',
       autoCutoffMessage: 'S’ha tallat automàticament en arribar al límit de {minutes} min.',
       recordedDuration: 'Duració gravada: {time}',
       discardAndRetry: 'Descartar i gravar de nou',

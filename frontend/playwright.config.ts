@@ -23,11 +23,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'node ./node_modules/vite/bin/vite.js',
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     stdout: 'ignore',
-    stderr: 'pipe',
+    stderr: 'ignore',
   },
 })

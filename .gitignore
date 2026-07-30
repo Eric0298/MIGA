@@ -17,6 +17,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 .npm/
+.npm-cache/
 .pnpm-store/
 
 # Build outputs
@@ -56,6 +57,26 @@ coverage/
 !.env.local.example
 !.env.development.example
 !.env.production.example
+
+# Private keys, certificates and local credential stores
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.pgpass
+pgpass.conf
+secrets.json
+**/secrets.json
+DataProtection-Keys/
+**/DataProtection-Keys/
+
+# Database exports can contain personal data and credentials.
+*.sql
+*.sql.gz
+*.dump
+*.backup
 
 
 # =========================================================
@@ -172,6 +193,15 @@ workbox-*.js
 
 TestResults/
 **/TestResults/
+playwright-report/
+**/playwright-report/
+test-results/
+**/test-results/
+blob-report/
+**/blob-report/
+
+# Local EF migration-scaffolding scratch project.
+backend/.migration-scaffolder/
 
 
 # =========================================================

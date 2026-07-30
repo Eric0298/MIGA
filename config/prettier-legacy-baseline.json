@@ -1,0 +1,162 @@
+{
+  "description": "Pre-existing formatting debt outside the security change. An entry is exempt only while its exact SHA-256 remains unchanged; edited files must pass Prettier.",
+  "generatedAt": "2026-07-30",
+  "files": [
+    {
+      "path": "frontend/e2e/create-goal.spec.ts",
+      "sha256": "ad1c8f7b00ffd775a81b68fcd0bbc0c2f7d5c99e80ae06ac339a78389eebffd4"
+    },
+    {
+      "path": "frontend/src/components/layout/SideNavDrawer.tsx",
+      "sha256": "16b5e7babaa575316a8a0e9b9dd0870939c46c439f0d810ae4b9d40ecc30cae8"
+    },
+    {
+      "path": "frontend/src/components/layout/TopBar.tsx",
+      "sha256": "896d57b56b924cdc27e42fc9f5bdbfeee6f4d821e3b33910b4b07193d9bf55da"
+    },
+    {
+      "path": "frontend/src/features/estudio/components/GoalsBrowseGrid.tsx",
+      "sha256": "fb83618d04857e4c65e082b5f4375fb63236f65470aa20b0b3f023605e68a92e"
+    },
+    {
+      "path": "frontend/src/features/estudio/EstudioHubPage.tsx",
+      "sha256": "f18e72c20cb6cba04a7846b5f9b25662fb41b5f66b8c63d8b5bf77fc15faced8"
+    },
+    {
+      "path": "frontend/src/features/estudio/ExamenesGoalPage.tsx",
+      "sha256": "b5483685d82552814ee9a0955db3c9f31487bce6b39721ed59eb298eef9e321b"
+    },
+    {
+      "path": "frontend/src/features/estudio/ExamenesPage.tsx",
+      "sha256": "5d6606c6c7a42e80fe48160bdd0a192c582536c013603da9d59d30b08e7bc84d"
+    },
+    {
+      "path": "frontend/src/features/estudio/NotasAllPage.tsx",
+      "sha256": "c19c5de7c09ab882341cf271fe26771672b45c876e33c7b2f6aabf61a242cd31"
+    },
+    {
+      "path": "frontend/src/features/estudio/QuestionsExamCreatePage.tsx",
+      "sha256": "f8b12414e64de25cc0e8948fd72129afd349ba3442f3d3b2fc0767d9caebf074"
+    },
+    {
+      "path": "frontend/src/features/estudio/RepasoSessionPage.tsx",
+      "sha256": "fb014f314b8d5f278d0c651567f87fdd19833a0149b6fa99bd2f72e45d3a9efc"
+    },
+    {
+      "path": "frontend/src/features/estudio/SimulacroCreatePage.tsx",
+      "sha256": "aaf1ff367adae78987176b3027d96e0a0e3eb5058597c260bc86915102e4e2db"
+    },
+    {
+      "path": "frontend/src/features/estudio/SimulacroSessionPage.tsx",
+      "sha256": "e5f3833dcd7a668ecb5656d03002a5e2ed4e84ea84ef975a2be9c4d7ae4e54cc"
+    },
+    {
+      "path": "frontend/src/features/exams/utils/question-to-note.ts",
+      "sha256": "6eef3b73b74d704d33bba254297fdb8d27655b2df5bca2808eb47f4331f0f6d4"
+    },
+    {
+      "path": "frontend/src/features/goals/GoalDetailPage.tsx",
+      "sha256": "238209680b7ece4c22ef0ffcb3906d33ff5e6cb71c1a41c41e557a82f0d4f827"
+    },
+    {
+      "path": "frontend/src/features/home/HomePage.tsx",
+      "sha256": "bbb63c6b7ee967550df0702b96f1179b8e8211bfab64dd840a28ef8d9ba72908"
+    },
+    {
+      "path": "frontend/src/features/materials/components/MaterialCard.tsx",
+      "sha256": "c947674fb09347a3e9aaf4ddc0d7dde30ed9c5f024f009aeeea53e58793effe0"
+    },
+    {
+      "path": "frontend/src/features/materials/components/PdfViewer.tsx",
+      "sha256": "b74b1b3c12759f76b0e085e07e92f30ca0798010c2414d5f75f86f4c7c47ab09"
+    },
+    {
+      "path": "frontend/src/features/materials/components/YouTubePlayer.tsx",
+      "sha256": "b59a1a2d904af25aa617e9dfdde85bc1a21056e7536b06953b5413703a5f40cf"
+    },
+    {
+      "path": "frontend/src/features/materials/hooks/use-material-aggregated-progress.ts",
+      "sha256": "c743da45de40849c38436e8ff096cbf70983410519f90ac3c5868aab7120d977"
+    },
+    {
+      "path": "frontend/src/features/notes/components/AudioPlayer.tsx",
+      "sha256": "eb0c95038479e32592e358614f223b869745d4165d8c5e769849476ffd6d08e5"
+    },
+    {
+      "path": "frontend/src/features/notes/components/DocumentNoteEditor.tsx",
+      "sha256": "f619b1fd6dd160d00e22e996563ded42351a675de13a54d67222784b524b539a"
+    },
+    {
+      "path": "frontend/src/features/notes/components/ImageNoteEditor.tsx",
+      "sha256": "6117f331915fa041557368a4eee36ee204130be4693d5f1e12806df7afb57acc"
+    },
+    {
+      "path": "frontend/src/features/notes/components/NoteCard.tsx",
+      "sha256": "0bced49efb9bc3ae14f344b7b8eed3e9daa57363113f710800b5fa309a28af96"
+    },
+    {
+      "path": "frontend/src/features/notes/components/NoteEditor.tsx",
+      "sha256": "411489b5b7dd3bbdf0363f46d0e3743943ead3e14f4723e93323ceff402c2b9a"
+    },
+    {
+      "path": "frontend/src/features/notes/components/VoiceNoteEditor.tsx",
+      "sha256": "23172b8fd97b31bfe1cc77677624c3520db298d417dfb0243f4c83cc49f8653f"
+    },
+    {
+      "path": "frontend/src/features/questions/components/QuestionMediaViewer.tsx",
+      "sha256": "8bf18ec4c6823d31a8c33623ca2fcd6109d27e2f0aeb3f4ac92b8fea41a0358e"
+    },
+    {
+      "path": "frontend/src/features/questions/components/QuestionsPanel.tsx",
+      "sha256": "952798e382d80e35d4fe6636e8f95f18c46c038e021fcc84c82d08370cda75a7"
+    },
+    {
+      "path": "frontend/src/features/sessions/components/ExamScoreEvolutionChart.tsx",
+      "sha256": "a8dac6416ae319bb57dc43dec0280808c263fd287acf8848ca1aa16b0f5c1f8d"
+    },
+    {
+      "path": "frontend/src/features/sessions/components/WeeklyStats.tsx",
+      "sha256": "ba0aa5097b52fa55d58c7d4cc3e58fd28a99e3ccfbef165837582b1ccd49551f"
+    },
+    {
+      "path": "frontend/src/features/sessions/SessionDetailPage.tsx",
+      "sha256": "d035bb19a50d04b960965e392a8ff0854e4592c2c9b9ffa13c961f6660e79118"
+    },
+    {
+      "path": "frontend/src/features/sessions/SessionsPage.tsx",
+      "sha256": "94f7c6408104b539294a03eec4dd437770924d4c32929c03426296b3cf3df6dc"
+    },
+    {
+      "path": "frontend/src/features/timer/components/StartSessionPanel.tsx",
+      "sha256": "23fcbd7d441b620cb9aec2f39b96371ab162416bf9ab0061f89aeb8754a625be"
+    },
+    {
+      "path": "frontend/src/features/timer/components/TimerActiveMaterial.tsx",
+      "sha256": "cce4719021730361a4b03351d4bc66473c9b942139992bd4b13cf39812794e88"
+    },
+    {
+      "path": "frontend/src/lib/api/youtube-iframe-api.ts",
+      "sha256": "8f38c2129d310845a3be8d5a8ddf9cdc7837b7f7892c368fc74072deac708823"
+    },
+    {
+      "path": "frontend/src/lib/db/materials.repository.ts",
+      "sha256": "a9c5b07d261dab1f9401656622318160eb0b527c340fc2591854f55bec58c562"
+    },
+    {
+      "path": "frontend/src/lib/db/notes.repository.test.ts",
+      "sha256": "f9feec8e1e7a81e1d420308d2e332cb9a995dba950daef94f85a53e39c9b5449"
+    },
+    {
+      "path": "frontend/src/lib/srs/srs.ts",
+      "sha256": "f4d5e8a72b2531592bfcdc0db7f1252dd0a48125242c65bca72ee21a01349943"
+    },
+    {
+      "path": "frontend/src/lib/stats/sessions-stats.ts",
+      "sha256": "fc79b3586e1708108cf3c8010063d5ce476c402789fc310fbeabf55d494fb64e"
+    },
+    {
+      "path": "frontend/src/lib/stats/weekly-stats.ts",
+      "sha256": "fb50923c773051f78e661c8c81a822d72338ee7a369122315f83a0acb7b2fff3"
+    }
+  ]
+}

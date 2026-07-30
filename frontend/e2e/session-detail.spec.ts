@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { resetApp, seedGoal } from './helpers/seed'
+import { DEXIE_DB_NAME, navigateInApp, resetApp, seedGoal } from './helpers/seed'
 
 test.beforeEach(async ({ page }) => {
   await resetApp(page)
@@ -10,7 +10,10 @@ test('opens the session detail from the sessions list', async ({ page }) => {
 
   // Seed a completed session tied to the goal and a note taken during it.
   await page.evaluate(
-    async ({ goalId }: { goalId: string }) => {
+    async ({ goalId, dbName }: { goalId: string; dbName: string }) => {
+      // @ts-expect-error Browser-only Vite module loaded inside page.evaluate.
+      const { db } = await import(/* @vite-ignore */ '/src/lib/db/miga-db.ts')
+      if (db.name !== dbName) throw new Error(`Unexpected active database: ${db.name}`)
       const now = Date.now()
       const sessionId = crypto.randomUUID()
       const startedAt = now - 30 * 60_000
@@ -39,29 +42,15 @@ test('opens the session detail from the sessions list', async ({ page }) => {
         createdAt: now,
         updatedAt: now,
       }
-      await new Promise<void>((resolve, reject) => {
-        const req = indexedDB.open('miga')
-        req.onsuccess = () => {
-          const idb = req.result
-          const tx = idb.transaction(['sessions', 'notes'], 'readwrite')
-          tx.objectStore('sessions').put(session)
-          tx.objectStore('notes').put(note)
-          tx.oncomplete = () => {
-            idb.close()
-            resolve()
-          }
-          tx.onerror = () => {
-            idb.close()
-            reject(tx.error)
-          }
-        }
-        req.onerror = () => reject(req.error)
+      await db.transaction('rw', [db.sessions, db.notes], async () => {
+        await db.sessions.put(session)
+        await db.notes.put(note)
       })
     },
-    { goalId: goal.id },
+    { goalId: goal.id, dbName: DEXIE_DB_NAME },
   )
 
-  await page.goto('/app/sesiones')
+  await navigateInApp(page, '/app/sesiones')
 
   await page.getByRole('link', { name: 'Ver detalle de la sesión' }).click()
 

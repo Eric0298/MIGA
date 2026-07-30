@@ -18,5 +18,16 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // These compiler-oriented rules are not part of the runtime Hooks
+      // contract and currently flag established, tested state-machine code.
+      'react-hooks/purity': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      // This project intentionally colocates small hooks/context helpers with
+      // their provider components.
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])

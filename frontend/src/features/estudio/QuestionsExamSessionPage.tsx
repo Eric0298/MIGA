@@ -230,9 +230,7 @@ function QuestionsExamSessionPage() {
               <p className="text-xs font-medium uppercase tracking-wide text-[color:var(--color-text-muted)]">
                 {t.examenes.questionsSession.header}
               </p>
-              <p className="mt-1 truncate text-base font-bold text-charcoal">
-                {attempt.title}
-              </p>
+              <p className="mt-1 truncate text-base font-bold text-charcoal">{attempt.title}</p>
               <p className="mt-0.5 text-xs text-[color:var(--color-text-muted)]">
                 {tpl(t.examenes.questionsSession.progress, {
                   current: questionNumber,
@@ -251,9 +249,7 @@ function QuestionsExamSessionPage() {
                 <p
                   className={clsx(
                     'text-[11px] font-semibold tabular-nums',
-                    remainingMs < 60_000
-                      ? 'text-apricot'
-                      : 'text-[color:var(--color-text-muted)]',
+                    remainingMs < 60_000 ? 'text-apricot' : 'text-[color:var(--color-text-muted)]',
                   )}
                 >
                   {formatDuration(remainingMs)} {t.examenes.session.remaining}
@@ -355,13 +351,9 @@ function QuestionsExamSessionPage() {
           >
             <div className="flex items-center gap-2">
               <AlertTriangle size={16} aria-hidden="true" />
-              <p className="text-sm font-semibold">
-                {t.examenes.questionsSession.discardTitle}
-              </p>
+              <p className="text-sm font-semibold">{t.examenes.questionsSession.discardTitle}</p>
             </div>
-            <p className="text-xs opacity-90">
-              {t.examenes.questionsSession.discardDescription}
-            </p>
+            <p className="text-xs opacity-90">{t.examenes.questionsSession.discardDescription}</p>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -403,12 +395,11 @@ function QuestionsExamResults({
   const [savedNoteIds, setSavedNoteIds] = useState<Set<string>>(() => new Set())
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null)
 
-  const responses = attempt.responses ?? []
   const responsesByQuestion = useMemo(() => {
     const map = new Map<string, ExamResponse>()
-    for (const r of responses) map.set(r.questionId, r)
+    for (const r of attempt.responses ?? []) map.set(r.questionId, r)
     return map
-  }, [responses])
+  }, [attempt.responses])
 
   const handleSaveAsNote = async (question: Question) => {
     try {
@@ -437,9 +428,7 @@ function QuestionsExamResults({
   const score = attempt.score ?? 0
   const maxScore = attempt.maxScore ?? questions.length
   const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0
-  const wrong = questions.filter(
-    (q) => !(responsesByQuestion.get(q.id)?.isCorrect ?? false),
-  )
+  const wrong = questions.filter((q) => !(responsesByQuestion.get(q.id)?.isCorrect ?? false))
   const displayed = showAll ? questions : wrong
 
   const handleSaveNotes = async () => {
@@ -491,6 +480,7 @@ function QuestionsExamResults({
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder={t.examenes.questionsResult.notesPlaceholder}
+          maxLength={10_000}
           rows={4}
           className="resize-none rounded-xl bg-cream px-3 py-2 text-sm text-charcoal ring-1 ring-[color:var(--color-border)] focus:ring-2 focus:ring-apricot focus:outline-none"
         />
@@ -549,9 +539,7 @@ function QuestionsExamResults({
                     <span
                       className={clsx(
                         'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                        isCorrect
-                          ? 'bg-pistachio/60 text-charcoal'
-                          : 'bg-apricot/20 text-apricot',
+                        isCorrect ? 'bg-pistachio/60 text-charcoal' : 'bg-apricot/20 text-apricot',
                       )}
                     >
                       {isCorrect ? (
@@ -604,9 +592,7 @@ function QuestionsExamResults({
                               <X size={12} aria-hidden="true" />
                             ) : null}
                           </span>
-                          <span className="min-w-0 flex-1 break-words font-medium">
-                            {a.text}
-                          </span>
+                          <span className="min-w-0 flex-1 break-words font-medium">{a.text}</span>
                         </li>
                       )
                     })}

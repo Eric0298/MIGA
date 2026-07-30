@@ -52,10 +52,11 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
   const activeMaterialRef = useRef<TimerActiveMaterialHandle>(null)
 
   const attachedMaterials = useMaterialsByIds(session.materialIds)
-  const goalMaterials = useMaterialsByGoal(session.goalId ?? undefined) ?? []
+  const queriedGoalMaterials = useMaterialsByGoal(session.goalId ?? undefined)
   const notYetAttached = useMemo(
-    () => goalMaterials.filter((m) => !session.materialIds.includes(m.id)),
-    [goalMaterials, session.materialIds],
+    () =>
+      (queriedGoalMaterials ?? []).filter((material) => !session.materialIds.includes(material.id)),
+    [queriedGoalMaterials, session.materialIds],
   )
   const activeMaterial = attachedMaterials.find((m) => m.id === activeMaterialId) ?? null
 
@@ -148,9 +149,7 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
               {goal ? goal.name : t.common.freeSession}
             </p>
             {activeMaterial && (
-              <p className="truncate text-sm font-semibold text-charcoal">
-                {activeMaterial.title}
-              </p>
+              <p className="truncate text-sm font-semibold text-charcoal">{activeMaterial.title}</p>
             )}
             {isPaused && (
               <p className="mt-0.5 text-xs font-medium text-apricot">{t.timer.paused}</p>
@@ -238,9 +237,7 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
       {showAdd && (
         <div className="flex flex-col gap-2 rounded-2xl bg-surface p-4 lg:col-start-2 lg:row-start-2">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-charcoal">
-              {t.timer.attachMaterialTitle}
-            </p>
+            <p className="text-sm font-semibold text-charcoal">{t.timer.attachMaterialTitle}</p>
             <button
               type="button"
               onClick={() => setShowAdd(false)}
@@ -255,9 +252,7 @@ function TimerMaterialSession({ session }: TimerMaterialSessionProps) {
               {t.timer.attachRequiresGoal}
             </p>
           ) : notYetAttached.length === 0 ? (
-            <p className="text-xs text-[color:var(--color-text-muted)]">
-              {t.timer.attachEmpty}
-            </p>
+            <p className="text-xs text-[color:var(--color-text-muted)]">{t.timer.attachEmpty}</p>
           ) : (
             <ul className="flex flex-col gap-1.5">
               {notYetAttached.map((m) => (

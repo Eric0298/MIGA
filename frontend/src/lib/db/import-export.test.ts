@@ -30,6 +30,10 @@ afterEach(async () => {
 })
 
 describe('import-export v7', () => {
+  const goalId = '11111111-1111-4111-8111-111111111111'
+  const sessionId = '22222222-2222-4222-8222-222222222222'
+  const materialId = '33333333-3333-4333-8333-333333333333'
+
   it('builds an export payload with current goals, sessions, materials and links', async () => {
     const goal = await createGoal({
       name: 'Estudiar',
@@ -70,7 +74,7 @@ describe('import-export v7', () => {
       exportedAt: now,
       goals: [
         {
-          id: 'goal-1',
+          id: goalId,
           name: 'Legacy',
           targetMinutes: 60,
           scheduledDays: ['2026-07-10'],
@@ -141,9 +145,9 @@ describe('import-export v7', () => {
       goals: [],
       sessions: [
         {
-          id: 'sess-1',
+          id: sessionId,
           goalId: null,
-          materialId: 'mat-abc',
+          materialId,
           startedAt: now,
           pausedAt: null,
           endedAt: now + 1_000,
@@ -153,13 +157,23 @@ describe('import-export v7', () => {
           updatedAt: now,
         },
       ],
-      materials: [],
+      materials: [
+        {
+          id: materialId,
+          kind: 'link',
+          title: 'Legacy link',
+          url: 'https://example.org',
+          metadata: {},
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
       materialGoalLinks: [],
       materialProgress: [],
     })
     expect(parsed.version).toBe(7)
     expect(parsed.sessions).toHaveLength(1)
-    expect(parsed.sessions[0].materialIds).toEqual(['mat-abc'])
+    expect(parsed.sessions[0].materialIds).toEqual([materialId])
     expect(parsed.notes).toEqual([])
     expect(parsed.questions).toEqual([])
     expect(parsed.examAttempts).toEqual([])
@@ -204,7 +218,7 @@ describe('import-export v7', () => {
       goals: [],
       sessions: [
         {
-          id: 'sess-1',
+          id: sessionId,
           goalId: null,
           startedAt: now - 60_000,
           pausedAt: null,
@@ -219,7 +233,7 @@ describe('import-export v7', () => {
     const result = await importAllData(parsed)
     expect(result.normalizedActiveSessions).toBe(1)
 
-    const saved = await db.sessions.get('sess-1')
+    const saved = await db.sessions.get(sessionId)
     expect(saved?.status).toBe('completed')
     expect(saved?.endedAt).not.toBeNull()
   })
@@ -357,5 +371,147 @@ describe('import-export v7', () => {
     // notes of goalA are gone, notes of goalB are kept
     expect((await listNotesByGoal(goalA.id)).length).toBe(0)
     expect((await listNotesByGoal(goalB.id)).length).toBe(1)
+  })
+
+  it('rejects unknown keys, prototype keys and broken relationships', () => {
+    const base = {
+      version: 7,
+      exportedAt: Date.now(),
+      goals: [],
+      sessions: [],
+      materials: [],
+      materialGoalLinks: [],
+      materialProgress: [],
+      notes: [],
+      questions: [],
+      examAttempts: [],
+    }
+
+    expect(() => parseImportPayload({ ...base, unexpected: true })).toThrow()
+    expect(() =>
+      parseImportPayload(
+        JSON.parse(
+          `{"__proto__":{},"version":7,"exportedAt":1,"goals":[],"sessions":[],"materials":[],"materialGoalLinks":[],"materialProgress":[],"notes":[],"questions":[],"examAttempts":[]}`,
+        ),
+      ),
+    ).toThrow(/forbidden/i)
+    expect(() =>
+      parseImportPayload({
+        ...base,
+        sessions: [
+          {
+            id: sessionId,
+            goalId,
+            materialIds: [],
+            startedAt: 1,
+            pausedAt: null,
+            endedAt: 2,
+            totalPausedMs: 0,
+            status: 'completed',
+            createdAt: 1,
+            updatedAt: 2,
+          },
+        ],
+      }),
+    ).toThrow(/unknown goal/i)
+  })
+
+  it('enforces page bounds and per-kind file metadata during import', () => {
+    const now = Date.now()
+    const fileBlobKey = '44444444-4444-4444-8444-444444444444'
+    const progressId = '55555555-5555-4555-8555-555555555555'
+    const noteId = '66666666-6666-4666-8666-666666666666'
+    const base = {
+      version: 7 as const,
+      exportedAt: now,
+      goals: [
+        {
+          id: goalId,
+          name: 'Goal',
+          targetMinutes: 60,
+          scheduledDays: ['2026-07-10'],
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      sessions: [],
+      materials: [
+        {
+          id: materialId,
+          kind: 'pdf',
+          title: 'PDF',
+          fileBlobKey,
+          metadata: { provider: 'pdf', mimeType: 'application/pdf', fileSizeBytes: 10 },
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      materialGoalLinks: [],
+      notes: [],
+      questions: [],
+      examAttempts: [],
+    }
+
+    expect(() =>
+      parseImportPayload({
+        ...base,
+        materialProgress: [
+          {
+            id: progressId,
+            materialId,
+            goalId: null,
+            sessionId: null,
+            kind: 'pdf',
+            totalWatchedMs: 0,
+            pagesRead: [100_001],
+            startedAt: now,
+            endedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      }),
+    ).toThrow()
+
+    expect(() =>
+      parseImportPayload({
+        ...base,
+        materialProgress: [],
+        materials: [
+          {
+            ...base.materials[0],
+            metadata: {
+              provider: 'pdf',
+              mimeType: 'video/mp4',
+              fileSizeBytes: 101 * 1024 * 1024,
+            },
+          },
+        ],
+      }),
+    ).toThrow()
+
+    expect(() =>
+      parseImportPayload({
+        ...base,
+        materialProgress: [],
+        notes: [
+          {
+            id: noteId,
+            goalIds: [goalId],
+            kind: 'image',
+            title: 'Image',
+            fileBlobKey,
+            metadata: {
+              mimeType: 'image/png',
+              fileSizeBytes: 11 * 1024 * 1024,
+            },
+            sourceSessionId: null,
+            source: 'manual',
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      }),
+    ).toThrow()
   })
 })

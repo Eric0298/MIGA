@@ -55,9 +55,7 @@ function ImageNoteEditor({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [existingUrl, setExistingUrl] = useState<string | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
-  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>(
-    existing?.goalIds ?? goalIds,
-  )
+  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>(existing?.goalIds ?? goalIds)
   const [goalsError, setGoalsError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -216,9 +214,7 @@ function ImageNoteEditor({
             {t.common.loading}
           </p>
         )}
-        <p className="text-xs text-[color:var(--color-text-muted)]">
-          {t.notes.image.notEditable}
-        </p>
+        <p className="text-xs text-[color:var(--color-text-muted)]">{t.notes.image.notEditable}</p>
         <div className="flex gap-2">
           <button
             type="button"

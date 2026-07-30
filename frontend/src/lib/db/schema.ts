@@ -1,6 +1,18 @@
 import { z } from 'zod'
+import { MAX_HTTP_URL_CHARS, SNAPSHOT_LIMITS } from './data-limits'
 
-const dayIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'invalidDayFormat')
+const dayIso = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'invalidDayFormat')
+  .refine((raw) => {
+    const [year, month, day] = raw.split('-').map(Number)
+    const date = new Date(Date.UTC(year, month - 1, day))
+    return (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    )
+  }, 'invalidDayFormat')
 
 export const goalInputSchema = z.object({
   name: z.string().trim().min(2, 'nameMin').max(60, 'nameMax'),
@@ -25,7 +37,11 @@ export type SessionStatus = z.infer<typeof sessionStatus>
 
 export const startSessionInputSchema = z.object({
   goalId: z.uuid().nullable(),
-  materialIds: z.array(z.uuid()).optional(),
+  materialIds: z
+    .array(z.uuid())
+    .max(SNAPSHOT_LIMITS.materialsPerSession, 'tooManyMaterials')
+    .refine((ids) => new Set(ids).size === ids.length, 'duplicateMaterials')
+    .optional(),
 })
 export type StartSessionInput = z.infer<typeof startSessionInputSchema>
 
@@ -60,27 +76,48 @@ export const MATERIAL_LIMITS = {
   },
 } as const
 
-const httpUrl = z.string().refine(
-  (raw) => {
-    try {
-      const parsed = new URL(raw)
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
-    } catch {
-      return false
-    }
-  },
-  { message: 'invalidUrl' },
-)
+const httpUrl = z
+  .string()
+  .max(MAX_HTTP_URL_CHARS, 'urlTooLong')
+  .refine(
+    (raw) => {
+      try {
+        if (raw.includes('\\')) return false
+        const parsed = new URL(raw)
+        return (
+          (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+          parsed.username === '' &&
+          parsed.password === ''
+        )
+      } catch {
+        return false
+      }
+    },
+    { message: 'invalidUrl' },
+  )
 
 export const materialMetadataSchema = z.object({
   provider: z.enum(['youtube', 'upload', 'pdf']).optional(),
-  youtubeVideoId: z.string().optional(),
-  thumbnailUrl: z.string().optional(),
-  author: z.string().optional(),
-  durationSeconds: z.number().int().nonnegative().optional(),
-  totalPages: z.number().int().positive().optional(),
-  mimeType: z.string().optional(),
-  fileSizeBytes: z.number().int().nonnegative().optional(),
+  youtubeVideoId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{11}$/)
+    .optional(),
+  thumbnailUrl: httpUrl.optional(),
+  author: z.string().trim().max(200).optional(),
+  durationSeconds: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(60 * 60 * 24 * 365)
+    .optional(),
+  totalPages: z.number().int().positive().max(100_000).optional(),
+  mimeType: z.string().max(200).optional(),
+  fileSizeBytes: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(MATERIAL_LIMITS.videoUpload.maxBytes)
+    .optional(),
 })
 
 export type MaterialMetadata = z.infer<typeof materialMetadataSchema>
@@ -125,7 +162,10 @@ export const materialInputSchema = z
     if (data.kind === 'pdf' && data.metadata) {
       const mime = data.metadata.mimeType
       const size = data.metadata.fileSizeBytes
-      if (mime !== undefined && !MATERIAL_LIMITS.pdf.mimeTypes.includes(mime as 'application/pdf')) {
+      if (
+        mime !== undefined &&
+        !MATERIAL_LIMITS.pdf.mimeTypes.includes(mime as 'application/pdf')
+      ) {
         ctx.addIssue({ code: 'custom', message: 'fileInvalidType', path: ['fileBlobKey'] })
       }
       if (size !== undefined && size > MATERIAL_LIMITS.pdf.maxBytes) {
@@ -248,7 +288,11 @@ export type NoteMetadata = z.infer<typeof noteMetadataSchema>
 
 export const noteInputSchema = z
   .object({
-    goalIds: z.array(z.uuid()).min(1, 'selectGoals'),
+    goalIds: z
+      .array(z.uuid())
+      .min(1, 'selectGoals')
+      .max(SNAPSHOT_LIMITS.goalsPerNote, 'tooManyGoals')
+      .refine((ids) => new Set(ids).size === ids.length, 'duplicateGoals'),
     kind: noteKind,
     title: z.string().trim().min(1, 'titleRequired').max(80, 'titleMax'),
     text: z.string().max(NOTE_LIMITS.text.maxChars, 'textMax').optional(),
@@ -298,9 +342,7 @@ export const noteInputSchema = z
       const mime = data.metadata.mimeType
       if (
         mime !== undefined &&
-        !NOTE_LIMITS.image.mimeTypes.includes(
-          mime as (typeof NOTE_LIMITS.image.mimeTypes)[number],
-        )
+        !NOTE_LIMITS.image.mimeTypes.includes(mime as (typeof NOTE_LIMITS.image.mimeTypes)[number])
       ) {
         ctx.addIssue({ code: 'custom', message: 'fileInvalidType', path: ['fileBlobKey'] })
       }
@@ -354,7 +396,11 @@ export const QUESTION_LIMITS = {
 
 export const questionAnswerInputSchema = z.object({
   id: z.string().optional(),
-  text: z.string().trim().min(1, 'answerRequired').max(QUESTION_LIMITS.answer.maxChars, 'answerMax'),
+  text: z
+    .string()
+    .trim()
+    .min(1, 'answerRequired')
+    .max(QUESTION_LIMITS.answer.maxChars, 'answerMax'),
   isCorrect: z.boolean(),
 })
 
@@ -442,6 +488,12 @@ export const examStatus = z.enum([
 ])
 export type ExamStatus = z.infer<typeof examStatus>
 
+export const EXAM_LIMITS = {
+  notes: { maxChars: 10_000 },
+  questions: { maxCount: 500 },
+  timeLimitMs: { max: 7 * 24 * 60 * 60 * 1_000 },
+} as const
+
 export type ExamResponse = {
   questionId: string
   chosenAnswerIds: string[]
@@ -455,9 +507,9 @@ export const pdfExamInputSchema = z
   .object({
     goalId: z.uuid(),
     title: z.string().trim().min(1, 'titleRequired').max(80, 'titleMax'),
-    pdfMaterialId: z.string().optional(),
-    pdfNoteId: z.string().optional(),
-    timeLimitMs: z.number().int().positive().nullable().optional(),
+    pdfMaterialId: z.uuid().optional(),
+    pdfNoteId: z.uuid().optional(),
+    timeLimitMs: z.number().int().positive().max(EXAM_LIMITS.timeLimitMs.max).nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (!data.pdfMaterialId && !data.pdfNoteId) {
@@ -476,8 +528,8 @@ export type PdfExamInput = z.infer<typeof pdfExamInputSchema>
 export const questionsExamInputSchema = z.object({
   goalId: z.uuid(),
   title: z.string().trim().min(1, 'titleRequired').max(80, 'titleMax'),
-  questionIds: z.array(z.string()).min(1, 'questionsRequired'),
-  timeLimitMs: z.number().int().positive().nullable().optional(),
+  questionIds: z.array(z.uuid()).min(1, 'questionsRequired').max(EXAM_LIMITS.questions.maxCount),
+  timeLimitMs: z.number().int().positive().max(EXAM_LIMITS.timeLimitMs.max).nullable().optional(),
 })
 
 export type QuestionsExamInput = z.infer<typeof questionsExamInputSchema>
