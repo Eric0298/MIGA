@@ -1,0 +1,45 @@
+# Build artefacts
+**/bin/
+**/obj/
+**/TestResults/
+**/coverage/
+**/*.log
+**/logs/
+
+# Source control / editor state
+.git/
+.gitignore
+.gitattributes
+.github/
+.vs/
+.vscode/
+.idea/
+
+# Local secrets / private files
+**/*.env
+**/*.env.*
+!**/*.env.example
+**/appsettings.Development.local.json
+**/secrets.json
+
+# Certificates and keys
+**/*.pfx
+**/*.p12
+**/*.pem
+**/*.key
+**/*.crt
+**/*.cer
+
+# Test projects and fixtures (not needed in the runtime image)
+backend/tests/
+
+# Frontend / infra / docs unrelated to the API image
+frontend/
+docker/
+docs/
+tmp/
+scripts/
+
+# OS junk
+**/.DS_Store
+**/Thumbs.db
