@@ -1,6 +1,6 @@
 # Checklist de despliegue seguro
 
-Fecha: 23 de julio de 2026.
+Fecha de revisión: 30 de julio de 2026.
 
 No despliegues MIGA en producción hasta completar y evidenciar los puntos aplicables. Una casilla sin
 marcar es un bloqueo o un riesgo aceptado por escrito, no una tarea implícitamente resuelta.
@@ -26,8 +26,11 @@ marcar es un bloqueo o un riesgo aceptado por escrito, no una tarea implícitame
       locales.
 - [ ] Los artefactos se escanearon buscando secretos después de construir.
 - [ ] Los hashes/digests están registrados.
-- [ ] La imagen usa usuario no root cuando se cree un Dockerfile de aplicación.
+- [ ] La derivada PostgreSQL mantiene `USER postgres` y no contiene `/usr/local/bin/gosu`.
 - [ ] Imágenes base están fijadas por digest y escaneadas.
+- [ ] CI escanea la imagen derivada final, no solo el `FROM`.
+- [ ] La derivada inicializa correctamente un volumen nuevo sin privilegios root.
+- [ ] No se ignoran vulnerabilidades de la base o herramientas de bootstrap de forma genérica.
 - [ ] Los permisos del registro impiden sobrescribir tags de release.
 
 ## 3. Secretos y configuración
@@ -85,6 +88,9 @@ marcar es un bloqueo o un riesgo aceptado por escrito, no una tarea implícitame
 
 - [ ] PostgreSQL no tiene puerto público.
 - [ ] La aplicación usa rol propio, sin superuser/createdb/createrole.
+- [ ] El rol migrador DDL y el rol runtime DML son identidades distintas con secretos separados.
+- [ ] El runtime no es propietario de esquemas/tablas y sus grants/default privileges están
+      versionados y probados después de migrar.
 - [ ] TLS y validación de certificado están activos entre app y DB.
 - [ ] Security groups/firewall solo permiten la aplicación y administración controlada.
 - [ ] Cifrado en reposo del proveedor está verificado con evidencia.
@@ -115,6 +121,9 @@ marcar es un bloqueo o un riesgo aceptado por escrito, no una tarea implícitame
 - [ ] Enlaces usan `PublicBaseUrl`, HTTPS y token en fragmento.
 - [ ] Logs no contienen email completo, cuerpo ni token.
 - [ ] Respuestas forgot/resend son genéricas.
+- [ ] La cola acotada no pierde solicitudes silenciosamente por saturación o reinicio.
+- [ ] Hay métricas, entrega idempotente/reintentos seguros y una cola durable antes de operar con
+      varias réplicas.
 - [ ] Existe fallback operativo si SMTP cae, sin desactivar seguridad silenciosamente.
 
 ## 9. Migraciones
@@ -124,6 +133,9 @@ marcar es un bloqueo o un riesgo aceptado por escrito, no una tarea implícitame
 - [ ] La migración está versionada y revisada.
 - [ ] `has-pending-model-changes` no detecta drift entre modelo y snapshot.
 - [ ] CI genera un script idempotente sin conectarse a producción.
+- [ ] CI aplica el candidato SQL dos veces sobre una segunda base limpia con error inmediato.
+- [ ] La API arranca contra la misma base creada por el candidato y el smoke recorre demo/snapshot.
+- [ ] El artefacto continúa marcado como candidato hasta la revisión/aprobación humana.
 - [ ] El SQL idempotente y su checksum proceden del mismo commit desplegado.
 - [ ] El script no contiene secretos, datos de aplicación ni seeds personales.
 - [ ] Se probó contra base vacía.
@@ -162,6 +174,8 @@ Orden normal:
 - [ ] Lockout no permite bloquear indefinidamente a una víctima.
 - [ ] La caché YouTube tiene límites, TTL y estrategia distribuida/invalidation.
 - [ ] Cleanup demo tiene líder/lock distribuido o SQL idempotente seguro.
+- [ ] Cleanup de cuentas sin confirmar respeta `UnconfirmedAccountLifetime` y la caducidad demo,
+      no elimina cuentas confirmadas y está coordinado al escalar.
 - [ ] Métricas alertan por 429, lockout, demos, SMTP, cuota YouTube y tamaño snapshot.
 - [ ] Rate limiting de infraestructura protege antes de Kestrel.
 
@@ -180,6 +194,11 @@ bloqueo de seguridad y coste.
 - [ ] Conversión exige consentimiento `importDemoData`.
 - [ ] Conversión ajena/doble falla.
 - [ ] Demo no accede a YouTube registrado, export/delete ni futuras funciones admin.
+- [ ] `DeferredDemoConfirmation` se probó en base limpia y desde la versión productiva anterior.
+- [ ] El registro pendiente no guarda hash de contraseña, consentimiento ni sesión antes de
+      confirmar.
+- [ ] La confirmación completa contraseña, privacidad y conversión demo en una transacción.
+- [ ] La vida máxima de una cuenta sin confirmar está configurada, documentada y probada.
 
 ## 13. Privacidad y legal
 
@@ -187,6 +206,9 @@ bloqueo de seguridad y coste.
 - [ ] Finalidades, base jurídica, destinatarios y transferencias están revisados.
 - [ ] Plazos de cuenta, demo, logs, auditoría y backups están decididos.
 - [ ] El texto deja claro que blobs solo viven en el dispositivo.
+- [ ] Logout, expiración, `401/403` y cambio de identidad conservan el IndexedDB de ese usuario.
+- [ ] El borrado local explícito y la eliminación de cuenta sí eliminan su IndexedDB.
+- [ ] El comportamiento anterior se probó entre pestañas y en un dispositivo compartido.
 - [ ] Exportación contiene solo datos propios y no promete incluir blobs.
 - [ ] Eliminación borra cuenta/workspace/sesiones y explica retención diferida de backups/auditoría.
 - [ ] Política y consentimiento tienen versión.

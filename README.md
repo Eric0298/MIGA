@@ -17,6 +17,7 @@ frontend/          React 19 + TypeScript + Vite + Tailwind + PWA
 backend/           ASP.NET Core (.NET 10) + Identity + EF Core + PostgreSQL
 docs/security/     Auditoría, amenazas, ASVS, backup, incidentes y despliegue
 MIGA_AI_RULES/     Reglas de producto, diseño y flujo de trabajo
+docker/postgres/   Imagen PostgreSQL derivada, fijada y ejecutada sin root/gosu
 docker-compose.yml PostgreSQL local, ligado a 127.0.0.1
 ```
 
@@ -37,8 +38,8 @@ El inventario detallado está en
 
 ## Requisitos
 
-- Node.js `22.20.0` (la misma versión que CI).
-- npm con soporte para lockfile v3.
+- Node.js `22.22.0` (la misma versión que CI).
+- npm `>=10.9.4`; Node 22.22.0 oficial incluye 10.9.4 y la validación local también cubrió 11.18.0.
 - .NET SDK definido por `global.json` (`10.0.301`, último parche compatible).
 - Docker Desktop o Docker Engine con Compose v2.
 - PowerShell, Bash o una terminal equivalente.
@@ -102,12 +103,16 @@ variables esperadas. Ningún ejemplo debe contener credenciales válidas.
 ### 3. Arrancar PostgreSQL y aplicar migraciones
 
 ```bash
-docker compose up -d
+docker compose up --build -d
 
 dotnet ef database update \
   --project backend/src/Miga.Infrastructure \
   --startup-project backend/src/Miga.Api
 ```
+
+Compose construye PostgreSQL desde un `FROM` fijado por digest. La única fase `RUN` se ejecuta sin
+red, elimina el binario `gosu` vulnerable y la imagen final declara `USER postgres`; el primer build
+todavía necesita obtener la base exacta si no existe en la caché local.
 
 Generar una migración nueva es una acción de desarrollo, no de arranque:
 
@@ -175,10 +180,14 @@ dotnet list backend/Miga.slnx package --vulnerable --include-transitive --no-res
 ```
 
 GitHub Actions configura formato, lint, tipos, tests unitarios/integración/E2E, build, auditoría de
-dependencias, Gitleaks, CodeQL, Trivy y validación de migraciones sobre PostgreSQL efímero. Genera
-un SQL idempotente con checksum y retención de siete días; no contiene datos de aplicación. Su mera
-presencia no demuestra éxito: los controles se consideran verificados únicamente cuando el
-workflow termina correctamente en GitHub.
+dependencias, Gitleaks, CodeQL, Trivy y validación de migraciones sobre PostgreSQL efímero. CI
+construye y escanea la misma derivada sin `gosu`, y el job backend inicializa con ella un volumen
+Docker nuevo. También está configurado para generar un **candidato** SQL idempotente, comprobar
+reglas mecánicas, aplicarlo dos veces sobre una segunda base limpia y arrancar la API contra esa
+misma base para un smoke de demo/snapshot. El candidato y su checksum se conservan siete días;
+estas comprobaciones no constituyen revisión humana ni autorizan su despliegue. La mera presencia
+del workflow tampoco demuestra éxito: los controles se consideran verificados únicamente cuando
+termina correctamente en GitHub.
 
 ## Datos locales y copias
 
@@ -188,6 +197,11 @@ borrar datos del navegador, cambiar de dispositivo o desinstalar la PWA:
 1. exporta los datos estructurados;
 2. conserva por separado los documentos y medios originales;
 3. verifica que puedes abrir ambas copias.
+
+Logout, expiración, respuestas `401/403` y cambio de identidad cierran el scope IndexedDB activo
+sin borrarlo. La eliminación ocurre únicamente mediante la acción local explícita, al eliminar la
+cuenta o al borrar los datos del navegador; así los blobs local-only no se pierden por cerrar
+sesión.
 
 Consulta [BACKUP_AND_RECOVERY.md](docs/security/BACKUP_AND_RECOVERY.md). Una copia nunca restaurada
 no se considera verificada.

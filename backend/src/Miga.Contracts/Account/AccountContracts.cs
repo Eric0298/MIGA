@@ -24,3 +24,10 @@ public sealed record AccountExportSnapshot(
     long Revision,
     DateTimeOffset UpdatedAtUtc,
     JsonElement Data);
+
+public sealed record AccountSessionResponse(
+    Guid SessionId,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset LastSeenAtUtc,
+    DateTimeOffset ExpiresAtUtc,
+    bool Current);

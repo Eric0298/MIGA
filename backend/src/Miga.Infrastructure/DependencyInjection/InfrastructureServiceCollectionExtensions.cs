@@ -157,6 +157,16 @@ public static class InfrastructureServiceCollectionExtensions
             services.AddScoped<IAccountEmailSender, UnconfiguredAccountEmailSender>();
         }
 
+        services.AddSingleton<AccountEmailQueue>();
+        services.AddSingleton<IAccountEmailQueue>(
+            provider => provider.GetRequiredService<AccountEmailQueue>());
+        services.AddHostedService(
+            provider => provider.GetRequiredService<AccountEmailQueue>());
+
+        services.AddSingleton<UnconfirmedAccountCleanupService>();
+        services.AddHostedService(
+            provider => provider.GetRequiredService<UnconfirmedAccountCleanupService>());
+
         services.AddSingleton<DemoCleanupService>();
         services.AddSingleton<IDemoCleanupService>(
             provider => provider.GetRequiredService<DemoCleanupService>());

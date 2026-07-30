@@ -120,24 +120,52 @@ public sealed class FakeAccountEmailSender : IAccountEmailSender
 
     public bool IsConfigured => true;
 
+    public bool BlockDelivery { get; set; }
+
     public IReadOnlyList<CapturedEmail> Messages => _messages.ToArray();
 
-    public Task SendEmailConfirmationAsync(
+    public async Task<CapturedEmail> WaitForMessageAsync(
+        Func<CapturedEmail, bool> predicate,
+        CancellationToken cancellationToken = default)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        while (!timeout.IsCancellationRequested)
+        {
+            var message = _messages.FirstOrDefault(predicate);
+            if (message is not null)
+            {
+                return message;
+            }
+
+            await Task.Delay(10, timeout.Token);
+        }
+
+        throw new TimeoutException("The expected account email was not queued.");
+    }
+
+    public async Task SendEmailConfirmationAsync(
         string email,
         Uri confirmationUrl,
         CancellationToken cancellationToken)
     {
         _messages.Enqueue(new CapturedEmail("confirmation", email, confirmationUrl));
-        return Task.CompletedTask;
+        if (BlockDelivery)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
     }
 
-    public Task SendPasswordResetAsync(
+    public async Task SendPasswordResetAsync(
         string email,
         Uri resetUrl,
         CancellationToken cancellationToken)
     {
         _messages.Enqueue(new CapturedEmail("password-reset", email, resetUrl));
-        return Task.CompletedTask;
+        if (BlockDelivery)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
     }
 }
 

@@ -2,6 +2,8 @@ namespace Miga.Api.Security;
 
 public static class ApiSecurityConstants
 {
+    public const int SensitiveRequestBodyLimit = 16 * 1024;
+
     public const string FrontendCorsPolicy = "MigaFrontend";
 
     public const string GlobalRatePolicy = "global";

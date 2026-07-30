@@ -200,6 +200,9 @@ test-results/
 blob-report/
 **/blob-report/
 
+# Local EF migration-scaffolding scratch project.
+backend/.migration-scaffolder/
+
 
 # =========================================================
 # Local database files

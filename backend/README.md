@@ -16,7 +16,7 @@ Desde la raíz del repositorio:
 ```bash
 cp .env.example .env
 # Asigna una contraseña local no reutilizada a POSTGRES_PASSWORD.
-docker compose up -d miga-postgres
+docker compose up --build -d miga-postgres
 
 dotnet user-secrets set \
   --project backend/src/Miga.Api \
@@ -29,6 +29,10 @@ dotnet ef database update \
   --startup-project backend/src/Miga.Api
 dotnet run --project backend/src/Miga.Api
 ```
+
+La imagen local deriva de PostgreSQL fijado por digest, elimina `gosu` en una fase sin red y
+declara `USER postgres`. No sustituyas este build por la referencia base directa: el workflow
+escanea la derivada y valida su inicialización sobre un volumen nuevo.
 
 El perfil de desarrollo escucha en las direcciones de `Properties/launchSettings.json`. El frontend
 Vite reenvía `/api` a `VITE_API_PROXY_TARGET`; el valor predeterminado es
@@ -66,6 +70,18 @@ Producción requiere, como mínimo:
   montado desde un gestor de secretos;
 - rotación independiente de credenciales PostgreSQL, SMTP, certificado y API de YouTube.
 
+Separa siempre dos identidades PostgreSQL:
+
+- el **migrador** recibe temporalmente los permisos DDL necesarios para crear/alterar esquemas,
+  tablas, índices y el historial EF; su credencial solo existe durante el job de migración;
+- el **runtime** tiene `CONNECT`, `USAGE` de esquema y el DML/secuencias estrictamente necesarios
+  para `auth`, `app` y `audit`, pero no es propietario, superusuario ni tiene `CREATEDB`,
+  `CREATEROLE`, acceso de escritura a `infra` o permisos DDL.
+
+El usuario bootstrap de PostgreSQL efímero que usa CI sirve para validar migraciones, no demuestra
+que los grants de producción sean correctos. El despliegue debe probar la API con la identidad
+runtime después de migrar y versionar el procedimiento de grants para el proveedor elegido.
+
 La topología de referencia es `https://app.example.com/api`: el frontend conserva
 `VITE_API_URL=/` y el reverse proxy reenvía `/api` al proceso ASP.NET Core. En el ejemplo, el proxy
 preserva `Host=app.example.com`, por lo que `AllowedHosts=app.example.com`. Si el proxy reescribe
@@ -89,6 +105,17 @@ incompleta. La terminación TLS y los headers reenviados solo deben confiar en p
   `Domain`.
 - Sesiones registradas: estado opaco en base de datos, inactividad de 30 minutos y máximo absoluto
   de 24 horas; se validan con el security stamp en cada petición.
+- Con email obligatorio, registro responde genéricamente sin guardar el hash de la contraseña ni
+  abrir sesión. La confirmación válida recibe una contraseña nueva y la versión de privacidad,
+  completa esos campos y convierte la demo pendiente dentro de una transacción.
+- `Authentication__UnconfirmedAccountLifetime` limita por defecto a siete días las cuentas sin
+  confirmar; también se eliminan si caduca la demo vinculada. El cleanup periódico es local a la
+  instancia.
+- Confirmación/reset se intentan encolar por ID de usuario en memoria, con capacidad 256 y un
+  consumidor. La preparación reintenta hasta cuatro veces antes de iniciar la entrega; una entrega
+  iniciada no se reintenta para evitar duplicados. La cola no es durable: saturación, reinicio,
+  reintentos de entrega seguros, métricas y varias réplicas requieren diseño operativo antes de
+  producción.
 - Toda mutación usa antiforgery: el cliente obtiene `GET /api/auth/csrf` y envía
   `X-XSRF-TOKEN`. CORS no sustituye esta comprobación.
 - Exportación y eliminación de cuenta requieren reautenticación en los diez minutos anteriores; la
@@ -146,7 +173,7 @@ dotnet ef migrations add <NombreDescriptivo> \
 ```
 
 Revisar el diff generado y probar una base limpia y una actualización antes de aplicarla. Para
-despliegue, genera un script idempotente y conserva el artefacto revisado:
+despliegue, genera un candidato idempotente:
 
 ```bash
 dotnet ef migrations script --idempotent \
@@ -154,6 +181,12 @@ dotnet ef migrations script --idempotent \
   --startup-project backend/src/Miga.Api \
   --output miga-migrations.sql
 ```
+
+El workflow de CI está configurado para ejecutar el candidato dos veces en una segunda base limpia
+y hacer un smoke de la API sobre esa misma base. Solo una ejecución verde valida ese recorrido, y
+no sustituye la prueba desde la versión productiva anterior, con volumen representativo y rol
+runtime restringido. Verifica el checksum, revisa manualmente el SQL y solo entonces promueve ese
+mismo artefacto inmutable.
 
 No se ejecutan down migrations destructivas automáticamente. La estrategia y el restore están en
 [`../docs/security/BACKUP_AND_RECOVERY.md`](../docs/security/BACKUP_AND_RECOVERY.md).

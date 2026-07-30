@@ -8,6 +8,8 @@ namespace Miga.Infrastructure.Auth;
 
 public sealed class SmtpAccountEmailSender : IAccountEmailSender
 {
+    private static readonly TimeSpan DeliveryTimeout = TimeSpan.FromSeconds(15);
+
     private readonly SmtpOptions _options;
 
     public SmtpAccountEmailSender(IOptions<SmtpOptions> options)
@@ -56,10 +58,14 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
             EnableSsl = _options.UseSsl,
             DeliveryMethod = SmtpDeliveryMethod.Network,
             UseDefaultCredentials = false,
-            Credentials = new NetworkCredential(_options.Username, _options.Password)
+            Credentials = new NetworkCredential(_options.Username, _options.Password),
+            Timeout = (int)DeliveryTimeout.TotalMilliseconds
         };
 
-        await client.SendMailAsync(message, cancellationToken);
+        using var deliveryCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deliveryCancellation.CancelAfter(DeliveryTimeout);
+        await client.SendMailAsync(message, deliveryCancellation.Token);
     }
 }
 

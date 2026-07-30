@@ -1,6 +1,6 @@
 # Copias de seguridad y recuperación
 
-Fecha: 23 de julio de 2026.
+Fecha de revisión: 30 de julio de 2026.
 
 Los objetivos de este documento son **propuestos**, no un SLA ni evidencia de que un proveedor ya
 los cumpla. Una copia que nunca se ha restaurado no se considera verificada.

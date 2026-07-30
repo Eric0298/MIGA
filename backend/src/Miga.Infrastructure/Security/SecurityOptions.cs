@@ -19,6 +19,8 @@ public sealed class AuthenticationSecurityOptions
     public TimeSpan DemoAbsoluteTimeout { get; init; } = TimeSpan.FromHours(2);
 
     public TimeSpan RecentAuthenticationWindow { get; init; } = TimeSpan.FromMinutes(10);
+
+    public TimeSpan UnconfirmedAccountLifetime { get; init; } = TimeSpan.FromDays(7);
 }
 
 public sealed class SmtpOptions

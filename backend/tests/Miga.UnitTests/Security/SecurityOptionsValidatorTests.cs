@@ -54,6 +54,34 @@ public sealed class SecurityOptionsValidatorTests
     }
 
     [Fact]
+    public void AuthenticationValidator_ShouldRejectExcessiveSecurityTimeouts()
+    {
+        var validator = new AuthenticationSecurityOptionsValidator(
+            new TestHostEnvironment(Environments.Production));
+
+        validator.Validate(
+                null,
+                new AuthenticationSecurityOptions
+                {
+                    RequireConfirmedEmail = true,
+                    PublicBaseUrl = "https://miga.example/",
+                    UserAbsoluteTimeout = TimeSpan.FromDays(8)
+                })
+            .Failed
+            .ShouldBeTrue();
+        validator.Validate(
+                null,
+                new AuthenticationSecurityOptions
+                {
+                    RequireConfirmedEmail = true,
+                    PublicBaseUrl = "https://miga.example/",
+                    UnconfirmedAccountLifetime = TimeSpan.FromDays(31)
+                })
+            .Failed
+            .ShouldBeTrue();
+    }
+
+    [Fact]
     public void SmtpValidator_ShouldRequireTlsAndValidMailboxInProduction()
     {
         var environment = new TestHostEnvironment(Environments.Production);

@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { db } from './miga-db'
+import { assertSnapshotSize, MAX_HTTP_URL_CHARS, SNAPSHOT_LIMITS } from './data-limits'
+import { db, type MigaDatabase, type WorkspaceSyncMetadata } from './miga-db'
 import {
   examKind,
   examStatus,
@@ -20,23 +21,7 @@ import {
   type Session,
 } from './schema'
 
-export const SNAPSHOT_LIMITS = {
-  goals: 500,
-  sessions: 20_000,
-  materials: 5_000,
-  materialGoalLinks: 20_000,
-  materialProgress: 50_000,
-  notes: 5_000,
-  questions: 10_000,
-  examAttempts: 10_000,
-  scheduledDaysPerGoal: 3_660,
-  materialsPerSession: 500,
-  goalsPerNote: 100,
-  videoRangesPerProgress: 10_000,
-  pagesPerProgress: 10_000,
-  questionsPerExam: 500,
-  responsesPerExam: 500,
-} as const
+export { SNAPSHOT_LIMITS } from './data-limits'
 const MAX_TEXT_CHARS = 50_000
 const MAX_SAFE_TIMESTAMP = 8_640_000_000_000
 const uuid = z.string().uuid()
@@ -56,7 +41,7 @@ const dayIso = z
   })
 const httpUrl = z
   .string()
-  .max(2_048)
+  .max(MAX_HTTP_URL_CHARS)
   .refine((raw) => {
     try {
       if (raw.includes('\\')) return false
@@ -697,10 +682,11 @@ function validateCurrentPayload(raw: unknown): ExportPayload {
   assertSafeObjectGraph(raw)
   const payload = payloadV7Schema.parse(raw)
   assertReferences(payload)
+  assertSnapshotSize(payload)
   return payload
 }
 
-export async function buildExportPayload(): Promise<ExportPayload> {
+export async function buildExportPayload(database: MigaDatabase = db): Promise<ExportPayload> {
   const [
     goals,
     sessions,
@@ -710,28 +696,28 @@ export async function buildExportPayload(): Promise<ExportPayload> {
     notes,
     questions,
     examAttempts,
-  ] = await db.transaction(
+  ] = await database.transaction(
     'r',
     [
-      db.goals,
-      db.sessions,
-      db.materials,
-      db.materialGoalLinks,
-      db.materialProgress,
-      db.notes,
-      db.questions,
-      db.examAttempts,
+      database.goals,
+      database.sessions,
+      database.materials,
+      database.materialGoalLinks,
+      database.materialProgress,
+      database.notes,
+      database.questions,
+      database.examAttempts,
     ],
     () =>
       Promise.all([
-        db.goals.toArray(),
-        db.sessions.toArray(),
-        db.materials.toArray(),
-        db.materialGoalLinks.toArray(),
-        db.materialProgress.toArray(),
-        db.notes.toArray(),
-        db.questions.toArray(),
-        db.examAttempts.toArray(),
+        database.goals.toArray(),
+        database.sessions.toArray(),
+        database.materials.toArray(),
+        database.materialGoalLinks.toArray(),
+        database.materialProgress.toArray(),
+        database.notes.toArray(),
+        database.questions.toArray(),
+        database.examAttempts.toArray(),
       ]),
   )
   // Note blobs, material blobs and question blobs (voice recordings,
@@ -844,6 +830,8 @@ async function writeStructuredData(
   payload: ExportPayload,
   replaceExisting: boolean,
   normalizeActiveSessions: boolean,
+  database: MigaDatabase,
+  syncMetadata?: WorkspaceSyncMetadata,
 ): Promise<ImportResult> {
   payload = validateCurrentPayload(payload)
   const now = Date.now()
@@ -877,41 +865,41 @@ async function writeStructuredData(
   const questions: Question[] = payload.questions
   const examAttempts: ExamAttempt[] = payload.examAttempts
 
-  await db.transaction(
-    'rw',
-    [
-      db.goals,
-      db.sessions,
-      db.materials,
-      db.materialGoalLinks,
-      db.materialProgress,
-      db.notes,
-      db.questions,
-      db.examAttempts,
-    ],
-    async () => {
-      if (replaceExisting) {
-        await Promise.all([
-          db.goals.clear(),
-          db.sessions.clear(),
-          db.materials.clear(),
-          db.materialGoalLinks.clear(),
-          db.materialProgress.clear(),
-          db.notes.clear(),
-          db.questions.clear(),
-          db.examAttempts.clear(),
-        ])
-      }
-      await db.goals.bulkPut(goals)
-      await db.sessions.bulkPut(sessions)
-      await db.materials.bulkPut(materials)
-      await db.materialGoalLinks.bulkPut(materialGoalLinks)
-      await db.materialProgress.bulkPut(materialProgress)
-      await db.notes.bulkPut(notes)
-      await db.questions.bulkPut(questions)
-      await db.examAttempts.bulkPut(examAttempts)
-    },
-  )
+  const transactionTables = [
+    database.goals,
+    database.sessions,
+    database.materials,
+    database.materialGoalLinks,
+    database.materialProgress,
+    database.notes,
+    database.questions,
+    database.examAttempts,
+    ...(syncMetadata ? [database.syncMetadata] : []),
+  ]
+
+  await database.transaction('rw', transactionTables, async () => {
+    if (replaceExisting) {
+      await Promise.all([
+        database.goals.clear(),
+        database.sessions.clear(),
+        database.materials.clear(),
+        database.materialGoalLinks.clear(),
+        database.materialProgress.clear(),
+        database.notes.clear(),
+        database.questions.clear(),
+        database.examAttempts.clear(),
+      ])
+    }
+    await database.goals.bulkPut(goals)
+    await database.sessions.bulkPut(sessions)
+    await database.materials.bulkPut(materials)
+    await database.materialGoalLinks.bulkPut(materialGoalLinks)
+    await database.materialProgress.bulkPut(materialProgress)
+    await database.notes.bulkPut(notes)
+    await database.questions.bulkPut(questions)
+    await database.examAttempts.bulkPut(examAttempts)
+    if (syncMetadata) await database.syncMetadata.put(syncMetadata)
+  })
 
   return {
     goalsCount: goals.length,
@@ -926,8 +914,11 @@ async function writeStructuredData(
   }
 }
 
-export function importAllData(payload: ExportPayload): Promise<ImportResult> {
-  return writeStructuredData(payload, false, true)
+export function importAllData(
+  payload: ExportPayload,
+  database: MigaDatabase = db,
+): Promise<ImportResult> {
+  return writeStructuredData(payload, false, true, database)
 }
 
 /**
@@ -936,38 +927,42 @@ export function importAllData(payload: ExportPayload): Promise<ImportResult> {
  * server snapshot, so deleting the whole scoped database on each pull would
  * destroy valid PDF/video/audio/image attachments.
  */
-export function replaceStructuredData(payload: ExportPayload): Promise<ImportResult> {
-  return writeStructuredData(payload, true, false)
+export function replaceStructuredData(
+  payload: ExportPayload,
+  database: MigaDatabase = db,
+  syncMetadata?: WorkspaceSyncMetadata,
+): Promise<ImportResult> {
+  return writeStructuredData(payload, true, false, database, syncMetadata)
 }
 
-export async function clearAllData(): Promise<void> {
-  await db.transaction(
+export async function clearAllData(database: MigaDatabase = db): Promise<void> {
+  await database.transaction(
     'rw',
     [
-      db.goals,
-      db.sessions,
-      db.materials,
-      db.materialGoalLinks,
-      db.materialProgress,
-      db.materialBlobs,
-      db.notes,
-      db.noteBlobs,
-      db.questions,
-      db.questionBlobs,
-      db.examAttempts,
+      database.goals,
+      database.sessions,
+      database.materials,
+      database.materialGoalLinks,
+      database.materialProgress,
+      database.materialBlobs,
+      database.notes,
+      database.noteBlobs,
+      database.questions,
+      database.questionBlobs,
+      database.examAttempts,
     ],
     async () => {
-      await db.goals.clear()
-      await db.sessions.clear()
-      await db.materials.clear()
-      await db.materialGoalLinks.clear()
-      await db.materialProgress.clear()
-      await db.materialBlobs.clear()
-      await db.notes.clear()
-      await db.noteBlobs.clear()
-      await db.questions.clear()
-      await db.questionBlobs.clear()
-      await db.examAttempts.clear()
+      await database.goals.clear()
+      await database.sessions.clear()
+      await database.materials.clear()
+      await database.materialGoalLinks.clear()
+      await database.materialProgress.clear()
+      await database.materialBlobs.clear()
+      await database.notes.clear()
+      await database.noteBlobs.clear()
+      await database.questions.clear()
+      await database.questionBlobs.clear()
+      await database.examAttempts.clear()
     },
   )
 }

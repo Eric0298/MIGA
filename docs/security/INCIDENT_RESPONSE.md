@@ -1,6 +1,6 @@
 # Respuesta a incidentes
 
-Fecha: 23 de julio de 2026.
+Fecha de revisión: 30 de julio de 2026.
 
 Este runbook debe adaptarse al proveedor y probarse antes de producción. No sustituye asesoramiento
 legal ni forense. Los contactos, suplentes y canales seguros todavía deben asignarse.

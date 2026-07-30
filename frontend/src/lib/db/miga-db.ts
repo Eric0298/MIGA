@@ -18,6 +18,7 @@ export type WorkspaceSyncMetadata = {
   revision: number
   updatedAtUtc: string
   dirty: boolean
+  contentHash?: string
 }
 
 type LegacyDayTarget = { day: string; targetMinutes: number }
@@ -252,6 +253,16 @@ export function getActiveDatabaseName(): string {
   return db.name
 }
 
+export function getActiveDatabase(): MigaDatabase {
+  return db
+}
+
+export function isActiveDatabase(database: MigaDatabase, scopeKey: string): boolean {
+  return (
+    db === database && activeScopeKey === scopeKey && database.name === scopedDatabaseName(scopeKey)
+  )
+}
+
 export function activateScopedDatabase(scopeKey: string): MigaDatabase {
   const nextName = scopedDatabaseName(scopeKey)
   if (activeScopeKey === scopeKey && db.name === nextName) return db
@@ -259,6 +270,14 @@ export function activateScopedDatabase(scopeKey: string): MigaDatabase {
   db.close()
   activeScopeKey = scopeKey
   db = new MigaDatabase(nextName)
+  return db
+}
+
+export function activateLegacyDatabase(): MigaDatabase {
+  if (activeScopeKey === null && db.name === LEGACY_DATABASE_NAME) return db
+  db.close()
+  activeScopeKey = null
+  db = new MigaDatabase(LEGACY_DATABASE_NAME)
   return db
 }
 
@@ -279,13 +298,37 @@ export async function resetActiveScopedDatabase(): Promise<MigaDatabase> {
  * Closes the active remote database and returns to a dormant legacy instance.
  * The legacy database is deliberately not opened here.
  */
-export async function deactivateScopedDatabase(deleteScoped: boolean): Promise<void> {
+export async function deactivateScopedDatabase({
+  deleteLocalData = false,
+}: {
+  deleteLocalData?: boolean
+} = {}): Promise<void> {
   const databaseName = db.name
   const wasScoped = activeScopeKey !== null && databaseName !== LEGACY_DATABASE_NAME
   db.close()
   activeScopeKey = null
-  if (deleteScoped && wasScoped) await Dexie.delete(databaseName)
+  if (deleteLocalData && wasScoped) await Dexie.delete(databaseName)
   db = new MigaDatabase(LEGACY_DATABASE_NAME)
+}
+
+/**
+ * Explicitly deletes one identity's local database. Passing null targets the
+ * legacy local-only workspace. Other scoped databases are never affected.
+ */
+export async function deleteLocalDatabaseForScope(scopeKey: string | null): Promise<void> {
+  const databaseName = scopeKey === null ? LEGACY_DATABASE_NAME : scopedDatabaseName(scopeKey)
+  const deletingActive = db.name === databaseName
+  if (deletingActive) db.close()
+  await Dexie.delete(databaseName)
+  if (!deletingActive) return
+
+  if (scopeKey === null) {
+    activeScopeKey = null
+    db = new MigaDatabase(LEGACY_DATABASE_NAME)
+  } else {
+    activeScopeKey = scopeKey
+    db = new MigaDatabase(databaseName)
+  }
 }
 
 /**

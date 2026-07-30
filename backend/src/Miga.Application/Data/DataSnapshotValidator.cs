@@ -83,7 +83,20 @@ public sealed class DataSnapshotValidator : IDataSnapshotValidator
             return context.ToResult();
         }
 
-        var raw = data.GetRawText();
+        string raw;
+        try
+        {
+            // JsonElement can defer UTF-8 transcoding until a string/raw value is
+            // materialized. Reject malformed request bytes as validation input
+            // instead of allowing GetRawText() to surface as an API 500.
+            raw = data.GetRawText();
+        }
+        catch (InvalidOperationException)
+        {
+            context.Add(DataSnapshotValidationErrorCodes.InvalidFormat, "$");
+            return context.ToResult();
+        }
+
         if (
             raw.Length > DataSnapshotValidationLimits.MaxPayloadUtf8Bytes
             || Encoding.UTF8.GetByteCount(raw) > DataSnapshotValidationLimits.MaxPayloadUtf8Bytes

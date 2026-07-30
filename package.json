@@ -4,16 +4,20 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "dev:db": "docker compose up -d",
+    "dev:db": "docker compose up --build -d",
     "dev:db:down": "docker compose down",
     "dev:frontend": "npm --prefix frontend run dev",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "node scripts/check-format.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=22.22.0",
+    "npm": ">=10.9.4"
+  },
   "devDependencies": {
     "prettier": "^3.9.4"
   }

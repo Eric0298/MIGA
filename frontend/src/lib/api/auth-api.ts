@@ -46,7 +46,23 @@ export type ResetPasswordInput = {
 export type ConfirmEmailInput = {
   userId: string
   token: string
+  newPassword: string
+  privacyPolicyVersion: '2026-07-23'
+  importDemoData: boolean
+  continueWithoutDemoData: boolean
 }
+
+const accountSessionSchema = z
+  .object({
+    sessionId: z.string().uuid(),
+    createdAtUtc: z.string().datetime({ offset: true }),
+    lastSeenAtUtc: z.string().datetime({ offset: true }),
+    expiresAtUtc: z.string().datetime({ offset: true }),
+    current: z.boolean(),
+  })
+  .strict()
+
+export type AccountSession = z.infer<typeof accountSessionSchema>
 
 export async function getAuthSession(signal?: AbortSignal): Promise<AuthSession> {
   const raw = await apiRequest<unknown>('/api/auth/session', { signal, csrf: false })
@@ -99,6 +115,22 @@ export async function reauthenticate(currentPassword: string): Promise<void> {
     method: 'POST',
     json: { currentPassword },
   })
+}
+
+export async function listAccountSessions(): Promise<AccountSession[]> {
+  const raw = await apiRequest<unknown>('/api/account/sessions', { csrf: false })
+  return z.array(accountSessionSchema).max(100).parse(raw)
+}
+
+export async function revokeAccountSession(sessionId: string): Promise<void> {
+  const validatedId = z.string().uuid().parse(sessionId)
+  await apiRequest(`/api/account/sessions/${encodeURIComponent(validatedId)}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function revokeOtherAccountSessions(): Promise<void> {
+  await apiRequest('/api/account/sessions/others', { method: 'DELETE' })
 }
 
 export function exportAccount(): Promise<Blob> {

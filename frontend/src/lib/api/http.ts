@@ -12,12 +12,14 @@ export type ApiProblem = {
 export class ApiError extends Error {
   readonly status: number
   readonly problem: ApiProblem | null
+  readonly retryAfterMs: number | null
 
-  constructor(status: number, problem: ApiProblem | null) {
+  constructor(status: number, problem: ApiProblem | null, retryAfterMs: number | null = null) {
     super(problem?.title ?? problem?.detail ?? `HTTP ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.problem = problem
+    this.retryAfterMs = retryAfterMs
   }
 }
 
@@ -29,8 +31,35 @@ type ApiRequestOptions = {
   csrf?: boolean
 }
 
+export type ApiAuthorizationFailure = {
+  path: string
+  error: ApiError
+}
+
 let csrfToken: string | null = null
 let csrfRequest: Promise<string> | null = null
+const authorizationFailureListeners = new Set<(failure: ApiAuthorizationFailure) => void>()
+
+export function subscribeToApiAuthorizationFailures(
+  listener: (failure: ApiAuthorizationFailure) => void,
+): () => void {
+  authorizationFailureListeners.add(listener)
+  return () => authorizationFailureListeners.delete(listener)
+}
+
+function notifyAuthorizationFailure(path: string, error: ApiError): void {
+  if ((error.status !== 401 && error.status !== 403) || path === '/api/auth/session') {
+    return
+  }
+
+  for (const listener of authorizationFailureListeners) {
+    try {
+      listener({ path, error })
+    } catch {
+      // A consumer cannot interfere with delivery of the original API error.
+    }
+  }
+}
 
 function configuredApiBase(): URL {
   const origin =
@@ -86,6 +115,26 @@ async function parseProblem(response: Response): Promise<ApiProblem | null> {
   }
 }
 
+function parseRetryAfter(response: Response): number | null {
+  const raw = response.headers.get('retry-after')
+  if (!raw) return null
+  const seconds = Number(raw)
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1_000, 60 * 60 * 1_000)
+  const at = Date.parse(raw)
+  if (!Number.isFinite(at)) return null
+  return Math.max(0, Math.min(at - Date.now(), 60 * 60 * 1_000))
+}
+
+async function apiErrorFromResponse(path: string, response: Response): Promise<ApiError> {
+  const error = new ApiError(
+    response.status,
+    await parseProblem(response),
+    parseRetryAfter(response),
+  )
+  notifyAuthorizationFailure(path, error)
+  return error
+}
+
 async function requestCsrfToken(force = false): Promise<string> {
   if (!force && csrfToken) return csrfToken
   if (!force && csrfRequest) return csrfRequest
@@ -100,7 +149,7 @@ async function requestCsrfToken(force = false): Promise<string> {
   })
     .then(async (response) => {
       if (!response.ok) {
-        throw new ApiError(response.status, await parseProblem(response))
+        throw await apiErrorFromResponse('/api/auth/csrf', response)
       }
       const payload = (await response.json()) as unknown
       if (
@@ -173,7 +222,9 @@ export async function apiRequest<T = undefined>(
   options: ApiRequestOptions = {},
 ): Promise<T> {
   const response = await send(path, options, true)
-  if (!response.ok) throw new ApiError(response.status, await parseProblem(response))
+  if (!response.ok) {
+    throw await apiErrorFromResponse(path, response)
+  }
   if (response.status === 204 || response.headers.get('content-length') === '0') {
     return undefined as T
   }
@@ -185,7 +236,9 @@ export async function apiRequest<T = undefined>(
 
 export async function apiDownload(path: string): Promise<Blob> {
   const response = await send(path, { method: 'GET' }, false)
-  if (!response.ok) throw new ApiError(response.status, await parseProblem(response))
+  if (!response.ok) {
+    throw await apiErrorFromResponse(path, response)
+  }
   return response.blob()
 }
 

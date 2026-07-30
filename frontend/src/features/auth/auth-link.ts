@@ -6,8 +6,8 @@ export type ConsumedAuthLink = {
 
 /**
  * Auth secrets are delivered in the URL fragment so they are never sent in
- * HTTP referrers or server requests. Query support is retained for old links,
- * but recognized values are removed from either location immediately.
+ * HTTP referrers or server requests. Query-string secrets are deliberately
+ * rejected; recognized query keys are only removed from the visible URL.
  */
 export function consumeAuthLinkParameters(
   hash: string,
@@ -21,9 +21,7 @@ export function consumeAuthLinkParameters(
 
   for (const key of keys) {
     const fragmentValue = fragment.get(key)
-    const queryValue = query.get(key)
-    const value = fragmentValue ?? queryValue
-    if (value !== null) values[key] = value
+    if (fragmentValue !== null) values[key] = fragmentValue
     if (fragment.has(key) || query.has(key)) containedSensitiveParameters = true
     query.delete(key)
   }

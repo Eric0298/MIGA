@@ -40,7 +40,7 @@ public sealed class DemoCleanupService : BackgroundService, IDemoCleanupService
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<MigaDbContext>();
-            List<Domain.Entities.Workspace> expiredWorkspaces;
+            List<CleanupCandidate> expiredWorkspaces;
             if (string.Equals(
                     dbContext.Database.ProviderName,
                     "Microsoft.EntityFrameworkCore.Sqlite",
@@ -49,27 +49,36 @@ public sealed class DemoCleanupService : BackgroundService, IDemoCleanupService
                 // SQLite cannot translate DateTimeOffset ordering. This branch
                 // exists for the isolated integration-test provider only.
                 expiredWorkspaces = (await dbContext.DemoSessions
-                        .Include(session => session.Workspace)
+                        .AsNoTracking()
                         .Where(session => session.Workspace.Kind == WorkspaceKind.Demo)
+                        .Select(session => new CleanupCandidate(
+                            session.WorkspaceId,
+                            session.Id,
+                            session.RevokedAtUtc,
+                            session.IdleExpiresAtUtc,
+                            session.AbsoluteExpiresAtUtc,
+                            session.Workspace.ExpiresAtUtc))
                         .ToListAsync(cancellationToken))
-                    .Where(session =>
-                        session.RevokedAtUtc is not null ||
-                        session.IdleExpiresAtUtc <= now ||
-                        session.AbsoluteExpiresAtUtc <= now ||
-                        session.Workspace.ExpiresAtUtc <= now)
-                    .Select(session => session.Workspace)
+                    .Where(candidate => IsExpired(candidate, now))
                     .ToList();
             }
             else
             {
                 expiredWorkspaces = await dbContext.DemoSessions
+                    .AsNoTracking()
                     .Where(session =>
                         session.Workspace.Kind == WorkspaceKind.Demo &&
                         (session.RevokedAtUtc != null ||
                          session.IdleExpiresAtUtc <= now ||
                          session.AbsoluteExpiresAtUtc <= now ||
                          session.Workspace.ExpiresAtUtc <= now))
-                    .Select(session => session.Workspace)
+                    .Select(session => new CleanupCandidate(
+                        session.WorkspaceId,
+                        session.Id,
+                        session.RevokedAtUtc,
+                        session.IdleExpiresAtUtc,
+                        session.AbsoluteExpiresAtUtc,
+                        session.Workspace.ExpiresAtUtc))
                     .ToListAsync(cancellationToken);
             }
 
@@ -78,9 +87,26 @@ public sealed class DemoCleanupService : BackgroundService, IDemoCleanupService
                 return 0;
             }
 
-            dbContext.Workspaces.RemoveRange(expiredWorkspaces);
-            await dbContext.SaveChangesAsync(cancellationToken);
-            return expiredWorkspaces.Count;
+            var removed = 0;
+            foreach (var candidate in expiredWorkspaces)
+            {
+                removed += await dbContext.Workspaces
+                    .Where(workspace =>
+                        workspace.Id == candidate.WorkspaceId &&
+                        workspace.Kind == WorkspaceKind.Demo &&
+                        workspace.OwnerUserId == null &&
+                        workspace.ExpiresAtUtc == candidate.WorkspaceExpiresAtUtc &&
+                        workspace.DemoSession != null &&
+                        workspace.DemoSession.Id == candidate.SessionId &&
+                        workspace.DemoSession.RevokedAtUtc == candidate.RevokedAtUtc &&
+                        workspace.DemoSession.IdleExpiresAtUtc ==
+                            candidate.IdleExpiresAtUtc &&
+                        workspace.DemoSession.AbsoluteExpiresAtUtc ==
+                            candidate.AbsoluteExpiresAtUtc)
+                    .ExecuteDeleteAsync(cancellationToken);
+            }
+
+            return removed;
         }
         finally
         {
@@ -118,4 +144,18 @@ public sealed class DemoCleanupService : BackgroundService, IDemoCleanupService
             // Normal host shutdown.
         }
     }
+
+    private static bool IsExpired(CleanupCandidate candidate, DateTimeOffset now) =>
+        candidate.RevokedAtUtc is not null ||
+        candidate.IdleExpiresAtUtc <= now ||
+        candidate.AbsoluteExpiresAtUtc <= now ||
+        candidate.WorkspaceExpiresAtUtc <= now;
+
+    private sealed record CleanupCandidate(
+        Guid WorkspaceId,
+        Guid SessionId,
+        DateTimeOffset? RevokedAtUtc,
+        DateTimeOffset IdleExpiresAtUtc,
+        DateTimeOffset AbsoluteExpiresAtUtc,
+        DateTimeOffset? WorkspaceExpiresAtUtc);
 }

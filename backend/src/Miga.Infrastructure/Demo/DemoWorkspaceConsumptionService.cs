@@ -22,6 +22,28 @@ public sealed class DemoWorkspaceConsumptionService : IDemoWorkspaceConsumptionS
         DateTimeOffset convertedAtUtc,
         CancellationToken cancellationToken = default)
     {
+        var sessionState = await _dbContext.DemoSessions
+            .AsNoTracking()
+            .Where(session =>
+                session.Id == demoSessionId &&
+                session.WorkspaceId == workspaceId)
+            .Select(session => new
+            {
+                session.IdleExpiresAtUtc,
+                session.AbsoluteExpiresAtUtc,
+                session.RevokedAtUtc,
+                WorkspaceExpiresAtUtc = session.Workspace.ExpiresAtUtc
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (sessionState is null ||
+            sessionState.RevokedAtUtc is not null ||
+            sessionState.IdleExpiresAtUtc <= convertedAtUtc ||
+            sessionState.AbsoluteExpiresAtUtc <= convertedAtUtc ||
+            sessionState.WorkspaceExpiresAtUtc <= convertedAtUtc)
+        {
+            return false;
+        }
+
         // Updating the versioned row first serializes conversion with
         // PUT /snapshot. Exactly one operation can win the expected revision.
         var snapshotRows = await _dbContext.WorkspaceSnapshots
@@ -42,7 +64,9 @@ public sealed class DemoWorkspaceConsumptionService : IDemoWorkspaceConsumptionS
             .Where(session =>
                 session.Id == demoSessionId &&
                 session.WorkspaceId == workspaceId &&
-                session.RevokedAtUtc == null)
+                session.RevokedAtUtc == null &&
+                session.IdleExpiresAtUtc == sessionState.IdleExpiresAtUtc &&
+                session.AbsoluteExpiresAtUtc == sessionState.AbsoluteExpiresAtUtc)
             .ExecuteDeleteAsync(cancellationToken);
         if (sessionRows != 1)
         {
@@ -53,7 +77,8 @@ public sealed class DemoWorkspaceConsumptionService : IDemoWorkspaceConsumptionS
             .Where(workspace =>
                 workspace.Id == workspaceId &&
                 workspace.Kind == WorkspaceKind.Demo &&
-                workspace.OwnerUserId == null)
+                workspace.OwnerUserId == null &&
+                workspace.ExpiresAtUtc == sessionState.WorkspaceExpiresAtUtc)
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(workspace => workspace.Kind, WorkspaceKind.Registered)

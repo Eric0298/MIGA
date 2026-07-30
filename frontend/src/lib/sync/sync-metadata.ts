@@ -1,4 +1,4 @@
-import { db, type WorkspaceSyncMetadata } from '@/lib/db/miga-db'
+import { db, type MigaDatabase, type WorkspaceSyncMetadata } from '@/lib/db/miga-db'
 import { z } from 'zod'
 
 const metadataSchema = z
@@ -7,16 +7,23 @@ const metadataSchema = z
     revision: z.number().int().nonnegative(),
     updatedAtUtc: z.string().datetime({ offset: true }),
     dirty: z.boolean(),
+    contentHash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
   })
   .strict()
 
-export async function getWorkspaceSyncMetadata(): Promise<WorkspaceSyncMetadata | undefined> {
-  const metadata = await db.syncMetadata.get('workspace')
+export async function getWorkspaceSyncMetadata(
+  database: MigaDatabase = db,
+): Promise<WorkspaceSyncMetadata | undefined> {
+  const metadata = await database.syncMetadata.get('workspace')
   return metadata === undefined ? undefined : metadataSchema.parse(metadata)
 }
 
 export async function putWorkspaceSyncMetadata(
   metadata: Omit<WorkspaceSyncMetadata, 'id'>,
+  database: MigaDatabase = db,
 ): Promise<void> {
-  await db.syncMetadata.put(metadataSchema.parse({ id: 'workspace', ...metadata }))
+  await database.syncMetadata.put(metadataSchema.parse({ id: 'workspace', ...metadata }))
 }

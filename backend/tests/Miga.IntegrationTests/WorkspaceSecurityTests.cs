@@ -1,9 +1,12 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Miga.Application.Demo;
+using Miga.Contracts.Auth;
 using Miga.Contracts.Data;
 using Miga.Domain.Entities;
 using Miga.Domain.Enums;
@@ -89,6 +92,48 @@ public sealed class WorkspaceSecurityTests
         var db = scope.ServiceProvider.GetRequiredService<MigaDbContext>();
         (await db.Users.CountAsync()).ShouldBe(0);
         (await db.Workspaces.CountAsync(x => x.Kind == WorkspaceKind.Demo)).ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task SnapshotWrite_ShouldRejectMalformedUtf8WithoutServerError()
+    {
+        using var factory = new MigaWebApplicationFactory();
+        using var client = factory.CreateClient();
+        using var demo = await client.PostWithCsrfAsync("/api/auth/demo", new { });
+        demo.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        var session = await client.GetFromJsonAsync<SessionResponse>("/api/auth/session");
+        var snapshot = await client.GetFromJsonAsync<DataSnapshotResponse>("/api/data/snapshot");
+        session!.WorkspaceId.ShouldNotBeNull();
+        snapshot.ShouldNotBeNull();
+
+        var data = JsonNode.Parse(snapshot.Data.GetRawText())!.AsObject();
+        data["goals"]!.AsArray()[0]!["name"] = "INVALID_BYTE_SENTINEL";
+        var body = new JsonObject
+        {
+            ["workspaceId"] = session.WorkspaceId.ToString(),
+            ["revision"] = snapshot.Revision,
+            ["data"] = data
+        };
+        var utf8 = Encoding.UTF8.GetBytes(body.ToJsonString());
+        var marker = Encoding.ASCII.GetBytes("INVALID_BYTE_SENTINEL");
+        var markerIndex = utf8.AsSpan().IndexOf(marker);
+        markerIndex.ShouldBeGreaterThanOrEqualTo(0);
+        utf8[markerIndex] = 0xF3;
+
+        var csrf = await client.GetFromJsonAsync<CsrfTokenResponse>("/api/auth/csrf");
+        csrf.ShouldNotBeNull();
+        using var request = new HttpRequestMessage(HttpMethod.Put, "/api/data/snapshot");
+        request.Headers.Add("X-XSRF-TOKEN", csrf.RequestToken);
+        request.Content = new ByteArrayContent(utf8);
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+        using var response = await client.SendAsync(request);
+
+        response.StatusCode.ShouldBe(
+            HttpStatusCode.BadRequest,
+            await response.Content.ReadAsStringAsync()
+        );
+        (await response.Content.ReadAsStringAsync()).ShouldContain("snapshot_invalid");
     }
 
     [Fact]
@@ -362,6 +407,7 @@ public sealed class WorkspaceSecurityTests
         var cleanup = factory.Services.GetRequiredService<IDemoCleanupService>();
         var removed = await cleanup.CleanupExpiredAsync(now);
         removed.ShouldBe(1);
+        (await cleanup.CleanupExpiredAsync(now)).ShouldBe(0);
 
         using var assertionScope = factory.Services.CreateScope();
         var assertionDb = assertionScope.ServiceProvider.GetRequiredService<MigaDbContext>();

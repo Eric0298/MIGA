@@ -5,6 +5,7 @@ import { useWorkspaceSync } from '@/lib/sync/WorkspaceSyncProvider'
 import { authCopyByLanguage } from './auth-copy'
 import { AuthError, AuthLayout, authFieldClass, authPrimaryButtonClass } from './AuthLayout'
 import { useAuth } from './AuthProvider'
+import { clearDemoImportPreference, rememberDemoImportPreference } from './demo-import-preference'
 
 function RegisterPage() {
   const auth = useAuth()
@@ -12,7 +13,11 @@ function RegisterPage() {
   const { lang } = useT()
   const copy = authCopyByLanguage[lang]
   const navigate = useNavigate()
-  const isDemo = auth.session.authenticated && auth.session.accountType === 'demo'
+  const demoWorkspaceId =
+    auth.session.authenticated && auth.session.accountType === 'demo'
+      ? auth.session.workspaceId
+      : null
+  const isDemo = demoWorkspaceId !== null
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
@@ -20,6 +25,7 @@ function RegisterPage() {
   const [importDemoData, setImportDemoData] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const authLoading = auth.status === 'loading'
 
   if (
     auth.status === 'ready' &&
@@ -31,7 +37,7 @@ function RegisterPage() {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (busy) return
+    if (busy || authLoading) return
     if (password !== confirmation) {
       setError(copy.common.passwordsMismatch)
       return
@@ -43,6 +49,9 @@ function RegisterPage() {
         setError(copy.register.importDemoSyncError)
         return
       }
+      if (demoWorkspaceId) {
+        rememberDemoImportPreference(demoWorkspaceId, importDemoData)
+      }
       const session = await auth.register({
         email: email.trim(),
         password,
@@ -50,8 +59,17 @@ function RegisterPage() {
         importDemoData: isDemo && importDemoData,
       })
       if (session.authenticated && session.accountType === 'registered') {
+        clearDemoImportPreference()
         navigate('/app', { replace: true })
-      } else navigate('/verificar-email', { replace: true, state: { email: email.trim() } })
+      } else {
+        navigate('/verificar-email', {
+          replace: true,
+          state: {
+            email: email.trim(),
+            importDemoData: isDemo && importDemoData,
+          },
+        })
+      }
     } catch {
       setError(copy.common.genericError)
     } finally {
@@ -71,6 +89,7 @@ function RegisterPage() {
             autoComplete="email"
             inputMode="email"
             required
+            disabled={authLoading || busy}
             maxLength={254}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -83,6 +102,7 @@ function RegisterPage() {
             type="password"
             autoComplete="new-password"
             required
+            disabled={authLoading || busy}
             minLength={12}
             maxLength={128}
             value={password}
@@ -99,6 +119,7 @@ function RegisterPage() {
             type="password"
             autoComplete="new-password"
             required
+            disabled={authLoading || busy}
             minLength={12}
             maxLength={128}
             value={confirmation}
@@ -110,6 +131,7 @@ function RegisterPage() {
             className="mt-1 h-4 w-4 accent-apricot"
             type="checkbox"
             required
+            disabled={authLoading || busy}
             checked={accepted}
             onChange={(event) => setAccepted(event.target.checked)}
           />
@@ -125,8 +147,15 @@ function RegisterPage() {
             <input
               className="mt-1 h-4 w-4 accent-apricot"
               type="checkbox"
+              disabled={authLoading || busy}
               checked={importDemoData}
-              onChange={(event) => setImportDemoData(event.target.checked)}
+              onChange={(event) => {
+                const checked = event.target.checked
+                setImportDemoData(checked)
+                if (demoWorkspaceId) {
+                  rememberDemoImportPreference(demoWorkspaceId, checked)
+                }
+              }}
             />
             <span>
               <span className="block font-semibold">{copy.register.importDemo}</span>
@@ -136,7 +165,11 @@ function RegisterPage() {
             </span>
           </label>
         )}
-        <button className={authPrimaryButtonClass} type="submit" disabled={busy || !accepted}>
+        <button
+          className={authPrimaryButtonClass}
+          type="submit"
+          disabled={busy || authLoading || !accepted}
+        >
           {copy.register.submit}
         </button>
       </form>

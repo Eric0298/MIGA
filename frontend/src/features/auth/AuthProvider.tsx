@@ -16,23 +16,34 @@ import {
   forgotPassword as forgotPasswordRequest,
   getAuthSession,
   login as loginRequest,
+  listAccountSessions as listAccountSessionsRequest,
   logout as logoutRequest,
   reauthenticate as reauthenticateRequest,
   register as registerRequest,
   resendConfirmation as resendConfirmationRequest,
   resetPassword as resetPasswordRequest,
+  revokeAccountSession as revokeAccountSessionRequest,
+  revokeOtherAccountSessions as revokeOtherAccountSessionsRequest,
   startDemo as startDemoRequest,
   type AuthSession,
+  type AccountSession,
   type ConfirmEmailInput,
   type RegisterInput,
   type ResetPasswordInput,
 } from '@/lib/api/auth-api'
-import { deactivateScopedDatabase, getActiveDatabaseScope } from '@/lib/db/miga-db'
+import { ApiError, subscribeToApiAuthorizationFailures } from '@/lib/api/http'
+import {
+  deactivateScopedDatabase,
+  deleteLocalDatabaseForScope,
+  getActiveDatabaseScope,
+} from '@/lib/db/miga-db'
+import { abortActiveWorkspaceSync } from '@/lib/sync/WorkspaceSyncProvider'
 import {
   bootstrapAuthenticatedWorkspace,
   scopeKeyForSession,
   type WorkspaceBootstrapResult,
 } from '@/lib/sync/workspace-bootstrap'
+import { clearDemoImportPreference } from './demo-import-preference'
 
 type AuthStatus = 'loading' | 'ready' | 'error'
 
@@ -49,6 +60,10 @@ type AuthContextValue = AuthState & {
   register: (input: RegisterInput) => Promise<AuthSession>
   login: (email: string, password: string) => Promise<AuthSession>
   logout: () => Promise<void>
+  deleteLocalData: () => Promise<void>
+  listAccountSessions: () => Promise<AccountSession[]>
+  revokeAccountSession: (sessionId: string) => Promise<void>
+  revokeOtherAccountSessions: () => Promise<void>
   forgotPassword: (email: string) => Promise<void>
   resetPassword: (input: ResetPasswordInput) => Promise<void>
   confirmEmail: (input: ConfirmEmailInput) => Promise<AuthSession>
@@ -57,6 +72,12 @@ type AuthContextValue = AuthState & {
   reauthenticate: (currentPassword: string) => Promise<void>
   exportAccount: () => Promise<Blob>
   deleteAccount: (currentPassword: string) => Promise<void>
+}
+
+type AuthChannelMessage = {
+  type: 'session-invalidated'
+  deleteLocalData: boolean
+  scopeKey: string | null
 }
 
 const EMPTY_SESSION: AuthSession = {
@@ -73,121 +94,241 @@ const INITIAL_STATE: AuthState = {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 const AUTH_CHANNEL_NAME = 'miga-auth-state-v1'
+const SCOPE_PATTERN = /^[a-f0-9]{24,64}$/
+const SESSION_BOUND_AUTH_PATHS = new Set([
+  '/api/auth/logout',
+  '/api/auth/change-password',
+  '/api/auth/reauthenticate',
+])
+
+function isSessionBoundApiPath(path: string): boolean {
+  return (
+    path.startsWith('/api/data/') ||
+    path === '/api/account' ||
+    path.startsWith('/api/account/') ||
+    SESSION_BOUND_AUTH_PATHS.has(path)
+  )
+}
+
+function parseChannelMessage(raw: unknown): AuthChannelMessage | null {
+  if (!raw || typeof raw !== 'object') return null
+  const value = raw as Partial<AuthChannelMessage>
+  if (
+    value.type !== 'session-invalidated' ||
+    typeof value.deleteLocalData !== 'boolean' ||
+    !(
+      value.scopeKey === null ||
+      (typeof value.scopeKey === 'string' && SCOPE_PATTERN.test(value.scopeKey))
+    )
+  ) {
+    return null
+  }
+  return value as AuthChannelMessage
+}
+
+function abortError(): DOMException {
+  return new DOMException('Session request superseded', 'AbortError')
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>(INITIAL_STATE)
   const stateRef = useRef<AuthState>(INITIAL_STATE)
   const requestGeneration = useRef(0)
+  const sessionAbortRef = useRef<AbortController | null>(null)
   const channelRef = useRef<BroadcastChannel | null>(null)
+  const lastReadyAuthenticatedStateRef = useRef<AuthState | null>(null)
+  const authorizationRevalidationRef = useRef<{
+    retainAuthenticatedOnFailure: boolean
+  } | null>(null)
 
-  const loadSession = useCallback(async (forceWorkspace = false): Promise<AuthSession> => {
-    const generation = ++requestGeneration.current
-    setState((current) => ({ ...current, status: 'loading', error: null }))
-
-    try {
-      const session = await getAuthSession()
-      if (generation !== requestGeneration.current) {
-        throw new DOMException('Session request superseded', 'AbortError')
-      }
-
-      if (!session.authenticated) {
-        // A missing/expired cookie is not consent to destroy device-local
-        // attachments. Close the scope so its data cannot be exposed through
-        // repositories, but retain it for a later login to the same workspace.
-        await deactivateScopedDatabase(false)
-        if (generation !== requestGeneration.current) {
-          throw new DOMException('Session request superseded', 'AbortError')
-        }
-        const next = { status: 'ready', session, workspace: null, error: null } satisfies AuthState
-        stateRef.current = next
-        setState(next)
-        return session
-      }
-
-      const current = stateRef.current
-      const scopeKey = await scopeKeyForSession(session)
-      if (
-        !forceWorkspace &&
-        current.workspace?.scopeKey === scopeKey &&
-        getActiveDatabaseScope() === scopeKey
-      ) {
-        const next = {
-          status: 'ready',
-          session,
-          workspace: current.workspace,
-          error: null,
-        } satisfies AuthState
-        stateRef.current = next
-        setState(next)
-        return session
-      }
-
-      const workspace = await bootstrapAuthenticatedWorkspace(session)
-      if (generation !== requestGeneration.current) {
-        throw new DOMException('Session request superseded', 'AbortError')
-      }
-      const next = { status: 'ready', session, workspace, error: null } satisfies AuthState
-      stateRef.current = next
-      setState(next)
-      return session
-    } catch (cause) {
-      if (generation !== requestGeneration.current) throw cause
-      const error = cause instanceof Error ? cause : new Error('Could not load the session')
-      setState((current) => ({ ...current, status: 'error', error }))
-      throw error
+  const commitState = useCallback((next: AuthState) => {
+    if (next.status === 'ready') {
+      lastReadyAuthenticatedStateRef.current =
+        next.session.authenticated && next.workspace ? next : null
     }
+    stateRef.current = next
+    setState(next)
   }, [])
+
+  const beginTransition = useCallback((): { generation: number; previous: AuthState } => {
+    const previous = stateRef.current
+    const generation = ++requestGeneration.current
+    sessionAbortRef.current?.abort()
+    sessionAbortRef.current = null
+    abortActiveWorkspaceSync()
+    commitState({
+      status: 'loading',
+      session: EMPTY_SESSION,
+      workspace: null,
+      error: null,
+    })
+    return { generation, previous }
+  }, [commitState])
+
+  const loadSession = useCallback(
+    async (
+      forceWorkspace = false,
+      retainAuthenticatedOnTransientFailure = true,
+      fallbackOverride?: AuthState,
+    ): Promise<AuthSession> => {
+      const fallback = fallbackOverride ?? stateRef.current
+      const generation = ++requestGeneration.current
+      sessionAbortRef.current?.abort()
+      const controller = new AbortController()
+      sessionAbortRef.current = controller
+      if (fallback.status !== 'ready') {
+        commitState({ ...fallback, status: 'loading', error: null })
+      }
+
+      try {
+        const session = await getAuthSession(controller.signal)
+        if (generation !== requestGeneration.current) throw abortError()
+
+        if (!session.authenticated) {
+          abortActiveWorkspaceSync()
+          await deactivateScopedDatabase()
+          if (generation !== requestGeneration.current) throw abortError()
+          commitState({ status: 'ready', session, workspace: null, error: null })
+          return session
+        }
+
+        const current = stateRef.current.status === 'loading' ? fallback : stateRef.current
+        const scopeKey = await scopeKeyForSession(session)
+        if (
+          !forceWorkspace &&
+          current.workspace?.scopeKey === scopeKey &&
+          getActiveDatabaseScope() === scopeKey
+        ) {
+          commitState({
+            status: 'ready',
+            session,
+            workspace: current.workspace,
+            error: null,
+          })
+          return session
+        }
+
+        if (current.workspace && current.workspace.scopeKey !== scopeKey) {
+          abortActiveWorkspaceSync()
+        }
+        const workspace = await bootstrapAuthenticatedWorkspace(session, controller.signal)
+        if (generation !== requestGeneration.current) throw abortError()
+        commitState({ status: 'ready', session, workspace, error: null })
+        return session
+      } catch (cause) {
+        if (generation !== requestGeneration.current || controller.signal.aborted) throw cause
+        const error = cause instanceof Error ? cause : new Error('Could not load the session')
+
+        if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
+          abortActiveWorkspaceSync()
+          await deactivateScopedDatabase()
+          commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error })
+          return EMPTY_SESSION
+        }
+
+        if (
+          retainAuthenticatedOnTransientFailure &&
+          fallback.status === 'ready' &&
+          fallback.session.authenticated &&
+          fallback.workspace &&
+          getActiveDatabaseScope() === fallback.workspace.scopeKey
+        ) {
+          commitState({ ...fallback, status: 'ready', error })
+          return fallback.session
+        }
+
+        abortActiveWorkspaceSync()
+        await deactivateScopedDatabase()
+        commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error })
+        return EMPTY_SESSION
+      } finally {
+        if (sessionAbortRef.current === controller) sessionAbortRef.current = null
+      }
+    },
+    [commitState],
+  )
 
   const refreshSession = useCallback(() => loadSession(false), [loadSession])
 
-  useEffect(() => {
-    stateRef.current = state
-  }, [state])
+  useEffect(
+    () =>
+      subscribeToApiAuthorizationFailures(({ path, error }) => {
+        if (!isSessionBoundApiPath(path)) return
+        const retainAuthenticatedOnFailure =
+          (error.status === 403 && error.problem?.code === 'reauthentication_required') ||
+          (error.status === 401 && error.problem?.code === 'invalid_credentials')
+        const active = authorizationRevalidationRef.current
+        if (active && (!active.retainAuthenticatedOnFailure || retainAuthenticatedOnFailure)) {
+          return
+        }
+
+        const marker = { retainAuthenticatedOnFailure }
+        authorizationRevalidationRef.current = marker
+        const fallback = retainAuthenticatedOnFailure
+          ? (lastReadyAuthenticatedStateRef.current ?? undefined)
+          : undefined
+        void loadSession(false, retainAuthenticatedOnFailure, fallback)
+          .then(() => undefined)
+          .catch(() => undefined)
+          .finally(() => {
+            if (authorizationRevalidationRef.current === marker) {
+              authorizationRevalidationRef.current = null
+            }
+          })
+      }),
+    [loadSession],
+  )
 
   useEffect(() => {
     void refreshSession().catch(() => undefined)
     return () => {
       requestGeneration.current += 1
+      sessionAbortRef.current?.abort()
+      abortActiveWorkspaceSync()
     }
   }, [refreshSession])
+
+  const applyInvalidation = useCallback(
+    async (message: AuthChannelMessage) => {
+      const generation = ++requestGeneration.current
+      sessionAbortRef.current?.abort()
+      abortActiveWorkspaceSync()
+      commitState({
+        status: 'loading',
+        session: EMPTY_SESSION,
+        workspace: null,
+        error: null,
+      })
+
+      await deactivateScopedDatabase()
+      if (message.deleteLocalData) {
+        clearDemoImportPreference()
+        await deleteLocalDatabaseForScope(message.scopeKey)
+        await deactivateScopedDatabase()
+      }
+      if (generation !== requestGeneration.current) return
+      commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error: null })
+    },
+    [commitState],
+  )
 
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return
     const channel = new BroadcastChannel(AUTH_CHANNEL_NAME)
     channelRef.current = channel
     channel.onmessage = (event: MessageEvent<unknown>) => {
-      if (
-        !event.data ||
-        typeof event.data !== 'object' ||
-        (event.data as { type?: unknown }).type !== 'session-invalidated'
-      ) {
-        return
-      }
-      requestGeneration.current += 1
-      const next = {
-        status: 'loading',
-        session: EMPTY_SESSION,
-        workspace: null,
-        error: null,
-      } satisfies AuthState
-      stateRef.current = next
-      setState(next)
-      void deactivateScopedDatabase(true)
-        .then(() => {
-          const ready = { ...next, status: 'ready' } satisfies AuthState
-          stateRef.current = ready
-          setState(ready)
-        })
-        .catch((cause) => {
-          const error = cause instanceof Error ? cause : new Error('Could not clear local data')
-          setState({ ...next, status: 'error', error })
-        })
+      const message = parseChannelMessage(event.data)
+      if (!message) return
+      void applyInvalidation(message).catch((cause) => {
+        const error = cause instanceof Error ? cause : new Error('Could not update local data')
+        commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error })
+      })
     }
     return () => {
       channel.close()
       if (channelRef.current === channel) channelRef.current = null
     }
-  }, [])
+  }, [applyInvalidation, commitState])
 
   useEffect(() => {
     const validateWhenVisible = () => {
@@ -212,10 +353,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshAfter = useCallback(
     async (operation: () => Promise<void>, forceWorkspace = true) => {
-      await operation()
-      return loadSession(forceWorkspace)
+      const { generation, previous } = beginTransition()
+      try {
+        await operation()
+        if (generation !== requestGeneration.current) throw abortError()
+        return loadSession(forceWorkspace)
+      } catch (cause) {
+        if (generation === requestGeneration.current) {
+          commitState({ ...previous, status: 'ready', error: cause as Error })
+        }
+        throw cause
+      }
     },
-    [loadSession],
+    [beginTransition, commitState, loadSession],
   )
 
   const startDemo = useCallback(() => refreshAfter(startDemoRequest), [refreshAfter])
@@ -231,47 +381,87 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const logout = useCallback(async () => {
-    await logoutRequest()
-    requestGeneration.current += 1
-    channelRef.current?.postMessage({ type: 'session-invalidated' })
-    const loading = {
-      status: 'loading',
-      session: EMPTY_SESSION,
-      workspace: null,
-      error: null,
-    } satisfies AuthState
-    stateRef.current = loading
-    setState(loading)
-    await Promise.resolve()
-    await deactivateScopedDatabase(true)
-    const ready = { ...loading, status: 'ready' } satisfies AuthState
-    stateRef.current = ready
-    setState(ready)
-  }, [])
+    const scopeKey = getActiveDatabaseScope()
+    const { generation, previous } = beginTransition()
+    try {
+      await logoutRequest()
+      if (generation !== requestGeneration.current) throw abortError()
+      clearDemoImportPreference()
+      const message: AuthChannelMessage = {
+        type: 'session-invalidated',
+        deleteLocalData: false,
+        scopeKey,
+      }
+      channelRef.current?.postMessage(message)
+      await deactivateScopedDatabase()
+      commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error: null })
+    } catch (cause) {
+      if (generation === requestGeneration.current) {
+        commitState({ ...previous, status: 'ready', error: cause as Error })
+      }
+      throw cause
+    }
+  }, [beginTransition, commitState])
+
+  const deleteLocalData = useCallback(async () => {
+    const scopeKey = getActiveDatabaseScope()
+    const { generation, previous } = beginTransition()
+    try {
+      // A scoped local purge also signs out, avoiding an authenticated cookie
+      // pointing at a just-deleted workspace until the next visibility refresh.
+      if (previous.session.authenticated) await logoutRequest()
+      if (generation !== requestGeneration.current) throw abortError()
+      clearDemoImportPreference()
+      const message: AuthChannelMessage = {
+        type: 'session-invalidated',
+        deleteLocalData: true,
+        scopeKey,
+      }
+      channelRef.current?.postMessage(message)
+      await deactivateScopedDatabase()
+      await deleteLocalDatabaseForScope(scopeKey)
+      await deactivateScopedDatabase()
+      commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error: null })
+    } catch (cause) {
+      if (generation === requestGeneration.current) {
+        commitState({ ...previous, status: 'ready', error: cause as Error })
+      }
+      throw cause
+    }
+  }, [beginTransition, commitState])
 
   const confirmEmail = useCallback(
     (input: ConfirmEmailInput) => refreshAfter(() => confirmEmailRequest(input), false),
     [refreshAfter],
   )
 
-  const deleteAccount = useCallback(async (currentPassword: string) => {
-    await deleteAccountRequest(currentPassword)
-    requestGeneration.current += 1
-    channelRef.current?.postMessage({ type: 'session-invalidated' })
-    const loading = {
-      status: 'loading',
-      session: EMPTY_SESSION,
-      workspace: null,
-      error: null,
-    } satisfies AuthState
-    stateRef.current = loading
-    setState(loading)
-    await Promise.resolve()
-    await deactivateScopedDatabase(true)
-    const ready = { ...loading, status: 'ready' } satisfies AuthState
-    stateRef.current = ready
-    setState(ready)
-  }, [])
+  const deleteAccount = useCallback(
+    async (currentPassword: string) => {
+      const scopeKey = getActiveDatabaseScope()
+      const { generation, previous } = beginTransition()
+      try {
+        await deleteAccountRequest(currentPassword)
+        if (generation !== requestGeneration.current) throw abortError()
+        clearDemoImportPreference()
+        const message: AuthChannelMessage = {
+          type: 'session-invalidated',
+          deleteLocalData: true,
+          scopeKey,
+        }
+        channelRef.current?.postMessage(message)
+        await deactivateScopedDatabase()
+        await deleteLocalDatabaseForScope(scopeKey)
+        await deactivateScopedDatabase()
+        commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error: null })
+      } catch (cause) {
+        if (generation === requestGeneration.current) {
+          commitState({ ...previous, status: 'ready', error: cause as Error })
+        }
+        throw cause
+      }
+    },
+    [beginTransition, commitState],
+  )
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -281,6 +471,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       login,
       logout,
+      deleteLocalData,
+      listAccountSessions: listAccountSessionsRequest,
+      revokeAccountSession: revokeAccountSessionRequest,
+      revokeOtherAccountSessions: revokeOtherAccountSessionsRequest,
       forgotPassword: forgotPasswordRequest,
       resetPassword: resetPasswordRequest,
       confirmEmail,
@@ -290,7 +484,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       exportAccount: exportAccountRequest,
       deleteAccount,
     }),
-    [state, refreshSession, startDemo, register, login, logout, confirmEmail, deleteAccount],
+    [
+      state,
+      refreshSession,
+      startDemo,
+      register,
+      login,
+      logout,
+      deleteLocalData,
+      confirmEmail,
+      deleteAccount,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

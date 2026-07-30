@@ -35,7 +35,7 @@ public static class YouTubeUrlParser
             return false;
         }
 
-        if (url.Length > MaxUrlLength)
+        if (url.Length > MaxUrlLength || url.Contains('\\'))
         {
             return false;
         }
@@ -50,12 +50,20 @@ public static class YouTubeUrlParser
             return false;
         }
 
-        if (!AllowedHosts.Contains(uri.Host))
+        if (!string.IsNullOrEmpty(uri.UserInfo) || !AllowedHosts.Contains(uri.Host))
         {
             return false;
         }
 
-        var candidate = ExtractCandidate(uri);
+        string? candidate;
+        try
+        {
+            candidate = ExtractCandidate(uri);
+        }
+        catch (UriFormatException)
+        {
+            return false;
+        }
         if (candidate is null)
         {
             return false;

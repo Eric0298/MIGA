@@ -47,15 +47,38 @@ public sealed class MigaDbContext
     {
         builder.Entity<MigaUser>(entity =>
         {
-            entity.ToTable("users", "auth");
+            entity.ToTable(
+                "users",
+                "auth",
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "CK_users_confirmed_privacy",
+                        "NOT \"EmailConfirmed\" OR " +
+                        "(\"PrivacyPolicyVersion\" IS NOT NULL AND " +
+                        "\"PrivacyPolicyAcceptedAtUtc\" IS NOT NULL)");
+                    table.HasCheckConstraint(
+                        "CK_users_pending_demo_link",
+                        "(\"PendingDemoWorkspaceId\" IS NULL AND " +
+                        "\"PendingDemoSessionId\" IS NULL AND " +
+                        "\"PendingDemoExpiresAtUtc\" IS NULL) OR " +
+                        "(NOT \"EmailConfirmed\" AND " +
+                        "\"PendingDemoWorkspaceId\" IS NOT NULL AND " +
+                        "\"PendingDemoSessionId\" IS NOT NULL AND " +
+                        "\"PendingDemoExpiresAtUtc\" IS NOT NULL)");
+                });
             entity.Property(x => x.Email).HasMaxLength(254).IsRequired();
             entity.Property(x => x.NormalizedEmail).HasMaxLength(254).IsRequired();
             entity.Property(x => x.UserName).HasMaxLength(254).IsRequired();
             entity.Property(x => x.NormalizedUserName).HasMaxLength(254).IsRequired();
-            entity.Property(x => x.PrivacyPolicyVersion).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.PrivacyPolicyVersion).HasMaxLength(32);
             entity.HasIndex(x => x.NormalizedEmail)
                 .HasDatabaseName("IX_users_normalized_email")
                 .IsUnique();
+            entity.HasIndex(x => x.PendingDemoWorkspaceId)
+                .HasDatabaseName("IX_users_pending_demo_workspace")
+                .IsUnique()
+                .HasFilter("\"PendingDemoWorkspaceId\" IS NOT NULL");
         });
 
         builder.Entity<IdentityRole<Guid>>().ToTable("roles", "auth");

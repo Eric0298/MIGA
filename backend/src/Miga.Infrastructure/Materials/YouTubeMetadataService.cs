@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -16,6 +17,16 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
     private const string CacheKeyPrefix = "yt-meta:";
     private const string BaseAddress = "https://www.googleapis.com/youtube/v3/";
     private const int MaxResponseBytes = 256 * 1024;
+    private const int MaxTitleLength = 500;
+    private const int MaxAuthorLength = 200;
+    private const int MaxDurationSeconds = 60 * 60 * 24 * 365;
+
+    private static readonly Regex DurationRegex = new(
+        "^P(?:(?<days>[0-9]+)D)?T(?:(?<hours>[0-9]+)H)?" +
+        "(?:(?<minutes>[0-9]+)M)?(?:(?<seconds>[0-9]+)S)?$",
+        RegexOptions.Compiled |
+        RegexOptions.CultureInvariant |
+        RegexOptions.NonBacktracking);
 
     private readonly HttpClient _httpClient;
     private readonly IMemoryCache _cache;
@@ -107,20 +118,47 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
             var payload = await response.Content.ReadFromJsonAsync<YouTubeVideoListPayload>(
                 cancellationToken: cancellationToken);
 
-            var item = payload?.Items?.FirstOrDefault();
-            if (item is null)
+            if (payload?.Items is null)
+            {
+                return InvalidUpstreamResponse();
+            }
+
+            var items = payload.Items;
+            if (items.Count == 0)
             {
                 return new YouTubeMetadataResult.Failure(
                     YouTubeMetadataErrorCode.VideoNotFound,
                     "video_not_found");
             }
 
-            var duration = YouTubeDurationParser.ToSeconds(item.ContentDetails?.Duration);
+            if (items.Count != 1 ||
+                items[0] is not { } item ||
+                !string.Equals(item.Id, videoId, StringComparison.Ordinal))
+            {
+                return InvalidUpstreamResponse();
+            }
+
+            var title = item.Snippet?.Title?.Trim();
+            var author = item.Snippet?.ChannelTitle?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(title) ||
+                title.Length > MaxTitleLength ||
+                author.Length > MaxAuthorLength)
+            {
+                return InvalidUpstreamResponse();
+            }
+
+            if (!TryParseDurationSeconds(
+                    item.ContentDetails?.Duration,
+                    out var duration))
+            {
+                return InvalidUpstreamResponse();
+            }
+
             var metadata = new YouTubeMetadataResponse(
                 Provider: Provider,
                 VideoId: videoId,
-                Title: item.Snippet?.Title ?? string.Empty,
-                Author: item.Snippet?.ChannelTitle ?? string.Empty,
+                Title: title,
+                Author: author,
                 ThumbnailUrl: $"https://i.ytimg.com/vi/{videoId}/hqdefault.jpg",
                 DurationSeconds: duration);
 
@@ -172,9 +210,10 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
     }
 
     private sealed record YouTubeVideoListPayload(
-        [property: JsonPropertyName("items")] IReadOnlyList<YouTubeVideoItem>? Items);
+        [property: JsonPropertyName("items")] IReadOnlyList<YouTubeVideoItem?>? Items);
 
     private sealed record YouTubeVideoItem(
+        [property: JsonPropertyName("id")] string? Id,
         [property: JsonPropertyName("snippet")] YouTubeVideoSnippet? Snippet,
         [property: JsonPropertyName("contentDetails")] YouTubeVideoContentDetails? ContentDetails);
 
@@ -184,4 +223,66 @@ public sealed class YouTubeMetadataService : IYouTubeMetadataService
 
     private sealed record YouTubeVideoContentDetails(
         [property: JsonPropertyName("duration")] string? Duration);
+
+    private static YouTubeMetadataResult.Failure InvalidUpstreamResponse() =>
+        new(
+            YouTubeMetadataErrorCode.UpstreamError,
+            "invalid_upstream_response");
+
+    private static bool TryParseDurationSeconds(string? value, out int seconds)
+    {
+        seconds = 0;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var match = DurationRegex.Match(value);
+        if (!match.Success ||
+            !HasDurationComponent(match) ||
+            !TryParseComponent(match.Groups["days"], out var days) ||
+            !TryParseComponent(match.Groups["hours"], out var hours) ||
+            !TryParseComponent(match.Groups["minutes"], out var minutes) ||
+            !TryParseComponent(match.Groups["seconds"], out var remainingSeconds))
+        {
+            return false;
+        }
+
+        try
+        {
+            var totalSeconds = checked(
+                days * 24 * 60 * 60 +
+                hours * 60 * 60 +
+                minutes * 60 +
+                remainingSeconds);
+            if (totalSeconds > MaxDurationSeconds)
+            {
+                return false;
+            }
+
+            seconds = (int)totalSeconds;
+            return true;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+    }
+
+    private static bool HasDurationComponent(Match match) =>
+        match.Groups["days"].Success ||
+        match.Groups["hours"].Success ||
+        match.Groups["minutes"].Success ||
+        match.Groups["seconds"].Success;
+
+    private static bool TryParseComponent(Group group, out long value)
+    {
+        if (!group.Success)
+        {
+            value = 0;
+            return true;
+        }
+
+        return long.TryParse(group.Value, out value);
+    }
 }

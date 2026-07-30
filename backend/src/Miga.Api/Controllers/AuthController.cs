@@ -26,6 +26,7 @@ namespace Miga.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[RequestSizeLimit(ApiSecurityConstants.SensitiveRequestBodyLimit)]
 public sealed class AuthController : ApiControllerBase
 {
     private static readonly TimeSpan GenericResponseFloor = TimeSpan.FromMilliseconds(500);
@@ -35,13 +36,12 @@ public sealed class AuthController : ApiControllerBase
     private readonly SignInManager<MigaUser> _signInManager;
     private readonly IPasswordHasher<MigaUser> _passwordHasher;
     private readonly IPasswordPolicy _passwordPolicy;
-    private readonly IAccountEmailSender _emailSender;
+    private readonly IAccountEmailQueue _emailQueue;
     private readonly IDemoWorkspaceConsumptionService _demoWorkspaceConsumption;
     private readonly ICurrentActorAccessor _currentActorAccessor;
     private readonly ISecurityAuditService _auditService;
     private readonly MigaDbContext _dbContext;
     private readonly AuthenticationSecurityOptions _authenticationOptions;
-    private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IAntiforgery antiforgery,
@@ -49,26 +49,24 @@ public sealed class AuthController : ApiControllerBase
         SignInManager<MigaUser> signInManager,
         IPasswordHasher<MigaUser> passwordHasher,
         IPasswordPolicy passwordPolicy,
-        IAccountEmailSender emailSender,
+        IAccountEmailQueue emailQueue,
         IDemoWorkspaceConsumptionService demoWorkspaceConsumption,
         ICurrentActorAccessor currentActorAccessor,
         ISecurityAuditService auditService,
         MigaDbContext dbContext,
-        IOptions<AuthenticationSecurityOptions> authenticationOptions,
-        ILogger<AuthController> logger)
+        IOptions<AuthenticationSecurityOptions> authenticationOptions)
     {
         _antiforgery = antiforgery;
         _userManager = userManager;
         _signInManager = signInManager;
         _passwordHasher = passwordHasher;
         _passwordPolicy = passwordPolicy;
-        _emailSender = emailSender;
+        _emailQueue = emailQueue;
         _demoWorkspaceConsumption = demoWorkspaceConsumption;
         _currentActorAccessor = currentActorAccessor;
         _auditService = auditService;
         _dbContext = dbContext;
         _authenticationOptions = authenticationOptions.Value;
-        _logger = logger;
     }
 
     [AllowAnonymous]
@@ -224,6 +222,14 @@ public sealed class AuthController : ApiControllerBase
         CancellationToken cancellationToken)
     {
         var genericResponseStarted = Stopwatch.GetTimestamp();
+        if (await _currentActorAccessor.GetRegisteredAsync(cancellationToken) is not null)
+        {
+            return ApiProblem(
+                StatusCodes.Status409Conflict,
+                "registered_session_active",
+                "A registered session is already active.");
+        }
+
         if (!string.Equals(
                 request.PrivacyPolicyVersion,
                 _authenticationOptions.PrivacyPolicyVersion,
@@ -242,15 +248,6 @@ public sealed class AuthController : ApiControllerBase
                 StatusCodes.Status400BadRequest,
                 passwordResult.ErrorCode!,
                 "The password does not meet the security policy.");
-        }
-
-        var email = request.Email.Trim();
-        var existing = await _userManager.FindByEmailAsync(email);
-        if (existing is not null)
-        {
-            await TrySendConfirmationAsync(existing, cancellationToken);
-            await EnforceGenericResponseFloorAsync(genericResponseStarted, cancellationToken);
-            return Accepted();
         }
 
         var demoActor = request.ImportDemoData
@@ -283,15 +280,34 @@ public sealed class AuthController : ApiControllerBase
             }
         }
 
+        var email = request.Email.Trim();
+        var existing = await _userManager.FindByEmailAsync(email);
+        if (existing is not null)
+        {
+            if (!existing.EmailConfirmed)
+            {
+                _ = _emailQueue.TryQueueEmailConfirmation(existing.Id);
+            }
+
+            await EnforceGenericResponseFloorAsync(genericResponseStarted, cancellationToken);
+            return Accepted();
+        }
+
         var now = DateTimeOffset.UtcNow;
+        var confirmationRequired = _authenticationOptions.RequireConfirmedEmail;
         var user = new MigaUser
         {
             Id = Guid.CreateVersion7(),
             Email = email,
             UserName = email,
             CreatedAtUtc = now,
-            PrivacyPolicyVersion = request.PrivacyPolicyVersion,
-            PrivacyPolicyAcceptedAtUtc = now,
+            PrivacyPolicyVersion = confirmationRequired
+                ? null
+                : request.PrivacyPolicyVersion,
+            PrivacyPolicyAcceptedAtUtc = confirmationRequired ? null : now,
+            PendingDemoWorkspaceId = confirmationRequired ? demoWorkspace?.Id : null,
+            PendingDemoSessionId = confirmationRequired ? demoActor?.SessionId : null,
+            PendingDemoExpiresAtUtc = confirmationRequired ? demoActor?.ExpiresAtUtc : null,
             SecurityStamp = Guid.NewGuid().ToString("N")
         };
 
@@ -299,7 +315,9 @@ public sealed class AuthController : ApiControllerBase
         IdentityResult createResult;
         try
         {
-            createResult = await _userManager.CreateAsync(user, request.Password);
+            createResult = confirmationRequired
+                ? await _userManager.CreateAsync(user)
+                : await _userManager.CreateAsync(user, request.Password);
         }
         catch (DbUpdateException exception)
             when (exception.InnerException is PostgresException
@@ -330,7 +348,7 @@ public sealed class AuthController : ApiControllerBase
                 "The account could not be created.");
         }
 
-        if (demoWorkspace is not null)
+        if (demoWorkspace is not null && !confirmationRequired)
         {
             var converted = await _demoWorkspaceConsumption.TryConvertAsync(
                 demoWorkspace.Id,
@@ -348,7 +366,7 @@ public sealed class AuthController : ApiControllerBase
                     "The demo workspace changed during conversion. Retry the operation.");
             }
         }
-        else
+        else if (demoWorkspace is null)
         {
             var workspace = new Workspace
             {
@@ -370,7 +388,7 @@ public sealed class AuthController : ApiControllerBase
 
         await transaction.CommitAsync(cancellationToken);
 
-        if (demoActor is not null)
+        if (demoActor is not null && !confirmationRequired)
         {
             await HttpContext.SignOutAsync(MigaAuthenticationConstants.DemoScheme);
         }
@@ -382,9 +400,9 @@ public sealed class AuthController : ApiControllerBase
             user.Id,
             cancellationToken);
 
-        if (_authenticationOptions.RequireConfirmedEmail)
+        if (confirmationRequired)
         {
-            await TrySendConfirmationAsync(user, cancellationToken);
+            _ = _emailQueue.TryQueueEmailConfirmation(user.Id);
             await EnforceGenericResponseFloorAsync(genericResponseStarted, cancellationToken);
             return Accepted();
         }
@@ -399,6 +417,7 @@ public sealed class AuthController : ApiControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken cancellationToken)
     {
+        var genericResponseStarted = Stopwatch.GetTimestamp();
         var user = await _userManager.FindByEmailAsync(request.Email.Trim());
         if (user is null)
         {
@@ -409,6 +428,7 @@ public sealed class AuthController : ApiControllerBase
                 null,
                 null,
                 cancellationToken);
+            await EnforceGenericResponseFloorAsync(genericResponseStarted, cancellationToken);
             return InvalidCredentials();
         }
 
@@ -422,9 +442,10 @@ public sealed class AuthController : ApiControllerBase
             await _auditService.RecordAsync(
                 "auth.login",
                 "failure",
-                ActorType.Registered,
-                user.Id,
+                null,
+                null,
                 cancellationToken);
+            await EnforceGenericResponseFloorAsync(genericResponseStarted, cancellationToken);
             return InvalidCredentials();
         }
 
@@ -490,34 +511,16 @@ public sealed class AuthController : ApiControllerBase
     {
         var genericResponseStarted = Stopwatch.GetTimestamp();
         var user = await _userManager.FindByEmailAsync(request.Email.Trim());
-        if (user is not null && user.EmailConfirmed && _emailSender.IsConfigured)
+        if (user is not null && user.EmailConfirmed)
         {
-            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-            var resetUrl = BuildFragmentUrl(
-                "restablecer",
-                ("email", user.Email!),
-                ("token", token));
-            try
-            {
-                await _emailSender.SendPasswordResetAsync(
-                    user.Email!,
-                    resetUrl,
-                    cancellationToken);
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(
-                    exception,
-                    "Password reset delivery failed for user {UserId}",
-                    user.Id);
-            }
+            _ = _emailQueue.TryQueuePasswordReset(user.Id);
         }
 
         await _auditService.RecordAsync(
             "password.reset_requested",
             "accepted",
-            user is null ? null : ActorType.Registered,
-            user?.Id,
+            null,
+            null,
             cancellationToken);
         await EnforceGenericResponseFloorAsync(genericResponseStarted, cancellationToken);
         return Accepted();
@@ -531,6 +534,7 @@ public sealed class AuthController : ApiControllerBase
         ResetPasswordRequest request,
         CancellationToken cancellationToken)
     {
+        var genericResponseStarted = Stopwatch.GetTimestamp();
         var passwordResult = _passwordPolicy.Validate(request.NewPassword);
         if (!passwordResult.IsValid)
         {
@@ -543,7 +547,9 @@ public sealed class AuthController : ApiControllerBase
         var user = await _userManager.FindByEmailAsync(request.Email.Trim());
         if (user is null)
         {
-            return InvalidToken();
+            return await InvalidResetTokenAsync(
+                genericResponseStarted,
+                cancellationToken);
         }
 
         var result = await _userManager.ResetPasswordAsync(
@@ -552,7 +558,9 @@ public sealed class AuthController : ApiControllerBase
             request.NewPassword);
         if (!result.Succeeded)
         {
-            return InvalidToken();
+            return await InvalidResetTokenAsync(
+                genericResponseStarted,
+                cancellationToken);
         }
 
         await RevokeAllUserSessionsAsync(user.Id, cancellationToken);
@@ -573,21 +581,210 @@ public sealed class AuthController : ApiControllerBase
         ConfirmEmailRequest request,
         CancellationToken cancellationToken)
     {
+        if (request.ImportDemoData && request.ContinueWithoutDemoData)
+        {
+            return ApiProblem(
+                StatusCodes.Status400BadRequest,
+                "demo_confirmation_options_invalid",
+                "Demo data cannot be imported and skipped in the same request.");
+        }
+
+        if (!string.Equals(
+                request.PrivacyPolicyVersion,
+                _authenticationOptions.PrivacyPolicyVersion,
+                StringComparison.Ordinal))
+        {
+            return ApiProblem(
+                StatusCodes.Status400BadRequest,
+                "privacy_policy_version_invalid",
+                "The current privacy policy must be accepted.");
+        }
+
+        var passwordResult = _passwordPolicy.Validate(request.NewPassword);
+        if (!passwordResult.IsValid)
+        {
+            return ApiProblem(
+                StatusCodes.Status400BadRequest,
+                passwordResult.ErrorCode!,
+                "The password does not meet the security policy.");
+        }
+
         var user = await _userManager.FindByIdAsync(request.UserId.ToString());
         if (user is null || user.EmailConfirmed)
         {
             return InvalidToken();
         }
 
-        var result = await _userManager.ConfirmEmailAsync(user, request.Token);
-        if (!result.Succeeded)
+        var validToken = await _userManager.VerifyUserTokenAsync(
+            user,
+            _userManager.Options.Tokens.EmailConfirmationTokenProvider,
+            UserManager<MigaUser>.ConfirmEmailTokenPurpose,
+            request.Token);
+        if (!validToken)
         {
             return InvalidToken();
         }
 
-        // Make every outstanding confirmation token unusable after the first
-        // successful confirmation. There is no authenticated session yet.
-        await _userManager.UpdateSecurityStampAsync(user);
+        var now = DateTimeOffset.UtcNow;
+        await using var transaction =
+            await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var claimedUserRows = await _dbContext.Users
+            .Where(candidate =>
+                candidate.Id == user.Id &&
+                !candidate.EmailConfirmed &&
+                candidate.SecurityStamp == user.SecurityStamp)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(
+                    candidate => candidate.AccessFailedCount,
+                    candidate => candidate.AccessFailedCount),
+                cancellationToken);
+        if (claimedUserRows != 1)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return InvalidToken();
+        }
+
+        await _dbContext.Entry(user).ReloadAsync(cancellationToken);
+        var hasAnyPendingDemoLink =
+            user.PendingDemoWorkspaceId is not null ||
+            user.PendingDemoSessionId is not null ||
+            user.PendingDemoExpiresAtUtc is not null;
+        CurrentActor? activeDemo = null;
+        if (!request.ContinueWithoutDemoData &&
+            (request.ImportDemoData || hasAnyPendingDemoLink))
+        {
+            activeDemo = await _currentActorAccessor.GetDemoAsync(cancellationToken);
+        }
+
+        var activeDemoMatchesPending =
+            activeDemo is not null &&
+            user.PendingDemoWorkspaceId == activeDemo.WorkspaceId &&
+            user.PendingDemoSessionId == activeDemo.SessionId &&
+            user.PendingDemoExpiresAtUtc is DateTimeOffset pendingExpiry &&
+            pendingExpiry > now;
+        var shouldConvertDemo =
+            !request.ContinueWithoutDemoData &&
+            (request.ImportDemoData || activeDemoMatchesPending);
+        if (!request.ContinueWithoutDemoData &&
+            ((request.ImportDemoData && activeDemo is null) ||
+             (!request.ImportDemoData &&
+              hasAnyPendingDemoLink &&
+              !activeDemoMatchesPending)))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return DemoConversionUnavailable();
+        }
+
+        var convertedDemo = false;
+        if (shouldConvertDemo)
+        {
+            var demoToConvert = activeDemo!;
+            var existingWorkspace = await _dbContext.Workspaces
+                .AsNoTracking()
+                .Where(workspace => workspace.OwnerUserId == user.Id)
+                .Select(workspace => new
+                {
+                    workspace.Id,
+                    workspace.Kind,
+                    SnapshotRevision = workspace.Snapshot == null
+                        ? (long?)null
+                        : workspace.Snapshot.Revision
+                })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (existingWorkspace is not null)
+            {
+                if (existingWorkspace.Kind != WorkspaceKind.Registered ||
+                    existingWorkspace.SnapshotRevision != 0)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return DemoConversionUnavailable();
+                }
+
+                var deletedSnapshotRows = await _dbContext.WorkspaceSnapshots
+                    .Where(snapshot =>
+                        snapshot.WorkspaceId == existingWorkspace.Id &&
+                        snapshot.Revision == 0)
+                    .ExecuteDeleteAsync(cancellationToken);
+                var deletedWorkspaceRows = deletedSnapshotRows == 1
+                    ? await _dbContext.Workspaces
+                        .Where(workspace =>
+                            workspace.Id == existingWorkspace.Id &&
+                            workspace.OwnerUserId == user.Id &&
+                            workspace.Kind == WorkspaceKind.Registered)
+                        .ExecuteDeleteAsync(cancellationToken)
+                    : 0;
+                if (deletedSnapshotRows != 1 || deletedWorkspaceRows != 1)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return DemoConversionUnavailable();
+                }
+            }
+
+            var demoRevision = await _dbContext.WorkspaceSnapshots
+                .AsNoTracking()
+                .Where(snapshot => snapshot.WorkspaceId == demoToConvert.WorkspaceId)
+                .Select(snapshot => (long?)snapshot.Revision)
+                .SingleOrDefaultAsync(cancellationToken);
+            convertedDemo = demoRevision is not null &&
+                await _demoWorkspaceConsumption.TryConvertAsync(
+                    demoToConvert.WorkspaceId,
+                    demoToConvert.SessionId,
+                    demoRevision.Value,
+                    user.Id,
+                    now,
+                    cancellationToken);
+            if (!convertedDemo)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return DemoConversionUnavailable();
+            }
+        }
+        else if (!await _dbContext.Workspaces.AnyAsync(
+                     workspace => workspace.OwnerUserId == user.Id,
+                     cancellationToken))
+        {
+            var workspace = new Workspace
+            {
+                Id = Guid.CreateVersion7(),
+                Kind = WorkspaceKind.Registered,
+                OwnerUserId = user.Id,
+                CreatedAtUtc = now,
+                Snapshot = new WorkspaceSnapshot
+                {
+                    Revision = 0,
+                    DataJson = SnapshotSeedFactory.CreateEmpty(now),
+                    UpdatedAtUtc = now
+                }
+            };
+            workspace.Snapshot.WorkspaceId = workspace.Id;
+            _dbContext.Workspaces.Add(workspace);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        user.EmailConfirmed = true;
+        user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
+        user.PrivacyPolicyVersion = request.PrivacyPolicyVersion;
+        user.PrivacyPolicyAcceptedAtUtc = now;
+        user.PendingDemoWorkspaceId = null;
+        user.PendingDemoSessionId = null;
+        user.PendingDemoExpiresAtUtc = null;
+        user.AccessFailedCount = 0;
+        user.LockoutEnd = null;
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+
+        var updateResult = await _userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return InvalidToken();
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        if (convertedDemo)
+        {
+            await HttpContext.SignOutAsync(MigaAuthenticationConstants.DemoScheme);
+        }
+
         await _auditService.RecordAsync(
             "email.confirmed",
             "success",
@@ -609,7 +806,7 @@ public sealed class AuthController : ApiControllerBase
         var user = await _userManager.FindByEmailAsync(request.Email.Trim());
         if (user is not null && !user.EmailConfirmed)
         {
-            await TrySendConfirmationAsync(user, cancellationToken);
+            _ = _emailQueue.TryQueueEmailConfirmation(user.Id);
         }
 
         await EnforceGenericResponseFloorAsync(genericResponseStarted, cancellationToken);
@@ -818,47 +1015,6 @@ public sealed class AuthController : ApiControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task TrySendConfirmationAsync(
-        MigaUser user,
-        CancellationToken cancellationToken)
-    {
-        if (!_emailSender.IsConfigured || user.EmailConfirmed || string.IsNullOrEmpty(user.Email))
-        {
-            return;
-        }
-
-        var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-        var confirmationUrl = BuildFragmentUrl(
-            "verificar-email",
-            ("userId", user.Id.ToString()),
-            ("token", token));
-        try
-        {
-            await _emailSender.SendEmailConfirmationAsync(
-                user.Email,
-                confirmationUrl,
-                cancellationToken);
-        }
-        catch (Exception exception)
-        {
-            _logger.LogError(
-                exception,
-                "Email confirmation delivery failed for user {UserId}",
-                user.Id);
-        }
-    }
-
-    private Uri BuildFragmentUrl(string relativePath, params (string Key, string Value)[] values)
-    {
-        var baseUri = new Uri(_authenticationOptions.PublicBaseUrl.TrimEnd('/') + "/");
-        var destination = new Uri(baseUri, relativePath);
-        var fragment = string.Join(
-            "&",
-            values.Select(value =>
-                $"{Uri.EscapeDataString(value.Key)}={Uri.EscapeDataString(value.Value)}"));
-        return new UriBuilder(destination) { Fragment = fragment }.Uri;
-    }
-
     private IActionResult InvalidCredentials() =>
         ApiProblem(
             StatusCodes.Status401Unauthorized,
@@ -870,6 +1026,28 @@ public sealed class AuthController : ApiControllerBase
             StatusCodes.Status400BadRequest,
             "invalid_or_expired_token",
             "The token is invalid or expired.");
+
+    private IActionResult DemoConversionUnavailable() =>
+        ApiProblem(
+            StatusCodes.Status409Conflict,
+            "demo_conversion_unavailable",
+            "Use the matching active demo session, or explicitly continue without demo data.");
+
+    private async Task<IActionResult> InvalidResetTokenAsync(
+        long genericResponseStarted,
+        CancellationToken cancellationToken)
+    {
+        await _auditService.RecordAsync(
+            "password.reset",
+            "failure",
+            null,
+            null,
+            cancellationToken);
+        await EnforceGenericResponseFloorAsync(
+            genericResponseStarted,
+            cancellationToken);
+        return InvalidToken();
+    }
 
     private static DateTimeOffset Min(DateTimeOffset left, DateTimeOffset right) =>
         left <= right ? left : right;

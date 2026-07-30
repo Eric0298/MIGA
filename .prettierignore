@@ -9,7 +9,14 @@ frontend/public/brand
 
 backend/**/bin
 backend/**/obj
+backend/.migration-scaffolder
+
+**/TestResults
+**/playwright-report
+**/test-results
+**/blob-report
 
 *.csv
 *.min.*
 package-lock.json
+**/packages.lock.json

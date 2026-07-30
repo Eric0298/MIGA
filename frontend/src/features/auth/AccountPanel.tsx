@@ -3,13 +3,13 @@ import { Download, KeyRound, LogOut, ShieldAlert, UserRound } from 'lucide-react
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { useT } from '@/i18n/i18n-context'
-import { formatBytes } from '@/lib/format-bytes'
 import { tpl } from '@/i18n/tpl'
 import { useWorkspaceSync } from '@/lib/sync/WorkspaceSyncProvider'
+import { buildExportPayload } from '@/lib/db/import-export'
+import type { AccountSession } from '@/lib/api/auth-api'
 import { authCopyByLanguage } from './auth-copy'
 import { authFieldClass, authPrimaryButtonClass, authSecondaryButtonClass } from './AuthLayout'
 import { useAuth } from './AuthProvider'
-import { confirmLogoutSafety, getLocalBlobSummary } from './logout-safety'
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
@@ -28,31 +28,26 @@ export function AccountPanel() {
   const navigate = useNavigate()
   const { lang } = useT()
   const copy = authCopyByLanguage[lang]
-  const [busy, setBusy] = useState<'logout' | 'password' | 'export' | 'delete' | null>(null)
+  const [busy, setBusy] = useState<
+    'logout' | 'password' | 'export' | 'delete' | 'conflict' | 'sessions' | null
+  >(null)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('')
   const [exportPassword, setExportPassword] = useState('')
   const [deletePassword, setDeletePassword] = useState('')
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [sessionsPassword, setSessionsPassword] = useState('')
+  const [sessions, setSessions] = useState<AccountSession[] | null>(null)
 
   if (!auth.session.authenticated) return null
 
   const logout = async () => {
     setBusy('logout')
     try {
-      const confirmed = await confirmLogoutSafety({
-        syncNow: sync.syncNow,
-        inspectLocalBlobs: getLocalBlobSummary,
-        confirm: (message) => window.confirm(message),
-        unsyncedMessage: copy.account.logoutUnsynced,
-        localFilesMessage: ({ count, bytes }) =>
-          tpl(copy.account.logoutLocalFiles, {
-            count,
-            size: formatBytes(bytes),
-          }),
-      })
-      if (!confirmed) return
+      // Best effort only. Pending changes and local blobs remain in the scoped
+      // database even when the network is unavailable.
+      await sync.syncNow()
       await auth.logout()
       navigate('/', { replace: true })
     } catch {
@@ -61,6 +56,55 @@ export function AccountPanel() {
       setBusy(null)
     }
   }
+
+  const resolveConflict = async (resolution: 'keep-local' | 'keep-remote') => {
+    const confirmation =
+      resolution === 'keep-local' ? copy.account.keepLocalConfirm : copy.account.useServerConfirm
+    if (!window.confirm(confirmation)) return
+
+    setBusy('conflict')
+    try {
+      if (resolution === 'keep-remote') {
+        const payload = await buildExportPayload()
+        downloadBlob(
+          new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
+          `miga-conflict-backup-${new Date().toISOString().slice(0, 10)}.json`,
+        )
+      }
+      const resolved = await sync.resolveConflict(resolution)
+      if (!resolved) throw new Error('Conflict resolution failed')
+      toast.success(copy.account.conflictResolved)
+    } catch {
+      toast.error(copy.account.conflictFailed)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const conflictActions =
+    sync.status === 'conflict' ? (
+      <div className="mt-4 rounded-xl bg-peach/60 p-4">
+        <p className="text-sm text-charcoal">{copy.account.conflictTitle}</p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            className={authSecondaryButtonClass}
+            disabled={busy !== null}
+            onClick={() => void resolveConflict('keep-local')}
+          >
+            {copy.account.keepLocal}
+          </button>
+          <button
+            type="button"
+            className={authSecondaryButtonClass}
+            disabled={busy !== null}
+            onClick={() => void resolveConflict('keep-remote')}
+          >
+            {copy.account.useServer}
+          </button>
+        </div>
+      </div>
+    ) : null
 
   if (auth.session.accountType === 'demo') {
     return (
@@ -81,6 +125,7 @@ export function AccountPanel() {
           >
             {copy.account.logout}
           </button>
+          {conflictActions}
         </div>
       </section>
     )
@@ -119,6 +164,36 @@ export function AccountPanel() {
       downloadBlob(blob, `miga-account-${new Date().toISOString().slice(0, 10)}.json`)
       setExportPassword('')
       toast.success(copy.account.exportSuccess)
+    } catch {
+      toast.error(copy.common.genericError)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const loadSessions = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (busy) return
+    setBusy('sessions')
+    try {
+      await auth.reauthenticate(sessionsPassword)
+      setSessions(await auth.listAccountSessions())
+      setSessionsPassword('')
+    } catch {
+      toast.error(copy.common.genericError)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const revokeSession = async (sessionId?: string) => {
+    if (busy || !window.confirm(copy.account.revokeSessionConfirm)) return
+    setBusy('sessions')
+    try {
+      if (sessionId) await auth.revokeAccountSession(sessionId)
+      else await auth.revokeOtherAccountSessions()
+      setSessions(await auth.listAccountSessions())
+      toast.success(copy.account.sessionsUpdated)
     } catch {
       toast.error(copy.common.genericError)
     } finally {
@@ -169,6 +244,7 @@ export function AccountPanel() {
           <LogOut size={17} aria-hidden="true" />
           {copy.account.logout}
         </button>
+        {conflictActions}
       </div>
 
       <details className="rounded-2xl bg-surface p-5">
@@ -216,6 +292,81 @@ export function AccountPanel() {
             {copy.account.changePassword}
           </button>
         </form>
+      </details>
+
+      <details className="rounded-2xl bg-surface p-5">
+        <summary className="flex cursor-pointer list-none items-center gap-3 font-semibold text-charcoal">
+          <UserRound size={18} aria-hidden="true" />
+          {copy.account.sessionsTitle}
+        </summary>
+        <p className="mt-3 text-sm text-[color:var(--color-text-muted)]">
+          {copy.account.sessionsHint}
+        </p>
+        <form className="mt-4 flex flex-col gap-3" onSubmit={loadSessions}>
+          <input
+            className={authFieldClass}
+            aria-label={copy.common.currentPassword}
+            placeholder={copy.common.currentPassword}
+            type="password"
+            autoComplete="current-password"
+            required
+            maxLength={128}
+            value={sessionsPassword}
+            onChange={(event) => setSessionsPassword(event.target.value)}
+          />
+          <button className={authSecondaryButtonClass} type="submit" disabled={busy !== null}>
+            {copy.account.sessionsLoad}
+          </button>
+        </form>
+        {sessions && (
+          <div className="mt-4 flex flex-col gap-3">
+            {sessions.map((accountSession) => (
+              <div
+                key={accountSession.sessionId}
+                className="rounded-xl border border-[color:var(--color-border)] p-3 text-sm"
+              >
+                {accountSession.current && (
+                  <p className="font-semibold text-charcoal">{copy.account.sessionsCurrent}</p>
+                )}
+                <p className="text-[color:var(--color-text-muted)]">
+                  {tpl(copy.account.sessionsLastSeen, {
+                    date: new Date(accountSession.lastSeenAtUtc).toLocaleString(),
+                  })}
+                </p>
+                <p className="text-[color:var(--color-text-muted)]">
+                  {tpl(copy.account.sessionsExpires, {
+                    date: new Date(accountSession.expiresAtUtc).toLocaleString(),
+                  })}
+                </p>
+                {!accountSession.current && (
+                  <button
+                    type="button"
+                    className={`${authSecondaryButtonClass} mt-2`}
+                    disabled={busy !== null}
+                    onClick={() => void revokeSession(accountSession.sessionId)}
+                  >
+                    {copy.account.revokeSession}
+                  </button>
+                )}
+              </div>
+            ))}
+            {!sessions.some((accountSession) => !accountSession.current) && (
+              <p className="text-sm text-[color:var(--color-text-muted)]">
+                {copy.account.sessionsEmpty}
+              </p>
+            )}
+            {sessions.some((accountSession) => !accountSession.current) && (
+              <button
+                type="button"
+                className={authSecondaryButtonClass}
+                disabled={busy !== null}
+                onClick={() => void revokeSession()}
+              >
+                {copy.account.revokeOthers}
+              </button>
+            )}
+          </div>
+        )}
       </details>
 
       <details className="rounded-2xl bg-surface p-5">

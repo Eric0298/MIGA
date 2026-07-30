@@ -385,17 +385,25 @@ namespace Miga.Infrastructure.Persistence.Migrations
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("PendingDemoExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PendingDemoSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PendingDemoWorkspaceId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("text");
 
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTimeOffset>("PrivacyPolicyAcceptedAtUtc")
+                    b.Property<DateTimeOffset?>("PrivacyPolicyAcceptedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PrivacyPolicyVersion")
-                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
@@ -420,7 +428,17 @@ namespace Miga.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
-                    b.ToTable("users", "auth");
+                    b.HasIndex("PendingDemoWorkspaceId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_users_pending_demo_workspace")
+                        .HasFilter("\"PendingDemoWorkspaceId\" IS NOT NULL");
+
+                    b.ToTable("users", "auth", t =>
+                        {
+                            t.HasCheckConstraint("CK_users_confirmed_privacy", "NOT \"EmailConfirmed\" OR (\"PrivacyPolicyVersion\" IS NOT NULL AND \"PrivacyPolicyAcceptedAtUtc\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_users_pending_demo_link", "(\"PendingDemoWorkspaceId\" IS NULL AND \"PendingDemoSessionId\" IS NULL AND \"PendingDemoExpiresAtUtc\" IS NULL) OR (NOT \"EmailConfirmed\" AND \"PendingDemoWorkspaceId\" IS NOT NULL AND \"PendingDemoSessionId\" IS NOT NULL AND \"PendingDemoExpiresAtUtc\" IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

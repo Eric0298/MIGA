@@ -13,6 +13,9 @@ test('filters the global notes hub by goal and origin', async ({ page }) => {
   // behavior without going through the create UI (already covered elsewhere).
   await page.evaluate(
     async ({ ids, dbName }: { ids: { a: string; b: string }; dbName: string }) => {
+      // @ts-expect-error Browser-only Vite module loaded inside page.evaluate.
+      const { db } = await import(/* @vite-ignore */ '/src/lib/db/miga-db.ts')
+      if (db.name !== dbName) throw new Error(`Unexpected active database: ${db.name}`)
       const now = Date.now()
       const makeNote = (goalId: string, index: number, title: string) => ({
         id: crypto.randomUUID(),
@@ -27,23 +30,7 @@ test('filters the global notes hub by goal and origin', async ({ page }) => {
         updatedAt: now + index,
       })
       const rows = [makeNote(ids.a, 1, 'Nota A'), makeNote(ids.b, 2, 'Nota B')]
-      await new Promise<void>((resolve, reject) => {
-        const req = indexedDB.open(dbName)
-        req.onsuccess = () => {
-          const idb = req.result
-          const tx = idb.transaction('notes', 'readwrite')
-          for (const row of rows) tx.objectStore('notes').put(row)
-          tx.oncomplete = () => {
-            idb.close()
-            resolve()
-          }
-          tx.onerror = () => {
-            idb.close()
-            reject(tx.error)
-          }
-        }
-        req.onerror = () => reject(req.error)
-      })
+      await db.notes.bulkPut(rows)
     },
     { ids: { a: goalA.id, b: goalB.id }, dbName: DEXIE_DB_NAME },
   )

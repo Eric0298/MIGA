@@ -54,6 +54,8 @@ export type AuthCopy = {
     sent: string
     success: string
     invalidLink: string
+    continueWithoutDemoDataConfirm: string
+    demoDataPreserved: string
   }
   demo: {
     title: string
@@ -80,8 +82,24 @@ export type AuthCopy = {
     title: string
     signedInAs: string
     logout: string
-    logoutUnsynced: string
-    logoutLocalFiles: string
+    conflictTitle: string
+    keepLocal: string
+    useServer: string
+    keepLocalConfirm: string
+    useServerConfirm: string
+    conflictResolved: string
+    conflictFailed: string
+    sessionsTitle: string
+    sessionsHint: string
+    sessionsLoad: string
+    sessionsCurrent: string
+    sessionsLastSeen: string
+    sessionsExpires: string
+    sessionsEmpty: string
+    revokeSession: string
+    revokeOthers: string
+    revokeSessionConfirm: string
+    sessionsUpdated: string
     changePassword: string
     passwordChanged: string
     export: string
@@ -156,6 +174,10 @@ const es: AuthCopy = {
     sent: 'Si corresponde, se ha enviado un nuevo correo de verificación.',
     success: 'Correo verificado correctamente.',
     invalidLink: 'Abre el enlace completo recibido por correo para verificar la cuenta.',
+    continueWithoutDemoDataConfirm:
+      'No se ha podido importar la demo actual. Si continúas, se confirmará la cuenta sin importarla. Sus datos permanecerán locales en este dispositivo mientras no borres la demo ni sus datos locales. ¿Continuar sin importar esta demo?',
+    demoDataPreserved:
+      'La confirmación no ha continuado. Los datos de la demo permanecen locales en este dispositivo.',
   },
   demo: {
     title: 'Preparando la demo',
@@ -182,10 +204,26 @@ const es: AuthCopy = {
     title: 'Cuenta y seguridad',
     signedInAs: 'Sesión iniciada como {email}',
     logout: 'Cerrar sesión',
-    logoutUnsynced:
-      'Hay cambios que no se han podido sincronizar. Si cierras sesión ahora, se eliminará la copia local. ¿Quieres continuar?',
-    logoutLocalFiles:
-      'Este dispositivo guarda {count} archivo(s) local(es) ({size}) que no se sincronizan ni se incluyen en el backup: PDF, vídeo, audio o imágenes. Cerrar sesión los eliminará. ¿Quieres continuar?',
+    conflictTitle: 'Elige cómo resolver el conflicto antes de seguir sincronizando.',
+    keepLocal: 'Conservar esta copia',
+    useServer: 'Usar copia del servidor',
+    keepLocalConfirm:
+      'Esto reemplazará en el servidor los datos estructurados por esta copia local. Los archivos locales no se subirán. ¿Continuar?',
+    useServerConfirm:
+      'Se descargará un backup JSON y después los datos estructurados locales se reemplazarán por la copia del servidor. Los archivos locales se conservarán. ¿Continuar?',
+    conflictResolved: 'Conflicto resuelto.',
+    conflictFailed: 'No se pudo resolver el conflicto.',
+    sessionsTitle: 'Sesiones activas',
+    sessionsHint: 'Confirma tu contraseña para revisar y revocar accesos de otros dispositivos.',
+    sessionsLoad: 'Mostrar sesiones',
+    sessionsCurrent: 'Este dispositivo',
+    sessionsLastSeen: 'Último uso: {date}',
+    sessionsExpires: 'Caduca: {date}',
+    sessionsEmpty: 'No hay otras sesiones activas.',
+    revokeSession: 'Revocar',
+    revokeOthers: 'Revocar las demás',
+    revokeSessionConfirm: 'La sesión seleccionada perderá el acceso. ¿Continuar?',
+    sessionsUpdated: 'Sesiones actualizadas.',
     changePassword: 'Cambiar contraseña',
     passwordChanged: 'Contraseña actualizada.',
     export: 'Exportar mis datos',
@@ -261,6 +299,9 @@ const en: AuthCopy = {
     sent: 'When applicable, a new verification email has been sent.',
     success: 'Email verified.',
     invalidLink: 'Open the complete link from your email to verify the account.',
+    continueWithoutDemoDataConfirm:
+      'The current demo could not be imported. If you continue, the account will be confirmed without importing it. Its data will remain local on this device unless you delete the demo or its local data. Continue without importing this demo?',
+    demoDataPreserved: 'Confirmation did not continue. The demo data remains local on this device.',
   },
   demo: {
     title: 'Preparing the demo',
@@ -287,10 +328,26 @@ const en: AuthCopy = {
     title: 'Account and security',
     signedInAs: 'Signed in as {email}',
     logout: 'Sign out',
-    logoutUnsynced:
-      'Some changes could not be synchronized. Signing out now will remove the local copy. Continue?',
-    logoutLocalFiles:
-      'This device stores {count} local file(s) ({size}) that are neither synchronized nor included in the backup: PDFs, video, audio, or images. Signing out will delete them. Continue?',
+    conflictTitle: 'Choose how to resolve the conflict before synchronization continues.',
+    keepLocal: 'Keep this copy',
+    useServer: 'Use server copy',
+    keepLocalConfirm:
+      'This will replace the server structured data with this local copy. Local files are not uploaded. Continue?',
+    useServerConfirm:
+      'A JSON backup will be downloaded, then local structured data will be replaced by the server copy. Local files will be kept. Continue?',
+    conflictResolved: 'Conflict resolved.',
+    conflictFailed: 'The conflict could not be resolved.',
+    sessionsTitle: 'Active sessions',
+    sessionsHint: 'Confirm your password to review and revoke access from other devices.',
+    sessionsLoad: 'Show sessions',
+    sessionsCurrent: 'This device',
+    sessionsLastSeen: 'Last used: {date}',
+    sessionsExpires: 'Expires: {date}',
+    sessionsEmpty: 'There are no other active sessions.',
+    revokeSession: 'Revoke',
+    revokeOthers: 'Revoke other sessions',
+    revokeSessionConfirm: 'The selected session will lose access. Continue?',
+    sessionsUpdated: 'Sessions updated.',
     changePassword: 'Change password',
     passwordChanged: 'Password updated.',
     export: 'Export my data',
@@ -366,6 +423,10 @@ const va: AuthCopy = {
     sent: 'Si correspon, s’ha enviat un correu de verificació nou.',
     success: 'Correu verificat correctament.',
     invalidLink: 'Obri l’enllaç complet rebut per correu.',
+    continueWithoutDemoDataConfirm:
+      'No s’ha pogut importar la demo actual. Si continues, es confirmarà el compte sense importar-la. Les dades continuaran locals en este dispositiu mentre no esborres la demo ni les seues dades locals. Vols continuar sense importar esta demo?',
+    demoDataPreserved:
+      'La confirmació no ha continuat. Les dades de la demo continuen locals en este dispositiu.',
   },
   demo: {
     title: 'Preparant la demo',
@@ -392,10 +453,26 @@ const va: AuthCopy = {
     title: 'Compte i seguretat',
     signedInAs: 'Sessió iniciada com a {email}',
     logout: 'Tancar sessió',
-    logoutUnsynced:
-      'Hi ha canvis que no s’han pogut sincronitzar. Si tanques la sessió ara, s’eliminarà la còpia local. Vols continuar?',
-    logoutLocalFiles:
-      'Este dispositiu guarda {count} fitxer(s) local(s) ({size}) que no se sincronitzen ni s’inclouen en la còpia: PDF, vídeo, àudio o imatges. Tancar la sessió els eliminarà. Vols continuar?',
+    conflictTitle: 'Tria com resoldre el conflicte abans de continuar sincronitzant.',
+    keepLocal: 'Conservar esta còpia',
+    useServer: 'Usar còpia del servidor',
+    keepLocalConfirm:
+      'Açò reemplaçarà en el servidor les dades estructurades per esta còpia local. Els fitxers locals no es pujaran. Vols continuar?',
+    useServerConfirm:
+      'Es descarregarà una còpia JSON i després les dades estructurades locals seran reemplaçades per la còpia del servidor. Els fitxers locals es conservaran. Vols continuar?',
+    conflictResolved: 'Conflicte resolt.',
+    conflictFailed: 'No s’ha pogut resoldre el conflicte.',
+    sessionsTitle: 'Sessions actives',
+    sessionsHint: 'Confirma la contrasenya per a revisar i revocar accessos d’altres dispositius.',
+    sessionsLoad: 'Mostrar sessions',
+    sessionsCurrent: 'Este dispositiu',
+    sessionsLastSeen: 'Últim ús: {date}',
+    sessionsExpires: 'Caduca: {date}',
+    sessionsEmpty: 'No hi ha altres sessions actives.',
+    revokeSession: 'Revocar',
+    revokeOthers: 'Revocar les altres',
+    revokeSessionConfirm: 'La sessió seleccionada perdrà l’accés. Vols continuar?',
+    sessionsUpdated: 'Sessions actualitzades.',
     changePassword: 'Canviar contrasenya',
     passwordChanged: 'Contrasenya actualitzada.',
     export: 'Exportar les meues dades',

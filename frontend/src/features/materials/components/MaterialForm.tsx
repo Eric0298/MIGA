@@ -4,6 +4,7 @@ import { Loader2, Paperclip } from 'lucide-react'
 import { toast } from 'sonner'
 import { createMaterial } from '@/lib/db/materials.repository'
 import { deleteBlob, putBlob, setBlobMaterial } from '@/lib/db/blobs.repository'
+import { MAX_HTTP_URL_CHARS } from '@/lib/db/data-limits'
 import { MATERIAL_LIMITS, materialInputSchema, type MaterialKind } from '@/lib/db/schema'
 import { useT } from '@/i18n/i18n-context'
 import type { Messages } from '@/i18n/messages/es'
@@ -276,6 +277,7 @@ function MaterialForm({ goalId, onCreated, onCancel }: MaterialFormProps) {
             id="material-url"
             type="url"
             inputMode="url"
+            maxLength={MAX_HTTP_URL_CHARS}
             autoComplete="off"
             value={url}
             onChange={(e) => setUrl(e.target.value)}

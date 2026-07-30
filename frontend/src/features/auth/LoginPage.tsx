@@ -15,6 +15,7 @@ function LoginPage() {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const authLoading = auth.status === 'loading'
 
   if (auth.status === 'ready' && auth.session.authenticated) {
     return <Navigate to="/app" replace />
@@ -22,7 +23,7 @@ function LoginPage() {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (busy) return
+    if (busy || authLoading) return
     setBusy(true)
     setError(null)
     try {
@@ -48,6 +49,7 @@ function LoginPage() {
             autoComplete="email"
             inputMode="email"
             required
+            disabled={authLoading || busy}
             maxLength={254}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -60,12 +62,13 @@ function LoginPage() {
             type="password"
             autoComplete="current-password"
             required
+            disabled={authLoading || busy}
             maxLength={128}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
         </label>
-        <button className={authPrimaryButtonClass} type="submit" disabled={busy}>
+        <button className={authPrimaryButtonClass} type="submit" disabled={busy || authLoading}>
           {copy.login.submit}
         </button>
         <Link className="text-center text-sm font-semibold text-apricot" to="/recuperar">

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { assertSnapshotSize } from '@/lib/db/data-limits'
 import { parseImportPayload, type ExportPayload } from '@/lib/db/import-export'
 import { apiRequest } from './http'
 
@@ -31,13 +32,16 @@ export async function getSnapshot(signal?: AbortSignal): Promise<SnapshotEnvelop
 }
 
 export async function putSnapshot(
+  workspaceId: string,
   revision: number,
   data: ExportPayload,
   signal?: AbortSignal,
 ): Promise<SnapshotEnvelope> {
+  const validatedWorkspaceId = z.string().uuid().parse(workspaceId)
+  assertSnapshotSize(data)
   const raw = await apiRequest<unknown>('/api/data/snapshot', {
     method: 'PUT',
-    json: { revision, data },
+    json: { workspaceId: validatedWorkspaceId, revision, data },
     signal,
   })
   return parseSnapshotEnvelope(raw)

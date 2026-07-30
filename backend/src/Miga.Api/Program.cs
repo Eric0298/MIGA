@@ -328,6 +328,73 @@ app.UseSerilogRequestLogging();
 app.UseCors(ApiSecurityConstants.FrontendCorsPolicy);
 app.UseAuthentication();
 app.UseMiddleware<SecurityHeadersMiddleware>();
+app.Use(async (context, next) =>
+{
+    var contentLength = context.Request.ContentLength;
+    var isSensitiveApi =
+        context.Request.Path.StartsWithSegments("/api/auth") ||
+        context.Request.Path.StartsWithSegments("/api/account");
+    var requestTooLarge =
+        contentLength > ApiSecurityConstants.SensitiveRequestBodyLimit;
+    if (isSensitiveApi &&
+        contentLength is null &&
+        (HttpMethods.IsPost(context.Request.Method) ||
+         HttpMethods.IsPut(context.Request.Method) ||
+         HttpMethods.IsDelete(context.Request.Method) ||
+         HttpMethods.IsPatch(context.Request.Method)))
+    {
+        var readLimit = ApiSecurityConstants.SensitiveRequestBodyLimit + 1;
+        context.Request.EnableBuffering(
+            bufferThreshold: readLimit,
+            bufferLimit: readLimit);
+        var buffer = new byte[readLimit];
+        var totalRead = 0;
+        try
+        {
+            while (totalRead < readLimit)
+            {
+                var read = await context.Request.Body.ReadAsync(
+                    buffer.AsMemory(totalRead, readLimit - totalRead),
+                    context.RequestAborted);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                totalRead += read;
+            }
+
+            requestTooLarge = totalRead > ApiSecurityConstants.SensitiveRequestBodyLimit;
+        }
+        catch (IOException)
+        {
+            requestTooLarge = true;
+        }
+        finally
+        {
+            if (context.Request.Body.CanSeek)
+            {
+                context.Request.Body.Position = 0;
+            }
+        }
+    }
+
+    if (isSensitiveApi && requestTooLarge)
+    {
+        context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status413PayloadTooLarge,
+            Title = "Request body too large."
+        };
+        problem.Extensions["code"] = "request_too_large";
+        problem.Extensions["traceId"] = context.TraceIdentifier;
+        await context.Response.WriteAsJsonAsync(problem, context.RequestAborted);
+        return;
+    }
+
+    await next(context);
+});
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();

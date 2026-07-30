@@ -52,7 +52,15 @@ public sealed class AuthenticationSecurityOptionsValidator
             options.UserAbsoluteTimeout < options.UserIdleTimeout ||
             options.DemoIdleTimeout <= TimeSpan.Zero ||
             options.DemoAbsoluteTimeout < options.DemoIdleTimeout ||
-            options.RecentAuthenticationWindow <= TimeSpan.Zero)
+            options.RecentAuthenticationWindow <= TimeSpan.Zero ||
+            options.UserIdleTimeout > TimeSpan.FromHours(24) ||
+            options.UserAbsoluteTimeout > TimeSpan.FromDays(7) ||
+            options.DemoIdleTimeout > TimeSpan.FromHours(2) ||
+            options.DemoAbsoluteTimeout > TimeSpan.FromHours(24) ||
+            options.RecentAuthenticationWindow > TimeSpan.FromHours(1) ||
+            options.RecentAuthenticationWindow > options.UserAbsoluteTimeout ||
+            options.UnconfirmedAccountLifetime < TimeSpan.FromHours(1) ||
+            options.UnconfirmedAccountLifetime > TimeSpan.FromDays(30))
         {
             return ValidateOptionsResult.Fail("Authentication timeout values are invalid.");
         }

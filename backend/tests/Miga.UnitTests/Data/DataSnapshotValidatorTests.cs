@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Miga.Application.Data;
@@ -107,6 +108,25 @@ public sealed class DataSnapshotValidatorTests
             error =>
                 error.Code == DataSnapshotValidationErrorCodes.DuplicateProperty
                 && error.Path == "$.version"
+        );
+    }
+
+    [Fact]
+    public void Validate_ShouldRejectMalformedUtf8WithoutThrowing()
+    {
+        var snapshot = ValidDataSnapshot.Create();
+        Goal(snapshot)["name"] = "INVALID_BYTE_SENTINEL";
+        var utf8 = Encoding.UTF8.GetBytes(snapshot.ToJsonString());
+        var marker = Encoding.ASCII.GetBytes("INVALID_BYTE_SENTINEL");
+        var markerIndex = utf8.AsSpan().IndexOf(marker);
+        markerIndex.ShouldBeGreaterThanOrEqualTo(0);
+        utf8[markerIndex] = 0xF3;
+        using var document = JsonDocument.Parse(utf8);
+
+        var result = _sut.Validate(document.RootElement);
+
+        result.Errors.ShouldBe(
+            [new DataSnapshotValidationError(DataSnapshotValidationErrorCodes.InvalidFormat, "$")]
         );
     }
 

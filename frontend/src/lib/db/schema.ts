@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_HTTP_URL_CHARS, SNAPSHOT_LIMITS } from './data-limits'
 
 const dayIso = z
   .string()
@@ -36,7 +37,11 @@ export type SessionStatus = z.infer<typeof sessionStatus>
 
 export const startSessionInputSchema = z.object({
   goalId: z.uuid().nullable(),
-  materialIds: z.array(z.uuid()).optional(),
+  materialIds: z
+    .array(z.uuid())
+    .max(SNAPSHOT_LIMITS.materialsPerSession, 'tooManyMaterials')
+    .refine((ids) => new Set(ids).size === ids.length, 'duplicateMaterials')
+    .optional(),
 })
 export type StartSessionInput = z.infer<typeof startSessionInputSchema>
 
@@ -71,32 +76,48 @@ export const MATERIAL_LIMITS = {
   },
 } as const
 
-const httpUrl = z.string().refine(
-  (raw) => {
-    try {
-      if (raw.includes('\\')) return false
-      const parsed = new URL(raw)
-      return (
-        (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
-        parsed.username === '' &&
-        parsed.password === ''
-      )
-    } catch {
-      return false
-    }
-  },
-  { message: 'invalidUrl' },
-)
+const httpUrl = z
+  .string()
+  .max(MAX_HTTP_URL_CHARS, 'urlTooLong')
+  .refine(
+    (raw) => {
+      try {
+        if (raw.includes('\\')) return false
+        const parsed = new URL(raw)
+        return (
+          (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+          parsed.username === '' &&
+          parsed.password === ''
+        )
+      } catch {
+        return false
+      }
+    },
+    { message: 'invalidUrl' },
+  )
 
 export const materialMetadataSchema = z.object({
   provider: z.enum(['youtube', 'upload', 'pdf']).optional(),
-  youtubeVideoId: z.string().optional(),
-  thumbnailUrl: z.string().optional(),
-  author: z.string().optional(),
-  durationSeconds: z.number().int().nonnegative().optional(),
-  totalPages: z.number().int().positive().optional(),
-  mimeType: z.string().optional(),
-  fileSizeBytes: z.number().int().nonnegative().optional(),
+  youtubeVideoId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{11}$/)
+    .optional(),
+  thumbnailUrl: httpUrl.optional(),
+  author: z.string().trim().max(200).optional(),
+  durationSeconds: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(60 * 60 * 24 * 365)
+    .optional(),
+  totalPages: z.number().int().positive().max(100_000).optional(),
+  mimeType: z.string().max(200).optional(),
+  fileSizeBytes: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(MATERIAL_LIMITS.videoUpload.maxBytes)
+    .optional(),
 })
 
 export type MaterialMetadata = z.infer<typeof materialMetadataSchema>
@@ -267,7 +288,11 @@ export type NoteMetadata = z.infer<typeof noteMetadataSchema>
 
 export const noteInputSchema = z
   .object({
-    goalIds: z.array(z.uuid()).min(1, 'selectGoals'),
+    goalIds: z
+      .array(z.uuid())
+      .min(1, 'selectGoals')
+      .max(SNAPSHOT_LIMITS.goalsPerNote, 'tooManyGoals')
+      .refine((ids) => new Set(ids).size === ids.length, 'duplicateGoals'),
     kind: noteKind,
     title: z.string().trim().min(1, 'titleRequired').max(80, 'titleMax'),
     text: z.string().max(NOTE_LIMITS.text.maxChars, 'textMax').optional(),

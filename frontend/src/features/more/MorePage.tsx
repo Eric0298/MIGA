@@ -6,22 +6,19 @@ import { format } from 'date-fns'
 import { clsx } from 'clsx'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db/miga-db'
-import {
-  buildExportPayload,
-  clearAllData,
-  importAllData,
-  parseImportPayload,
-} from '@/lib/db/import-export'
+import { buildExportPayload, importAllData, parseImportPayload } from '@/lib/db/import-export'
 import { getActiveSession } from '@/lib/db/sessions.repository'
 import { useT } from '@/i18n/i18n-context'
 import { tpl } from '@/i18n/tpl'
 import type { Language } from '@/i18n/types'
 import { useSyncTimerVideo } from '@/lib/settings/player-prefs'
 import { AccountPanel } from '@/features/auth/AccountPanel'
+import { useAuth } from '@/features/auth/AuthProvider'
 import { assertImportFileSize } from '@/lib/db/import-file'
 
 function MorePage() {
   const { t, lang, setLang } = useT()
+  const auth = useAuth()
   const [syncTimerVideo, setSyncTimerVideo] = useSyncTimerVideo()
   const fileRef = useRef<HTMLInputElement>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -123,7 +120,7 @@ function MorePage() {
         toast.error(t.more.clearBlocked)
         return
       }
-      await clearAllData()
+      await auth.deleteLocalData()
       toast.success(t.more.clearSuccess)
     } catch {
       toast.error(t.more.clearError)

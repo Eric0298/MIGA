@@ -93,6 +93,9 @@ function WorkspaceBoundRoutes() {
   return (
     <WorkspaceSyncProvider
       key={workspace.scopeKey}
+      database={workspace.database}
+      scopeKey={workspace.scopeKey}
+      workspaceId={workspace.workspaceId}
       initialRevision={workspace.revision}
       initialUpdatedAtUtc={workspace.updatedAtUtc}
       initialSyncStatus={workspace.initialSyncStatus}

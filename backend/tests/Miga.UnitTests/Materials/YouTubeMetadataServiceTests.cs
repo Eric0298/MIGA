@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -111,6 +112,144 @@ public sealed class YouTubeMetadataServiceTests
     }
 
     [Fact]
+    public async Task GetMetadataAsync_ShouldRejectMissingItemsCollection()
+    {
+        var handler = new StubHttpMessageHandler(_ => Ok("{}"));
+        var service = CreateService(handler);
+
+        var result = await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        var failure = result.ShouldBeOfType<YouTubeMetadataResult.Failure>();
+        failure.Code.ShouldBe(YouTubeMetadataErrorCode.UpstreamError);
+    }
+
+    [Fact]
+    public async Task GetMetadataAsync_ShouldRejectNullItem()
+    {
+        var handler = new StubHttpMessageHandler(_ => Ok("{\"items\":[null]}"));
+        var service = CreateService(handler);
+
+        var result = await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        var failure = result.ShouldBeOfType<YouTubeMetadataResult.Failure>();
+        failure.Code.ShouldBe(YouTubeMetadataErrorCode.UpstreamError);
+    }
+
+    [Fact]
+    public async Task GetMetadataAsync_ShouldRejectMismatchedVideoId()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Ok(BuildOkResponse("Title", "Author", "PT1M", "aaaaaaaaaaa")));
+        var service = CreateService(handler);
+
+        var result = await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        var failure = result.ShouldBeOfType<YouTubeMetadataResult.Failure>();
+        failure.Code.ShouldBe(YouTubeMetadataErrorCode.UpstreamError);
+    }
+
+    [Fact]
+    public async Task GetMetadataAsync_ShouldRejectMissingTitle()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Ok(BuildOkResponse("", "Author", "PT1M")));
+        var service = CreateService(handler);
+
+        var result = await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        var failure = result.ShouldBeOfType<YouTubeMetadataResult.Failure>();
+        failure.Code.ShouldBe(YouTubeMetadataErrorCode.UpstreamError);
+    }
+
+    [Fact]
+    public async Task GetMetadataAsync_ShouldRejectOverlongAuthor()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Ok(BuildOkResponse("Title", new string('a', 201), "PT1M")));
+        var service = CreateService(handler);
+
+        var result = await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        var failure = result.ShouldBeOfType<YouTubeMetadataResult.Failure>();
+        failure.Code.ShouldBe(YouTubeMetadataErrorCode.UpstreamError);
+    }
+
+    [Fact]
+    public async Task GetMetadataAsync_ShouldRejectOverlongTitle()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Ok(BuildOkResponse(new string('t', 501), "Author", "PT1M")));
+        var service = CreateService(handler);
+
+        var result = await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        var failure = result.ShouldBeOfType<YouTubeMetadataResult.Failure>();
+        failure.Code.ShouldBe(YouTubeMetadataErrorCode.UpstreamError);
+    }
+
+    [Fact]
+    public async Task GetMetadataAsync_ShouldRejectMissingOrMalformedDuration()
+    {
+        var missingDuration = JsonSerializer.Serialize(new
+        {
+            items = new[]
+            {
+                new
+                {
+                    id = ValidVideoId,
+                    snippet = new { title = "Title", channelTitle = "Author" },
+                    contentDetails = new { }
+                }
+            }
+        });
+        var responses = new Queue<string>(
+            [missingDuration, BuildOkResponse("Title", "Author", "invalid")]);
+        var handler = new StubHttpMessageHandler(_ => Ok(responses.Dequeue()));
+        var service = CreateService(handler);
+
+        var missingResult =
+            await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+        var malformedResult =
+            await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        missingResult.ShouldBeOfType<YouTubeMetadataResult.Failure>()
+            .Code.ShouldBe(YouTubeMetadataErrorCode.UpstreamError);
+        malformedResult.ShouldBeOfType<YouTubeMetadataResult.Failure>()
+            .Code.ShouldBe(YouTubeMetadataErrorCode.UpstreamError);
+    }
+
+    [Fact]
+    public async Task GetMetadataAsync_ShouldAcceptDocumentedDayDurationAtContractLimits()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Ok(BuildOkResponse(
+                new string('t', 500),
+                new string('a', 200),
+                "P365DT0S")));
+        var service = CreateService(handler);
+
+        var result = await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        var success = result.ShouldBeOfType<YouTubeMetadataResult.Success>();
+        success.Data.Title.Length.ShouldBe(500);
+        success.Data.Author.Length.ShouldBe(200);
+        success.Data.DurationSeconds.ShouldBe(60 * 60 * 24 * 365);
+    }
+
+    [Fact]
+    public async Task GetMetadataAsync_ShouldRejectDurationBeyondContractLimit()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Ok(BuildOkResponse("Title", "Author", "P366DT0S")));
+        var service = CreateService(handler);
+
+        var result = await service.GetMetadataAsync(ValidUrl, CancellationToken.None);
+
+        var failure = result.ShouldBeOfType<YouTubeMetadataResult.Failure>();
+        failure.Code.ShouldBe(YouTubeMetadataErrorCode.UpstreamError);
+    }
+
+    [Fact]
     public async Task GetMetadataAsync_ShouldReturnQuotaExceeded_On403()
     {
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden));
@@ -191,24 +330,23 @@ public sealed class YouTubeMetadataServiceTests
         Content = new StringContent(json, Encoding.UTF8, "application/json")
     };
 
-    private static string BuildOkResponse(string title, string channel, string duration)
-    {
-        return $$"""
+    private static string BuildOkResponse(
+        string title,
+        string channel,
+        string duration,
+        string videoId = ValidVideoId) =>
+        JsonSerializer.Serialize(new
         {
-            "items": [
+            items = new[]
+            {
+                new
                 {
-                    "snippet": {
-                        "title": "{{title}}",
-                        "channelTitle": "{{channel}}"
-                    },
-                    "contentDetails": {
-                        "duration": "{{duration}}"
-                    }
+                    id = videoId,
+                    snippet = new { title, channelTitle = channel },
+                    contentDetails = new { duration }
                 }
-            ]
-        }
-        """;
-    }
+            }
+        });
 
     private sealed class StubHttpMessageHandler : HttpMessageHandler
     {
