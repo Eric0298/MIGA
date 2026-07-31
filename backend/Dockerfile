@@ -67,14 +67,15 @@ RUN set -eux; \
 WORKDIR /app
 
 COPY --from=build --chown=miga:miga /app/publish/ ./
+COPY --chown=miga:miga backend/docker/start-production.sh /app/start-production.sh
 
-# Migration bundle is a self-contained native binary; make it executable.
-RUN chmod 0555 /app/migrate && chown miga:miga /app/migrate
+# Migration bundle + startup script must be executable by the miga user.
+RUN chmod 0555 /app/migrate /app/start-production.sh
 
 USER miga
 
 EXPOSE 8080
 
-# CMD (not ENTRYPOINT) so Railway's startCommand can replace it via `sh -c`.
-# Locally the container still runs the API by default.
-CMD ["dotnet", "Miga.Api.dll"]
+# Versioned startup script: validates secret presence, runs migrations,
+# then execs dotnet as PID 1. Railway invokes CMD directly; no ENTRYPOINT.
+CMD ["/app/start-production.sh"]
