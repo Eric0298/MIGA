@@ -75,4 +75,6 @@ USER miga
 
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "Miga.Api.dll"]
+# CMD (not ENTRYPOINT) so Railway's startCommand can replace it via `sh -c`.
+# Locally the container still runs the API by default.
+CMD ["dotnet", "Miga.Api.dll"]

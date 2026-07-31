@@ -5,10 +5,7 @@
     "dockerfilePath": "backend/Dockerfile"
   },
   "deploy": {
-    "startCommand": "dotnet Miga.Api.dll",
-    "preDeployCommand": [
-      "/app/migrate --connection \"$ConnectionStrings__MigaDatabase\""
-    ],
+    "startCommand": "test -n \"$ConnectionStrings__MigaDatabase\" || { echo 'Database connection variable is unavailable' >&2; exit 1; }; /app/migrate --connection \"$ConnectionStrings__MigaDatabase\" && exec dotnet Miga.Api.dll",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 30,
     "restartPolicyType": "ON_FAILURE",
