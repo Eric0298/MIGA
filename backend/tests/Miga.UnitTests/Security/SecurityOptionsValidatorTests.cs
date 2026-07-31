@@ -88,7 +88,8 @@ public sealed class SecurityOptionsValidatorTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Authentication:RequireConfirmedEmail"] = "true"
+                ["Authentication:RequireConfirmedEmail"] = "true",
+                ["EmailDelivery:Provider"] = "Smtp"
             })
             .Build();
         var validator = new SmtpOptionsValidator(environment, configuration);

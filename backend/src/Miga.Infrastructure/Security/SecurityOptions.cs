@@ -42,6 +42,39 @@ public sealed class SmtpOptions
     public string FromAddress { get; init; } = string.Empty;
 }
 
+public enum EmailDeliveryProvider
+{
+    Disabled = 0,
+    BrevoApi,
+    Smtp
+}
+
+public sealed class EmailDeliveryOptions
+{
+    public const string SectionName = "EmailDelivery";
+
+    public EmailDeliveryProvider Provider { get; init; } = EmailDeliveryProvider.Disabled;
+}
+
+public sealed class BrevoOptions
+{
+    public const string SectionName = "Brevo";
+
+    // Fixed to prevent SSRF via configuration override.
+    public static readonly Uri BaseAddress = new("https://api.brevo.com/", UriKind.Absolute);
+    public const string SendEmailPath = "v3/smtp/email";
+
+    // Brevo v3 API keys observed at 60–72 chars ("xkeysib-…"); cap generously.
+    public const int MaxApiKeyLength = 200;
+    public const int MaxFromNameLength = 70;
+
+    public string ApiKey { get; init; } = string.Empty;
+
+    public string FromAddress { get; init; } = string.Empty;
+
+    public string FromName { get; init; } = string.Empty;
+}
+
 public sealed class DataProtectionSecurityOptions
 {
     public const string SectionName = "DataProtection";

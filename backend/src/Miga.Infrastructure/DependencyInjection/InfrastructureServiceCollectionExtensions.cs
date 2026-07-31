@@ -65,10 +65,24 @@ public static class InfrastructureServiceCollectionExtensions
             AuthenticationSecurityOptionsValidator>();
 
         services
+            .AddOptions<EmailDeliveryOptions>()
+            .Bind(configuration.GetSection(EmailDeliveryOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<
+            IValidateOptions<EmailDeliveryOptions>,
+            EmailDeliveryOptionsValidator>();
+
+        services
             .AddOptions<SmtpOptions>()
             .Bind(configuration.GetSection(SmtpOptions.SectionName))
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<SmtpOptions>, SmtpOptionsValidator>();
+
+        services
+            .AddOptions<BrevoOptions>()
+            .Bind(configuration.GetSection(BrevoOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<BrevoOptions>, BrevoOptionsValidator>();
 
         services
             .AddOptions<DataProtectionSecurityOptions>()
@@ -152,13 +166,40 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<RegisteredCookieEvents>();
         services.AddScoped<DemoCookieEvents>();
 
-        if (configuration.GetValue<bool>($"{SmtpOptions.SectionName}:Enabled"))
+        var providerRaw = configuration.GetValue<string>(
+            $"{EmailDeliveryOptions.SectionName}:Provider");
+        var provider = Enum.TryParse<EmailDeliveryProvider>(
+            providerRaw,
+            ignoreCase: true,
+            out var parsedProvider)
+            ? parsedProvider
+            : EmailDeliveryProvider.Disabled;
+
+        switch (provider)
         {
-            services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
-        }
-        else
-        {
-            services.AddScoped<IAccountEmailSender, UnconfiguredAccountEmailSender>();
+            case EmailDeliveryProvider.BrevoApi:
+                services
+                    .AddHttpClient<BrevoApiAccountEmailSender>(client =>
+                    {
+                        client.BaseAddress = BrevoOptions.BaseAddress;
+                        client.Timeout = TimeSpan.FromSeconds(15);
+                        client.DefaultRequestHeaders.Accept.Clear();
+                        client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+                        client.DefaultRequestHeaders.UserAgent.ParseAdd("Miga-Backend/1.0");
+                    })
+                    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+                    {
+                        AllowAutoRedirect = false
+                    });
+                services.AddScoped<IAccountEmailSender>(
+                    sp => sp.GetRequiredService<BrevoApiAccountEmailSender>());
+                break;
+            case EmailDeliveryProvider.Smtp:
+                services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
+                break;
+            default:
+                services.AddScoped<IAccountEmailSender, UnconfiguredAccountEmailSender>();
+                break;
         }
 
         services.AddSingleton<AccountEmailQueue>();

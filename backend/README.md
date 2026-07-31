@@ -65,10 +65,14 @@ Producción requiere, como mínimo:
   CA montada cuando la CA no pertenezca al almacén de confianza del sistema;
 - `AllowedHosts`, `Cors__AllowedOrigins__*`, `TrustedProxies__Addresses__*` y
   `Authentication__PublicBaseUrl` exactos;
-- SMTP real cuando `Authentication__RequireConfirmedEmail=true`;
+- proveedor de correo transaccional real cuando `Authentication__RequireConfirmedEmail=true`,
+  seleccionado explícitamente con `EmailDelivery__Provider`. `BrevoApi` publica los correos
+  contra `https://api.brevo.com/v3/smtp/email` con la cabecera `api-key`; `Smtp` conserva la
+  ruta legacy `System.Net.Mail` para hostings que permitan puertos SMTP salientes. Railway
+  Free/Trial/Hobby bloquean 25, 465, 587 y 2525 — en esos planes usa `BrevoApi`;
 - keyring de Data Protection persistido en PostgreSQL y protegido con un certificado X.509
   montado desde un gestor de secretos;
-- rotación independiente de credenciales PostgreSQL, SMTP, certificado y API de YouTube.
+- rotación independiente de credenciales PostgreSQL, Brevo/SMTP, certificado y API de YouTube.
 
 Separa siempre dos identidades PostgreSQL:
 

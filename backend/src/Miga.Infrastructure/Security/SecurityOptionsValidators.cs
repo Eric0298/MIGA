@@ -84,24 +84,26 @@ public sealed class SmtpOptionsValidator : IValidateOptions<SmtpOptions>
 
     public ValidateOptionsResult Validate(string? name, SmtpOptions options)
     {
-        var requireConfirmedEmail = _configuration.GetValue<bool>(
-            $"{AuthenticationSecurityOptions.SectionName}:RequireConfirmedEmail");
-
-        if (_environment.IsProduction() && requireConfirmedEmail && !options.Enabled)
+        // SMTP validation only applies when the selected email provider is SMTP.
+        // BrevoApi deployments intentionally leave the SMTP variables in place
+        // during the transition, so we must not fail startup when they are still
+        // set but the delivery path has moved to the HTTPS API.
+        var providerSelected = MailboxValidator.ReadProvider(_configuration);
+        if (providerSelected != EmailDeliveryProvider.Smtp)
         {
-            return ValidateOptionsResult.Fail(
-                "SMTP must be configured when confirmed email is required in production.");
+            return ValidateOptionsResult.Success;
         }
 
         if (!options.Enabled)
         {
-            return ValidateOptionsResult.Success;
+            return ValidateOptionsResult.Fail(
+                "SMTP must be enabled when EmailDelivery:Provider=Smtp.");
         }
 
         if (string.IsNullOrWhiteSpace(options.Host) ||
             options.Port is < 1 or > 65535 ||
             Uri.CheckHostName(options.Host) == UriHostNameType.Unknown ||
-            !IsValidMailbox(options.FromAddress) ||
+            !MailboxValidator.IsValidMailbox(options.FromAddress) ||
             (_environment.IsProduction() && !options.UseSsl))
         {
             return ValidateOptionsResult.Fail(
@@ -110,8 +112,136 @@ public sealed class SmtpOptionsValidator : IValidateOptions<SmtpOptions>
 
         return ValidateOptionsResult.Success;
     }
+}
 
-    private static bool IsValidMailbox(string value)
+public sealed class EmailDeliveryOptionsValidator : IValidateOptions<EmailDeliveryOptions>
+{
+    private readonly IHostEnvironment _environment;
+    private readonly IConfiguration _configuration;
+
+    public EmailDeliveryOptionsValidator(
+        IHostEnvironment environment,
+        IConfiguration configuration)
+    {
+        _environment = environment;
+        _configuration = configuration;
+    }
+
+    public ValidateOptionsResult Validate(string? name, EmailDeliveryOptions options)
+    {
+        if (!Enum.IsDefined(options.Provider))
+        {
+            return ValidateOptionsResult.Fail(
+                "EmailDelivery:Provider must be one of Disabled, BrevoApi, Smtp.");
+        }
+
+        if (!_environment.IsProduction())
+        {
+            return ValidateOptionsResult.Success;
+        }
+
+        var requireConfirmedEmail = _configuration.GetValue<bool>(
+            $"{AuthenticationSecurityOptions.SectionName}:RequireConfirmedEmail");
+        if (!requireConfirmedEmail)
+        {
+            return ValidateOptionsResult.Success;
+        }
+
+        if (options.Provider == EmailDeliveryProvider.Disabled)
+        {
+            return ValidateOptionsResult.Fail(
+                "EmailDelivery:Provider must be BrevoApi or Smtp in production when " +
+                "Authentication:RequireConfirmedEmail=true.");
+        }
+
+        return ValidateOptionsResult.Success;
+    }
+}
+
+public sealed class BrevoOptionsValidator : IValidateOptions<BrevoOptions>
+{
+    private readonly IHostEnvironment _environment;
+    private readonly IConfiguration _configuration;
+
+    public BrevoOptionsValidator(
+        IHostEnvironment environment,
+        IConfiguration configuration)
+    {
+        _environment = environment;
+        _configuration = configuration;
+    }
+
+    public ValidateOptionsResult Validate(string? name, BrevoOptions options)
+    {
+        var providerSelected = MailboxValidator.ReadProvider(_configuration);
+        if (providerSelected != EmailDeliveryProvider.BrevoApi)
+        {
+            return ValidateOptionsResult.Success;
+        }
+
+        if (string.IsNullOrWhiteSpace(options.ApiKey) ||
+            options.ApiKey.Length > BrevoOptions.MaxApiKeyLength ||
+            ContainsControlCharacter(options.ApiKey))
+        {
+            return ValidateOptionsResult.Fail(
+                "Brevo:ApiKey is required for EmailDelivery:Provider=BrevoApi and must not " +
+                "contain control characters.");
+        }
+
+        if (!MailboxValidator.IsValidMailbox(options.FromAddress))
+        {
+            return ValidateOptionsResult.Fail(
+                "Brevo:FromAddress must be a valid mailbox.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.FromName) ||
+            options.FromName.Length > BrevoOptions.MaxFromNameLength ||
+            ContainsControlCharacter(options.FromName))
+        {
+            return ValidateOptionsResult.Fail(
+                "Brevo:FromName is required, must be at most " +
+                $"{BrevoOptions.MaxFromNameLength} characters, and must not contain control characters.");
+        }
+
+        if (_environment.IsProduction() &&
+            !string.Equals(
+                options.FromAddress,
+                "no-reply@ericmancebo.com",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidateOptionsResult.Fail(
+                "Brevo:FromAddress must be the verified production sender identity.");
+        }
+
+        return ValidateOptionsResult.Success;
+    }
+
+    private static bool ContainsControlCharacter(string value)
+    {
+        foreach (var character in value)
+        {
+            if (char.IsControl(character))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+internal static class MailboxValidator
+{
+    internal static EmailDeliveryProvider ReadProvider(IConfiguration configuration)
+    {
+        var raw = configuration.GetValue<string>(
+            $"{EmailDeliveryOptions.SectionName}:Provider");
+        return Enum.TryParse<EmailDeliveryProvider>(raw, ignoreCase: true, out var provider)
+            ? provider
+            : EmailDeliveryProvider.Disabled;
+    }
+
+    internal static bool IsValidMailbox(string value)
     {
         if (string.IsNullOrWhiteSpace(value) ||
             value.Contains('\r') ||

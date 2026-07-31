@@ -38,7 +38,7 @@ marcar es un bloqueo o un riesgo aceptado por escrito, no una tarea implícitame
 - [ ] `ConnectionStrings__MigaDatabase` procede del gestor de secretos.
 - [ ] `POSTGRES_PASSWORD` no es el valor histórico/dev ni está reutilizado.
 - [ ] Si el valor histórico se reutilizó, fue rotado y sus accesos revisados.
-- [ ] `Smtp__Password` y `YouTubeApi__ApiKey` están en el gestor y restringidos.
+- [ ] `Brevo__ApiKey` (o `Smtp__Password` según proveedor) y `YouTubeApi__ApiKey` están en el gestor y restringidos.
 - [ ] `DataProtection__CertificatePassword` está separado del certificado.
 - [ ] Ningún secreto aparece en variables `VITE_*`; todo `VITE_*` es público.
 - [ ] El runtime tiene acceso de lectura solo a los secretos necesarios.
@@ -111,20 +111,29 @@ marcar es un bloqueo o un riesgo aceptado por escrito, no una tarea implícitame
 - [ ] Reinicio de todas las réplicas conserva sesiones/tokens compatibles.
 - [ ] Restaurar DB+keyring+certificado se probó en entorno aislado.
 
-## 8. SMTP y correo
+## 8. Correo transaccional
 
-- [ ] Se eligió proveedor y se revisó tratamiento de datos.
-- [ ] `Smtp__Enabled=true` solo con host, puerto, TLS, usuario, contraseña y remitente válidos.
+- [ ] Se eligió `EmailDelivery__Provider` explícitamente (`BrevoApi` o `Smtp`); `Disabled`
+      queda prohibido cuando `Authentication__RequireConfirmedEmail=true` en producción.
+- [ ] Si `EmailDelivery__Provider=BrevoApi`: `Brevo__ApiKey` está en el gestor de secretos,
+      `Brevo__FromAddress` coincide con el remitente verificado en Brevo, `Brevo__FromName`
+      está configurado y sin caracteres de control.
+- [ ] Si `EmailDelivery__Provider=Smtp`: `Smtp__Enabled=true` con host, puerto, TLS, usuario,
+      contraseña y remitente válidos, y el hosting permite tráfico SMTP saliente. Railway
+      Free/Trial/Hobby lo bloquean; en esos planes usar `BrevoApi`.
 - [ ] Si `RequireConfirmedEmail=true`, startup y envío sandbox pasan.
-- [ ] SPF, DKIM y DMARC están configurados.
+- [ ] SPF, DKIM y DMARC están configurados sobre el dominio de `FromAddress`.
 - [ ] Límites/cuotas y alertas evitan spam/agotamiento.
 - [ ] Enlaces usan `PublicBaseUrl`, HTTPS y token en fragmento.
-- [ ] Logs no contienen email completo, cuerpo ni token.
+- [ ] Logs no contienen email completo, cuerpo, token, `Brevo__ApiKey` ni `Smtp__Password`.
 - [ ] Respuestas forgot/resend son genéricas.
 - [ ] La cola acotada no pierde solicitudes silenciosamente por saturación o reinicio.
 - [ ] Hay métricas, entrega idempotente/reintentos seguros y una cola durable antes de operar con
       varias réplicas.
-- [ ] Existe fallback operativo si SMTP cae, sin desactivar seguridad silenciosamente.
+- [ ] Existe fallback operativo si el proveedor de correo cae, sin desactivar seguridad
+      silenciosamente.
+- [ ] Rotación del `Brevo__ApiKey` o de las credenciales SMTP está documentada e independiente
+      del resto de secretos.
 
 ## 9. Migraciones
 
