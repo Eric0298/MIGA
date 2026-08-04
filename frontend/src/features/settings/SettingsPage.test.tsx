@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/i18n/i18n-context'
-import MorePage from './MorePage'
+import SettingsPage from './SettingsPage'
 
 const auth = vi.hoisted(() => ({
   deleteLocalData: vi.fn(),
@@ -37,7 +37,7 @@ describe('local data deletion', () => {
     render(
       <I18nProvider initialLang="en">
         <MemoryRouter>
-          <MorePage />
+          <SettingsPage />
         </MemoryRouter>
       </I18nProvider>,
     )

@@ -1,11 +1,12 @@
 import {
+  BarChart3,
   BookOpen,
   FileText,
   GraduationCap,
   House,
   ListChecks,
-  MoreHorizontal,
   Repeat,
+  Settings,
   Target,
   Timer,
 } from 'lucide-react'
@@ -15,7 +16,7 @@ type NavIcon = typeof House
 
 export type MainNavItem = {
   to: string
-  labelKey: 'home' | 'timer' | 'goals' | 'estudio' | 'more'
+  labelKey: 'home' | 'timer' | 'goals' | 'estudio' | 'settings'
   icon: NavIcon
   end?: boolean
 }
@@ -25,7 +26,19 @@ export const mainNavItems: MainNavItem[] = [
   { to: '/app/timer', labelKey: 'timer', icon: Timer },
   { to: '/app/metas', labelKey: 'goals', icon: Target },
   { to: '/app/estudio', labelKey: 'estudio', icon: BookOpen },
-  { to: '/app/mas', labelKey: 'more', icon: MoreHorizontal },
+  { to: '/app/configuracion', labelKey: 'settings', icon: Settings },
+]
+
+export type SecondaryNavItem = {
+  to: string
+  labelKey: 'stats'
+  icon: NavIcon
+}
+
+/** Items shown in the side drawer under the "tools" section — not in the bottom nav
+ *  so we don't exceed 5 mobile tabs. */
+export const secondaryNavItems: SecondaryNavItem[] = [
+  { to: '/app/estadisticas', labelKey: 'stats', icon: BarChart3 },
 ]
 
 export type EstudioSubItem = {

@@ -6,7 +6,7 @@ import { useT } from '@/i18n/i18n-context'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { authCopyByLanguage } from '@/features/auth/auth-copy'
 import { useLogoutFlow } from '@/features/auth/use-logout'
-import { estudioSubItems, mainNavItems } from './nav-items'
+import { estudioSubItems, mainNavItems, secondaryNavItems } from './nav-items'
 
 type Props = {
   open: boolean
@@ -165,6 +165,28 @@ function SideNavDrawer({ open, onClose }: Props) {
                     ))}
                   </ul>
                 )}
+              </li>
+            ))}
+          </ul>
+
+          <p className="mt-6 mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]">
+            {t.nav.toolsSection}
+          </p>
+          <ul className="flex flex-col gap-1">
+            {secondaryNavItems.map(({ to, labelKey, icon: Icon }) => (
+              <li key={to}>
+                <NavLink
+                  to={to}
+                  className={({ isActive }) =>
+                    clsx(
+                      'flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-colors',
+                      isActive ? 'bg-peach/60 text-charcoal' : 'text-charcoal hover:bg-peach/30',
+                    )
+                  }
+                >
+                  <Icon size={20} aria-hidden="true" />
+                  <span>{t.nav[labelKey]}</span>
+                </NavLink>
               </li>
             ))}
           </ul>

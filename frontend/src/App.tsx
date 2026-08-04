@@ -5,7 +5,7 @@ import HomePage from '@/features/home/HomePage'
 import TimerPage from '@/features/timer/TimerPage'
 import GoalsPage from '@/features/goals/GoalsPage'
 import SessionsPage from '@/features/sessions/SessionsPage'
-import MorePage from '@/features/more/MorePage'
+import SettingsPage from '@/features/settings/SettingsPage'
 import EstudioHubPage from '@/features/estudio/EstudioHubPage'
 import ProtectedAppRoute from '@/features/auth/ProtectedAppRoute'
 import { useAuth } from '@/features/auth/AuthProvider'
@@ -40,6 +40,7 @@ const NotasGoalPage = lazy(() => import('@/features/estudio/NotasGoalPage'))
 const ExamenesPage = lazy(() => import('@/features/estudio/ExamenesPage'))
 const QuestionsExamCreatePage = lazy(() => import('@/features/estudio/QuestionsExamCreatePage'))
 const QuestionsExamSessionPage = lazy(() => import('@/features/estudio/QuestionsExamSessionPage'))
+const EstadisticasPage = lazy(() => import('@/features/estadisticas/EstadisticasPage'))
 
 function AppRoutes() {
   return (
@@ -76,7 +77,9 @@ function AppRoutes() {
           <Route path="examenes/:id/simulacro/:attemptId" element={<SimulacroSessionPage />} />
           <Route path="examenes/:id/preguntas/nuevo" element={<QuestionsExamCreatePage />} />
           <Route path="examenes/:id/preguntas/:attemptId" element={<QuestionsExamSessionPage />} />
-          <Route path="mas" element={<MorePage />} />
+          <Route path="configuracion" element={<SettingsPage />} />
+          <Route path="mas" element={<Navigate to="/app/configuracion" replace />} />
+          <Route path="estadisticas" element={<EstadisticasPage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

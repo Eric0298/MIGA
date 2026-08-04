@@ -16,7 +16,7 @@ import { AccountPanel } from '@/features/auth/AccountPanel'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { assertImportFileSize } from '@/lib/db/import-file'
 
-function MorePage() {
+function SettingsPage() {
   const { t, lang, setLang } = useT()
   const auth = useAuth()
   const [syncTimerVideo, setSyncTimerVideo] = useSyncTimerVideo()
@@ -49,9 +49,9 @@ function MorePage() {
       anchor.click()
       anchor.remove()
       URL.revokeObjectURL(url)
-      toast.success(t.more.exportSuccess)
+      toast.success(t.settings.exportSuccess)
     } catch {
-      toast.error(t.more.exportError)
+      toast.error(t.settings.exportError)
     } finally {
       setBusy(null)
     }
@@ -60,7 +60,7 @@ function MorePage() {
   const handleImportClick = async () => {
     const active = await getActiveSession()
     if (active) {
-      toast.error(t.more.importBlocked)
+      toast.error(t.settings.importBlocked)
       return
     }
     fileRef.current?.click()
@@ -79,10 +79,10 @@ function MorePage() {
       const result = await importAllData(parsed)
       const extras =
         result.normalizedActiveSessions > 0
-          ? tpl(t.more.importActiveCleared, { count: result.normalizedActiveSessions })
+          ? tpl(t.settings.importActiveCleared, { count: result.normalizedActiveSessions })
           : ''
-      toast.success(t.more.importSuccess, {
-        description: tpl(t.more.importSummary, {
+      toast.success(t.settings.importSuccess, {
+        description: tpl(t.settings.importSummary, {
           goals: result.goalsCount,
           sessions: result.sessionsCount,
           materials: result.materialsCount,
@@ -95,8 +95,8 @@ function MorePage() {
     } catch (cause) {
       toast.error(
         cause instanceof Error && cause.message.includes('5 MiB')
-          ? t.more.importTooLarge
-          : t.more.importInvalid,
+          ? t.settings.importTooLarge
+          : t.settings.importInvalid,
       )
     } finally {
       setBusy(null)
@@ -106,7 +106,7 @@ function MorePage() {
   const handleClearRequest = async () => {
     const active = await getActiveSession()
     if (active) {
-      toast.error(t.more.clearBlocked)
+      toast.error(t.settings.clearBlocked)
       return
     }
     setShowClearConfirm(true)
@@ -117,13 +117,13 @@ function MorePage() {
       setBusy('clear')
       const active = await getActiveSession()
       if (active) {
-        toast.error(t.more.clearBlocked)
+        toast.error(t.settings.clearBlocked)
         return
       }
       await auth.deleteLocalData()
-      toast.success(t.more.clearSuccess)
+      toast.success(t.settings.clearSuccess)
     } catch {
-      toast.error(t.more.clearError)
+      toast.error(t.settings.clearError)
     } finally {
       setBusy(null)
       setShowClearConfirm(false)
@@ -131,24 +131,24 @@ function MorePage() {
   }
 
   const languageOptions: { code: Language; label: string }[] = [
-    { code: 'es', label: t.more.languageSpanish },
-    { code: 'en', label: t.more.languageEnglish },
-    { code: 'va', label: t.more.languageValencian },
+    { code: 'es', label: t.settings.languageSpanish },
+    { code: 'en', label: t.settings.languageEnglish },
+    { code: 'va', label: t.settings.languageValencian },
   ]
 
   return (
     <div className="flex flex-col gap-8">
       <header>
-        <h1 className="text-2xl font-bold text-charcoal">{t.more.title}</h1>
-        <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">{t.more.subtitle}</p>
+        <h1 className="text-2xl font-bold text-charcoal">{t.settings.title}</h1>
+        <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">{t.settings.subtitle}</p>
       </header>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-charcoal">{t.more.languageSection}</h2>
-        <p className="text-xs text-[color:var(--color-text-muted)]">{t.more.languageHint}</p>
+        <h2 className="text-sm font-medium text-charcoal">{t.settings.languageSection}</h2>
+        <p className="text-xs text-[color:var(--color-text-muted)]">{t.settings.languageHint}</p>
         <div
           role="radiogroup"
-          aria-label={t.more.languageSection}
+          aria-label={t.settings.languageSection}
           className="grid grid-cols-3 gap-2"
         >
           {languageOptions.map((option) => (
@@ -175,8 +175,8 @@ function MorePage() {
       <AccountPanel />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-charcoal">{t.more.playerSection}</h2>
-        <p className="text-xs text-[color:var(--color-text-muted)]">{t.more.playerHint}</p>
+        <h2 className="text-sm font-medium text-charcoal">{t.settings.playerSection}</h2>
+        <p className="text-xs text-[color:var(--color-text-muted)]">{t.settings.playerHint}</p>
         <button
           type="button"
           role="switch"
@@ -189,9 +189,9 @@ function MorePage() {
               <PlaySquare size={18} aria-hidden="true" />
             </span>
             <span className="flex flex-col">
-              <span>{t.more.syncTimerVideo}</span>
+              <span>{t.settings.syncTimerVideo}</span>
               <span className="text-xs font-normal text-[color:var(--color-text-muted)]">
-                {t.more.syncTimerVideoHint}
+                {t.settings.syncTimerVideoHint}
               </span>
             </span>
           </span>
@@ -213,8 +213,8 @@ function MorePage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-charcoal">{t.more.dataSection}</h2>
-        <p className="text-xs text-[color:var(--color-text-muted)]">{t.more.dataHint}</p>
+        <h2 className="text-sm font-medium text-charcoal">{t.settings.dataSection}</h2>
+        <p className="text-xs text-[color:var(--color-text-muted)]">{t.settings.dataHint}</p>
 
         <button
           type="button"
@@ -226,10 +226,10 @@ function MorePage() {
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-peach text-charcoal">
               <Download size={18} aria-hidden="true" />
             </span>
-            {t.more.export}
+            {t.settings.export}
           </span>
           <span className="text-xs font-normal text-[color:var(--color-text-muted)]">
-            {t.more.exportBadge}
+            {t.settings.exportBadge}
           </span>
         </button>
 
@@ -243,10 +243,10 @@ function MorePage() {
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-peach text-charcoal">
               <Upload size={18} aria-hidden="true" />
             </span>
-            {t.more.import}
+            {t.settings.import}
           </span>
           <span className="text-xs font-normal text-[color:var(--color-text-muted)]">
-            {t.more.importBadge}
+            {t.settings.importBadge}
           </span>
         </button>
         <input
@@ -267,10 +267,10 @@ function MorePage() {
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-peach text-apricot">
               <Trash2 size={18} aria-hidden="true" />
             </span>
-            {t.more.clear}
+            {t.settings.clear}
           </span>
           <span className="text-xs font-normal text-[color:var(--color-text-muted)]">
-            {t.more.clearBadge}
+            {t.settings.clearBadge}
           </span>
         </button>
       </section>
@@ -288,15 +288,18 @@ function MorePage() {
             </span>
             <div>
               <p id="clear-confirm-title" className="text-base font-semibold">
-                {t.more.clearConfirmTitle}
+                {t.settings.clearConfirmTitle}
               </p>
               <p className="mt-1 text-sm opacity-90">
-                {tpl(t.more.clearConfirmDescription, {
+                {tpl(t.settings.clearConfirmDescription, {
                   goals: totals?.goals ?? 0,
-                  goalWord: (totals?.goals ?? 0) === 1 ? t.more.goalWordOne : t.more.goalWordOther,
+                  goalWord:
+                    (totals?.goals ?? 0) === 1 ? t.settings.goalWordOne : t.settings.goalWordOther,
                   sessions: totals?.sessions ?? 0,
                   sessionWord:
-                    (totals?.sessions ?? 0) === 1 ? t.more.sessionWordOne : t.more.sessionWordOther,
+                    (totals?.sessions ?? 0) === 1
+                      ? t.settings.sessionWordOne
+                      : t.settings.sessionWordOther,
                   materials: totals?.materials ?? 0,
                   notes: totals?.notes ?? 0,
                   questions: totals?.questions ?? 0,
@@ -313,7 +316,7 @@ function MorePage() {
               disabled={busy === 'clear'}
               className="flex-1 rounded-2xl bg-white px-5 py-3 text-base font-semibold text-apricot transition active:scale-[0.98] disabled:opacity-70"
             >
-              {t.more.clearConfirmYes}
+              {t.settings.clearConfirmYes}
             </button>
             <button
               type="button"
@@ -328,25 +331,25 @@ function MorePage() {
       )}
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-charcoal">{t.more.infoSection}</h2>
-        <nav aria-label={t.more.additionalLinks} className="flex flex-col gap-3">
+        <h2 className="text-sm font-medium text-charcoal">{t.settings.infoSection}</h2>
+        <nav aria-label={t.settings.additionalLinks} className="flex flex-col gap-3">
           <Link
             to="/arquitectura"
             className="rounded-2xl bg-surface px-5 py-4 text-base font-semibold text-charcoal"
           >
-            {t.more.architecture}
+            {t.settings.architecture}
           </Link>
           <Link
             to="/privacidad"
             className="rounded-2xl bg-surface px-5 py-4 text-base font-semibold text-charcoal"
           >
-            {t.more.privacy}
+            {t.settings.privacy}
           </Link>
           <Link
             to="/"
             className="rounded-2xl bg-surface px-5 py-4 text-base font-semibold text-charcoal"
           >
-            {t.more.landing}
+            {t.settings.landing}
           </Link>
         </nav>
       </section>
@@ -354,4 +357,4 @@ function MorePage() {
   )
 }
 
-export default MorePage
+export default SettingsPage

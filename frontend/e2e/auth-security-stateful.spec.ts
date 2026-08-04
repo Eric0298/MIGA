@@ -34,7 +34,7 @@ async function login(page: Page, email: string, password = PASSWORD): Promise<vo
 }
 
 async function logout(page: Page): Promise<void> {
-  await page.goto('/app/mas')
+  await page.goto('/app/configuracion')
   await page.getByRole('button', { name: 'Cerrar sesión' }).click()
   await expect(page).toHaveURL(/\/$/)
 }
@@ -250,7 +250,7 @@ test('explicit local deletion signs out and never uploads an empty snapshot', as
   await expect(page.getByText('Guardado', { exact: true }).first()).toBeVisible()
   const putsBeforeDelete = api.getPutBodies()
 
-  await page.goto('/app/mas')
+  await page.goto('/app/configuracion')
   await page.getByRole('button', { name: /^Borrar todos los datos/ }).click()
   await page.getByRole('button', { name: 'Borrar localmente y cerrar sesión' }).click()
   await expect.poll(async () => activeDatabaseName(page)).toBe('miga')
@@ -267,7 +267,7 @@ test('explicit local deletion signs out and never uploads an empty snapshot', as
 test('active-session controls load through reauthentication', async ({ page }) => {
   await installStatefulAuthApi(page, [{ email: 'sessions@example.test', password: PASSWORD }])
   await login(page, 'sessions@example.test')
-  await page.goto('/app/mas')
+  await page.goto('/app/configuracion')
 
   await page.getByText('Sesiones activas').click()
   const sessionsSection = page.locator('details').filter({ hasText: 'Sesiones activas' })
@@ -286,7 +286,7 @@ test('confirmed account deletion revokes access and removes only its scoped data
   await login(page, 'account-delete@example.test')
   const accountDatabase = await activeDatabaseName(page)
   await seedActiveBlob(page)
-  await page.goto('/app/mas')
+  await page.goto('/app/configuracion')
 
   await page.getByText('Eliminar cuenta', { exact: true }).click()
   const deletion = page.locator('details').filter({ hasText: 'Eliminar cuenta' })

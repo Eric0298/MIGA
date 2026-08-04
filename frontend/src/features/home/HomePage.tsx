@@ -1,4 +1,12 @@
-import { CalendarClock, Flame, ListChecks, Play, Sparkles, TimerReset } from 'lucide-react'
+import {
+  BarChart3,
+  CalendarClock,
+  Flame,
+  ListChecks,
+  Play,
+  Sparkles,
+  TimerReset,
+} from 'lucide-react'
 import { Link } from 'react-router'
 import { format } from 'date-fns'
 import { clsx } from 'clsx'
@@ -160,7 +168,12 @@ function HomePage() {
                               {g.name}
                             </p>
                             <p className="text-xs text-[color:var(--color-text-muted)]">
-                              {statusLabel(t.goalStatus, info.status, info.actualMs, g.targetMinutes)}
+                              {statusLabel(
+                                t.goalStatus,
+                                info.status,
+                                info.actualMs,
+                                g.targetMinutes,
+                              )}
                             </p>
                           </div>
                           <p className="hidden text-sm font-bold text-charcoal tabular-nums lg:block">
@@ -198,9 +211,7 @@ function HomePage() {
                     ? (goals?.find((g) => g.id === s.goalId)?.name ?? t.common.freeSession)
                     : t.common.freeSession
                   const day = s.endedAt ? toLocalIsoDay(s.endedAt) : ''
-                  const dayLabel = day
-                    ? formatDayRelative(day, today, locale, relativeLabels)
-                    : ''
+                  const dayLabel = day ? formatDayRelative(day, today, locale, relativeLabels) : ''
                   const timeLabel = s.endedAt ? format(new Date(s.endedAt), 'HH:mm') : ''
                   return (
                     <li
@@ -223,6 +234,23 @@ function HomePage() {
             </section>
           )}
         </div>
+      )}
+
+      {!isLoading && (recentSessions.length > 0 || (goals?.length ?? 0) > 0) && (
+        <Link
+          to="/app/estadisticas"
+          className="flex items-center gap-3 rounded-2xl bg-surface p-4 transition-colors hover:bg-peach/30"
+        >
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-peach text-charcoal">
+            <BarChart3 size={18} aria-hidden="true" />
+          </span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-charcoal">{t.estadisticas.homeLinkTitle}</p>
+            <p className="text-xs text-[color:var(--color-text-muted)]">
+              {t.estadisticas.homeLinkHint}
+            </p>
+          </div>
+        </Link>
       )}
 
       {!isLoading && !active && recentSessions.length === 0 && (goals?.length ?? 0) === 0 && (
@@ -256,15 +284,7 @@ type KpiCardProps = {
   to?: string
 }
 
-function KpiCard({
-  icon,
-  label,
-  value,
-  hint,
-  accent = 'default',
-  className,
-  to,
-}: KpiCardProps) {
+function KpiCard({ icon, label, value, hint, accent = 'default', className, to }: KpiCardProps) {
   const inner = (
     <>
       <div className="flex items-center gap-2">
@@ -286,9 +306,7 @@ function KpiCard({
       >
         {value}
       </p>
-      {hint && (
-        <p className="text-xs text-[color:var(--color-text-muted)] truncate">{hint}</p>
-      )}
+      {hint && <p className="text-xs text-[color:var(--color-text-muted)] truncate">{hint}</p>}
     </>
   )
 
