@@ -12,9 +12,9 @@ function LandingPage() {
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 sm:px-8 sm:py-6">
         <Link to="/" aria-label="Miga" className="inline-flex">
           <img
-            src="/brand/04_miga_alt_logo_horizontal_transparent.png"
+            src="/brand/01_miga_primary_logo_with_claim_transparent.png"
             alt="Miga"
-            className="h-7 w-auto sm:h-8"
+            className="h-12 w-auto sm:h-14"
           />
         </Link>
         <nav aria-label={authCopy.common.backHome} className="flex items-center gap-1 sm:gap-2">
@@ -97,14 +97,42 @@ function LandingPage() {
                 </div>
 
                 <div className="col-span-2 flex flex-col justify-between rounded-3xl bg-peach p-5 ring-1 ring-[color:var(--color-border)]">
-                  <img
-                    src="/brand/07_miga_symbol_orange_transparent.png"
-                    alt=""
-                    className="h-10 w-auto"
-                  />
-                  <p className="mt-4 text-sm leading-tight font-semibold text-charcoal">
-                    {t.landing.tagline2}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-apricot text-white">
+                      <TrendingUp size={16} />
+                    </span>
+                    <span className="font-mono text-lg font-bold text-charcoal">+18%</span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-7 gap-1">
+                    {[
+                      'bg-cream',
+                      'bg-peach',
+                      'bg-apricot/60',
+                      'bg-apricot',
+                      'bg-pistachio',
+                      'bg-apricot',
+                      'bg-apricot/60',
+                      'bg-peach',
+                      'bg-apricot/60',
+                      'bg-apricot',
+                      'bg-apricot',
+                      'bg-pistachio',
+                      'bg-apricot/60',
+                      'bg-cream',
+                      'bg-apricot/60',
+                      'bg-apricot',
+                      'bg-pistachio',
+                      'bg-apricot',
+                      'bg-apricot/60',
+                      'bg-peach',
+                      'bg-cream',
+                    ].map((cellClass, index) => (
+                      <span
+                        key={index}
+                        className={`aspect-square rounded-[4px] ${cellClass} ring-1 ring-inset ring-white/40`}
+                      />
+                    ))}
+                  </div>
                 </div>
 
                 <div className="col-span-3 rounded-3xl bg-surface p-5 shadow-sm ring-1 ring-[color:var(--color-border)]">
