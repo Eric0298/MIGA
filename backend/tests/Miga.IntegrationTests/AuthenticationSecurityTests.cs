@@ -148,13 +148,10 @@ public sealed class AuthenticationSecurityTests
         confirmation.ActionUrl.AbsolutePath.ShouldBe("/verificar-email");
         confirmation.ActionUrl.Query.ShouldBeEmpty();
         var confirmationValues = ApiClientExtensions.ParseFragment(confirmation.ActionUrl);
-        const string confirmationPassword = "Miga!Confirmed-Unique-Passphrase-2841";
         var confirmationBody = new
         {
             userId = Guid.Parse(confirmationValues["userId"]),
-            token = confirmationValues["token"],
-            newPassword = confirmationPassword,
-            privacyPolicyVersion = "2026-07-23"
+            token = confirmationValues["token"]
         };
 
         using var confirmed = await client.PostWithCsrfAsync(
@@ -168,7 +165,7 @@ public sealed class AuthenticationSecurityTests
 
         using var login = await client.PostWithCsrfAsync(
             "/api/auth/login",
-            new { email, password = confirmationPassword });
+            new { email, password = ApiClientExtensions.ValidPassword });
         login.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         using var forgot = await client.PostWithCsrfAsync(
             "/api/auth/forgot-password",
@@ -220,9 +217,7 @@ public sealed class AuthenticationSecurityTests
             new
             {
                 userId = Guid.Parse(values["userId"]),
-                token = values["token"],
-                newPassword = "Miga!Expired-Confirmation-Passphrase-1374",
-                privacyPolicyVersion = "2026-07-23"
+                token = values["token"]
             });
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -291,9 +286,7 @@ public sealed class AuthenticationSecurityTests
             new
             {
                 userId = Guid.Parse(values["userId"]),
-                token = values["token"],
-                newPassword = "Miga!Confirmed-Recovery-Passphrase-8293",
-                privacyPolicyVersion = "2026-07-23"
+                token = values["token"]
             });
         confirm.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
@@ -348,9 +341,9 @@ public sealed class AuthenticationSecurityTests
             var db = scope.ServiceProvider.GetRequiredService<MigaDbContext>();
             var pendingUser = await db.Users.AsNoTracking().SingleAsync(x => x.Email == email);
             pendingUser.EmailConfirmed.ShouldBeFalse();
-            pendingUser.PasswordHash.ShouldBeNull();
-            pendingUser.PrivacyPolicyVersion.ShouldBeNull();
-            pendingUser.PrivacyPolicyAcceptedAtUtc.ShouldBeNull();
+            pendingUser.PasswordHash.ShouldNotBeNullOrEmpty();
+            pendingUser.PrivacyPolicyVersion.ShouldBe("2026-07-23");
+            pendingUser.PrivacyPolicyAcceptedAtUtc.ShouldNotBeNull();
             pendingUser.PendingDemoWorkspaceId.ShouldBe(demoSession.WorkspaceId);
             pendingUser.PendingDemoSessionId.ShouldNotBeNull();
             (await db.Workspaces.AsNoTracking().SingleAsync()).Kind
@@ -376,15 +369,12 @@ public sealed class AuthenticationSecurityTests
         var confirmation = await factory.EmailSender.WaitForMessageAsync(
             message => message.Kind == "confirmation" && message.Email == email);
         var values = ApiClientExtensions.ParseFragment(confirmation.ActionUrl);
-        const string confirmedPassword = "Miga!Deferred-Confirmation-Passphrase-4197";
         using var confirm = await client.PostWithCsrfAsync(
             "/api/auth/confirm-email",
             new
             {
                 userId = Guid.Parse(values["userId"]),
-                token = values["token"],
-                newPassword = confirmedPassword,
-                privacyPolicyVersion = "2026-07-23"
+                token = values["token"]
             });
         confirm.StatusCode.ShouldBe(
             HttpStatusCode.NoContent,
@@ -409,13 +399,9 @@ public sealed class AuthenticationSecurityTests
                 .ShouldBe(changedSnapshot!.Revision + 1);
         }
 
-        using var rejectedOldPassword = await client.PostWithCsrfAsync(
-            "/api/auth/login",
-            new { email, password = ApiClientExtensions.ValidPassword });
-        rejectedOldPassword.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         using var login = await client.PostWithCsrfAsync(
             "/api/auth/login",
-            new { email, password = confirmedPassword });
+            new { email, password = ApiClientExtensions.ValidPassword });
         login.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         var registeredSession =
             await client.GetFromJsonAsync<SessionResponse>("/api/auth/session");
@@ -469,8 +455,6 @@ public sealed class AuthenticationSecurityTests
             {
                 userId = Guid.Parse(values["userId"]),
                 token = values["token"],
-                newPassword = "Miga!Victim-Demo-Import-Passphrase-2951",
-                privacyPolicyVersion = "2026-07-23",
                 importDemoData = true
             });
 
@@ -550,8 +534,6 @@ public sealed class AuthenticationSecurityTests
             {
                 userId = Guid.Parse(values["userId"]),
                 token = values["token"],
-                newPassword = "Miga!Owned-Demo-Import-Passphrase-7194",
-                privacyPolicyVersion = "2026-07-23",
                 importDemoData = true
             });
 
@@ -609,16 +591,13 @@ public sealed class AuthenticationSecurityTests
         var confirmation = await factory.EmailSender.WaitForMessageAsync(
             message => message.Kind == "confirmation" && message.Email == email);
         var values = ApiClientExtensions.ParseFragment(confirmation.ActionUrl);
-        const string confirmedPassword = "Miga!Explicit-Fallback-Passphrase-3168";
 
         using var rejected = await confirmationClient.PostWithCsrfAsync(
             "/api/auth/confirm-email",
             new
             {
                 userId = Guid.Parse(values["userId"]),
-                token = values["token"],
-                newPassword = confirmedPassword,
-                privacyPolicyVersion = "2026-07-23"
+                token = values["token"]
             });
         rejected.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         (await rejected.Content.ReadAsStringAsync())
@@ -638,8 +617,6 @@ public sealed class AuthenticationSecurityTests
             {
                 userId = Guid.Parse(values["userId"]),
                 token = values["token"],
-                newPassword = confirmedPassword,
-                privacyPolicyVersion = "2026-07-23",
                 continueWithoutDemoData = true
             });
         confirmed.StatusCode.ShouldBe(HttpStatusCode.NoContent);
@@ -665,7 +642,7 @@ public sealed class AuthenticationSecurityTests
             .ShouldBe("demo");
         using var login = await confirmationClient.PostWithCsrfAsync(
             "/api/auth/login",
-            new { email, password = confirmedPassword });
+            new { email, password = ApiClientExtensions.ValidPassword });
         login.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         var registeredSession =
             await confirmationClient.GetFromJsonAsync<SessionResponse>("/api/auth/session");
@@ -695,8 +672,6 @@ public sealed class AuthenticationSecurityTests
             {
                 userId = Guid.Parse(values["userId"]),
                 token = values["token"],
-                newPassword = "Miga!Explicit-Matching-Skip-Passphrase-6731",
-                privacyPolicyVersion = "2026-07-23",
                 importDemoData = false,
                 continueWithoutDemoData = true
             });
@@ -759,15 +734,12 @@ public sealed class AuthenticationSecurityTests
         using var genericRegistration =
             await victimClient.RegisterAsync(email, importDemoData: true);
         genericRegistration.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        const string confirmedPassword = "Miga!Protected-Workspace-Passphrase-5408";
         using var rejected = await victimClient.PostWithCsrfAsync(
             "/api/auth/confirm-email",
             new
             {
                 userId = Guid.Parse(values["userId"]),
                 token = values["token"],
-                newPassword = confirmedPassword,
-                privacyPolicyVersion = "2026-07-23",
                 importDemoData = true
             });
         rejected.StatusCode.ShouldBe(HttpStatusCode.Conflict);
@@ -797,8 +769,6 @@ public sealed class AuthenticationSecurityTests
             {
                 userId = Guid.Parse(values["userId"]),
                 token = values["token"],
-                newPassword = confirmedPassword,
-                privacyPolicyVersion = "2026-07-23",
                 continueWithoutDemoData = true
             });
         confirmed.StatusCode.ShouldBe(HttpStatusCode.NoContent);
@@ -833,8 +803,6 @@ public sealed class AuthenticationSecurityTests
             {
                 userId = Guid.Parse(values["userId"]),
                 token = values["token"],
-                newPassword = "Miga!Contradictory-Demo-Flags-8173",
-                privacyPolicyVersion = "2026-07-23",
                 importDemoData = true,
                 continueWithoutDemoData = true
             });
@@ -869,15 +837,12 @@ public sealed class AuthenticationSecurityTests
             await db.SaveChangesAsync();
         }
 
-        const string confirmedPassword = "Miga!Deleted-Demo-Fallback-Passphrase-9504";
         using var rejected = await client.PostWithCsrfAsync(
             "/api/auth/confirm-email",
             new
             {
                 userId = Guid.Parse(values["userId"]),
                 token = values["token"],
-                newPassword = confirmedPassword,
-                privacyPolicyVersion = "2026-07-23",
                 importDemoData = true
             });
         rejected.StatusCode.ShouldBe(HttpStatusCode.Conflict);
@@ -896,8 +861,6 @@ public sealed class AuthenticationSecurityTests
             {
                 userId = Guid.Parse(values["userId"]),
                 token = values["token"],
-                newPassword = confirmedPassword,
-                privacyPolicyVersion = "2026-07-23",
                 continueWithoutDemoData = true
             });
         confirmed.StatusCode.ShouldBe(HttpStatusCode.NoContent);
@@ -908,6 +871,47 @@ public sealed class AuthenticationSecurityTests
         var workspace = await assertionDb.Workspaces.AsNoTracking().SingleAsync();
         workspace.Kind.ShouldBe(Miga.Domain.Enums.WorkspaceKind.Registered);
         (await assertionDb.DemoSessions.CountAsync()).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task LegacyPendingAccountWithoutPassword_ShouldBeRejectedAtConfirmation()
+    {
+        // Migration safety: accounts created before password-at-registration
+        // existed have no PasswordHash. Confirming them would leave a
+        // usable account with no credential, so the endpoint refuses and the
+        // cleanup job removes them once expired.
+        using var factory = new MigaWebApplicationFactory(requireConfirmedEmail: true);
+        using var client = factory.CreateClient();
+        var email = UniqueEmail();
+        Guid userId;
+        string confirmationToken;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<MigaUser>>();
+            var user = new MigaUser
+            {
+                Id = Guid.CreateVersion7(),
+                Email = email,
+                UserName = email,
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                SecurityStamp = Guid.NewGuid().ToString("N")
+            };
+            (await userManager.CreateAsync(user)).Succeeded.ShouldBeTrue();
+            userId = user.Id;
+            confirmationToken = await userManager.GenerateEmailConfirmationTokenAsync(user);
+        }
+
+        using var response = await client.PostWithCsrfAsync(
+            "/api/auth/confirm-email",
+            new { userId, token = confirmationToken });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync())
+            .ShouldContain("confirmation_password_missing");
+        using var scope2 = factory.Services.CreateScope();
+        var db = scope2.ServiceProvider.GetRequiredService<MigaDbContext>();
+        (await db.Users.AsNoTracking().SingleAsync(x => x.Email == email))
+            .EmailConfirmed.ShouldBeFalse();
     }
 
     [Fact]

@@ -7,6 +7,11 @@ import { useWorkspaceSync } from '@/lib/sync/WorkspaceSyncProvider'
 import { authCopyByLanguage } from './auth-copy'
 import { useAuth } from './AuthProvider'
 
+/**
+ * Rendered only for demo sessions. Registered sessions rely on
+ * SyncStatusIndicator so no permanent banner ("Guardado") is shown in
+ * regular use.
+ */
 export function DemoBanner() {
   const auth = useAuth()
   const sync = useWorkspaceSync()
@@ -14,17 +19,11 @@ export function DemoBanner() {
   const copy = authCopyByLanguage[lang]
   const [resetting, setResetting] = useState(false)
   const [resetError, setResetError] = useState(false)
-  const isDemo = auth.session.authenticated && auth.session.accountType === 'demo'
-  const expiresAt = auth.session.authenticated ? auth.session.expiresAtUtc : null
-  const syncLabel = copy.sync[sync.status]
 
-  if (!isDemo) {
-    return (
-      <div className="border-b border-[color:var(--color-border)] bg-white px-5 py-2 text-center text-xs text-[color:var(--color-text-muted)]">
-        <span role="status">{syncLabel}</span>
-      </div>
-    )
-  }
+  if (!auth.session.authenticated || auth.session.accountType !== 'demo') return null
+
+  const expiresAt = auth.session.expiresAtUtc
+  const syncLabel = copy.sync[sync.status]
 
   const reset = async () => {
     if (resetting) return

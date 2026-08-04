@@ -10,6 +10,7 @@ import type { AccountSession } from '@/lib/api/auth-api'
 import { authCopyByLanguage } from './auth-copy'
 import { authFieldClass, authPrimaryButtonClass, authSecondaryButtonClass } from './AuthLayout'
 import { useAuth } from './AuthProvider'
+import { useLogoutFlow } from './use-logout'
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
@@ -28,9 +29,11 @@ export function AccountPanel() {
   const navigate = useNavigate()
   const { lang } = useT()
   const copy = authCopyByLanguage[lang]
+  const { logout: logoutFlow, busy: logoutBusy } = useLogoutFlow()
   const [busy, setBusy] = useState<
-    'logout' | 'password' | 'export' | 'delete' | 'conflict' | 'sessions' | null
+    'password' | 'export' | 'delete' | 'conflict' | 'sessions' | null
   >(null)
+  const anyBusy = busy !== null || logoutBusy
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('')
@@ -43,17 +46,10 @@ export function AccountPanel() {
   if (!auth.session.authenticated) return null
 
   const logout = async () => {
-    setBusy('logout')
     try {
-      // Best effort only. Pending changes and local blobs remain in the scoped
-      // database even when the network is unavailable.
-      await sync.syncNow()
-      await auth.logout()
-      navigate('/', { replace: true })
+      await logoutFlow()
     } catch {
       toast.error(copy.common.genericError)
-    } finally {
-      setBusy(null)
     }
   }
 
@@ -89,7 +85,7 @@ export function AccountPanel() {
           <button
             type="button"
             className={authSecondaryButtonClass}
-            disabled={busy !== null}
+            disabled={anyBusy}
             onClick={() => void resolveConflict('keep-local')}
           >
             {copy.account.keepLocal}
@@ -97,7 +93,7 @@ export function AccountPanel() {
           <button
             type="button"
             className={authSecondaryButtonClass}
-            disabled={busy !== null}
+            disabled={anyBusy}
             onClick={() => void resolveConflict('keep-remote')}
           >
             {copy.account.useServer}
@@ -119,11 +115,13 @@ export function AccountPanel() {
           </div>
           <button
             type="button"
-            className={`${authSecondaryButtonClass} mt-4`}
-            disabled={busy !== null}
+            className={`${authSecondaryButtonClass} mt-4 inline-flex items-center justify-center gap-2`}
+            disabled={anyBusy}
+            aria-busy={logoutBusy}
             onClick={() => void logout()}
           >
-            {copy.account.logout}
+            <LogOut size={17} aria-hidden="true" />
+            {logoutBusy ? copy.nav.logoutBusy : copy.account.logout}
           </button>
           {conflictActions}
         </div>
@@ -238,11 +236,12 @@ export function AccountPanel() {
         <button
           type="button"
           className={`${authSecondaryButtonClass} mt-4 inline-flex items-center justify-center gap-2`}
-          disabled={busy !== null}
+          disabled={anyBusy}
+          aria-busy={logoutBusy}
           onClick={() => void logout()}
         >
           <LogOut size={17} aria-hidden="true" />
-          {copy.account.logout}
+          {logoutBusy ? copy.nav.logoutBusy : copy.account.logout}
         </button>
         {conflictActions}
       </div>
@@ -288,7 +287,7 @@ export function AccountPanel() {
             value={newPasswordConfirmation}
             onChange={(event) => setNewPasswordConfirmation(event.target.value)}
           />
-          <button className={authPrimaryButtonClass} type="submit" disabled={busy !== null}>
+          <button className={authPrimaryButtonClass} type="submit" disabled={anyBusy}>
             {copy.account.changePassword}
           </button>
         </form>
@@ -314,7 +313,7 @@ export function AccountPanel() {
             value={sessionsPassword}
             onChange={(event) => setSessionsPassword(event.target.value)}
           />
-          <button className={authSecondaryButtonClass} type="submit" disabled={busy !== null}>
+          <button className={authSecondaryButtonClass} type="submit" disabled={anyBusy}>
             {copy.account.sessionsLoad}
           </button>
         </form>
@@ -342,7 +341,7 @@ export function AccountPanel() {
                   <button
                     type="button"
                     className={`${authSecondaryButtonClass} mt-2`}
-                    disabled={busy !== null}
+                    disabled={anyBusy}
                     onClick={() => void revokeSession(accountSession.sessionId)}
                   >
                     {copy.account.revokeSession}
@@ -359,7 +358,7 @@ export function AccountPanel() {
               <button
                 type="button"
                 className={authSecondaryButtonClass}
-                disabled={busy !== null}
+                disabled={anyBusy}
                 onClick={() => void revokeSession()}
               >
                 {copy.account.revokeOthers}
@@ -389,7 +388,7 @@ export function AccountPanel() {
             value={exportPassword}
             onChange={(event) => setExportPassword(event.target.value)}
           />
-          <button className={authPrimaryButtonClass} type="submit" disabled={busy !== null}>
+          <button className={authPrimaryButtonClass} type="submit" disabled={anyBusy}>
             {copy.account.export}
           </button>
         </form>
@@ -428,7 +427,7 @@ export function AccountPanel() {
           <button
             className="w-full rounded-2xl bg-red-700 px-5 py-3.5 text-base font-semibold text-white disabled:opacity-60"
             type="submit"
-            disabled={busy !== null || deleteConfirmation !== 'DELETE'}
+            disabled={anyBusy || deleteConfirmation !== 'DELETE'}
           >
             {copy.account.deleteAction}
           </button>

@@ -22,12 +22,10 @@ beforeEach(() => {
 })
 
 describe('auth account API contracts', () => {
-  it('requires password and privacy acceptance when confirming email', async () => {
+  it('confirms email using only the single-use link parameters', async () => {
     const input = {
       userId: '11111111-1111-4111-8111-111111111111',
       token: 'fragment-token',
-      newPassword: 'a-long-unique-password',
-      privacyPolicyVersion: '2026-07-23' as const,
       importDemoData: true,
       continueWithoutDemoData: false,
     }

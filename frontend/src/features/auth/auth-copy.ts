@@ -49,13 +49,25 @@ export type AuthCopy = {
   verify: {
     title: string
     subtitle: string
-    confirm: string
+    verifying: string
+    successHeading: string
+    successBody: string
+    failed: string
     resend: string
     sent: string
     success: string
     invalidLink: string
-    continueWithoutDemoDataConfirm: string
-    demoDataPreserved: string
+  }
+  sync2: {
+    saving: string
+    pending: string
+    offline: string
+    error: string
+    conflict: string
+  }
+  nav: {
+    logout: string
+    logoutBusy: string
   }
   demo: {
     title: string
@@ -169,15 +181,26 @@ const es: AuthCopy = {
   verify: {
     title: 'Verificar correo',
     subtitle: 'Confirma tu correo para completar la protección de la cuenta.',
-    confirm: 'Verificar correo',
+    verifying: 'Estamos verificando tu correo…',
+    successHeading: 'Correo verificado correctamente',
+    successBody: 'Ya puedes iniciar sesión con la contraseña que creaste al registrarte.',
+    failed:
+      'No hemos podido verificar el correo. El enlace puede haber caducado o haber sido usado ya. Solicita uno nuevo.',
     resend: 'Reenviar verificación',
     sent: 'Si corresponde, se ha enviado un nuevo correo de verificación.',
     success: 'Correo verificado correctamente.',
     invalidLink: 'Abre el enlace completo recibido por correo para verificar la cuenta.',
-    continueWithoutDemoDataConfirm:
-      'No se ha podido importar la demo actual. Si continúas, se confirmará la cuenta sin importarla. Sus datos permanecerán locales en este dispositivo mientras no borres la demo ni sus datos locales. ¿Continuar sin importar esta demo?',
-    demoDataPreserved:
-      'La confirmación no ha continuado. Los datos de la demo permanecen locales en este dispositivo.',
+  },
+  sync2: {
+    saving: 'Guardando cambios…',
+    pending: 'Cambios pendientes de sincronizar.',
+    offline: 'Estás sin conexión. Tus cambios permanecen en este dispositivo.',
+    error: 'No se pudieron sincronizar los cambios.',
+    conflict: 'Hay un conflicto pendiente. Resuélvelo desde Cuenta.',
+  },
+  nav: {
+    logout: 'Cerrar sesión',
+    logoutBusy: 'Cerrando sesión…',
   },
   demo: {
     title: 'Preparando la demo',
@@ -294,14 +317,26 @@ const en: AuthCopy = {
   verify: {
     title: 'Verify email',
     subtitle: 'Confirm your email to finish protecting the account.',
-    confirm: 'Verify email',
+    verifying: 'We are verifying your email…',
+    successHeading: 'Email verified',
+    successBody: 'You can now sign in with the password you created at registration.',
+    failed:
+      'We could not verify the email. The link may have expired or already been used. Request a new one.',
     resend: 'Resend verification',
     sent: 'When applicable, a new verification email has been sent.',
     success: 'Email verified.',
     invalidLink: 'Open the complete link from your email to verify the account.',
-    continueWithoutDemoDataConfirm:
-      'The current demo could not be imported. If you continue, the account will be confirmed without importing it. Its data will remain local on this device unless you delete the demo or its local data. Continue without importing this demo?',
-    demoDataPreserved: 'Confirmation did not continue. The demo data remains local on this device.',
+  },
+  sync2: {
+    saving: 'Saving changes…',
+    pending: 'Changes pending to sync.',
+    offline: 'You are offline. Your changes stay on this device.',
+    error: 'We could not sync your changes.',
+    conflict: 'There is a pending conflict. Resolve it from Account.',
+  },
+  nav: {
+    logout: 'Sign out',
+    logoutBusy: 'Signing out…',
   },
   demo: {
     title: 'Preparing the demo',
@@ -418,15 +453,26 @@ const va: AuthCopy = {
   verify: {
     title: 'Verificar correu',
     subtitle: 'Confirma el correu per a completar la protecció del compte.',
-    confirm: 'Verificar correu',
+    verifying: 'Estem verificant el teu correu…',
+    successHeading: 'Correu verificat correctament',
+    successBody: 'Ja pots iniciar sessió amb la contrasenya que vas crear al registrar-te.',
+    failed:
+      'No hem pogut verificar el correu. L’enllaç pot haver caducat o haver estat usat ja. Sol·licita’n un nou.',
     resend: 'Reenviar verificació',
     sent: 'Si correspon, s’ha enviat un correu de verificació nou.',
     success: 'Correu verificat correctament.',
     invalidLink: 'Obri l’enllaç complet rebut per correu.',
-    continueWithoutDemoDataConfirm:
-      'No s’ha pogut importar la demo actual. Si continues, es confirmarà el compte sense importar-la. Les dades continuaran locals en este dispositiu mentre no esborres la demo ni les seues dades locals. Vols continuar sense importar esta demo?',
-    demoDataPreserved:
-      'La confirmació no ha continuat. Les dades de la demo continuen locals en este dispositiu.',
+  },
+  sync2: {
+    saving: 'Guardant canvis…',
+    pending: 'Canvis pendents de sincronitzar.',
+    offline: 'Estàs sense connexió. Els canvis continuen en este dispositiu.',
+    error: 'No s’han pogut sincronitzar els canvis.',
+    conflict: 'Hi ha un conflicte pendent. Resol-lo des de Compte.',
+  },
+  nav: {
+    logout: 'Tancar sessió',
+    logoutBusy: 'Tancant sessió…',
   },
   demo: {
     title: 'Preparant la demo',

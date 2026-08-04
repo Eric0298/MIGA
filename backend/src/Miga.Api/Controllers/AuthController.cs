@@ -295,16 +295,18 @@ public sealed class AuthController : ApiControllerBase
 
         var now = DateTimeOffset.UtcNow;
         var confirmationRequired = _authenticationOptions.RequireConfirmedEmail;
+        // The password and privacy consent are collected once at registration
+        // and reused after confirmation, so both are persisted immediately even
+        // for pending accounts. Confirmation only flips EmailConfirmed and
+        // completes any deferred demo conversion.
         var user = new MigaUser
         {
             Id = Guid.CreateVersion7(),
             Email = email,
             UserName = email,
             CreatedAtUtc = now,
-            PrivacyPolicyVersion = confirmationRequired
-                ? null
-                : request.PrivacyPolicyVersion,
-            PrivacyPolicyAcceptedAtUtc = confirmationRequired ? null : now,
+            PrivacyPolicyVersion = request.PrivacyPolicyVersion,
+            PrivacyPolicyAcceptedAtUtc = now,
             PendingDemoWorkspaceId = confirmationRequired ? demoWorkspace?.Id : null,
             PendingDemoSessionId = confirmationRequired ? demoActor?.SessionId : null,
             PendingDemoExpiresAtUtc = confirmationRequired ? demoActor?.ExpiresAtUtc : null,
@@ -315,9 +317,7 @@ public sealed class AuthController : ApiControllerBase
         IdentityResult createResult;
         try
         {
-            createResult = confirmationRequired
-                ? await _userManager.CreateAsync(user)
-                : await _userManager.CreateAsync(user, request.Password);
+            createResult = await _userManager.CreateAsync(user, request.Password);
         }
         catch (DbUpdateException exception)
             when (exception.InnerException is PostgresException
@@ -589,30 +589,22 @@ public sealed class AuthController : ApiControllerBase
                 "Demo data cannot be imported and skipped in the same request.");
         }
 
-        if (!string.Equals(
-                request.PrivacyPolicyVersion,
-                _authenticationOptions.PrivacyPolicyVersion,
-                StringComparison.Ordinal))
-        {
-            return ApiProblem(
-                StatusCodes.Status400BadRequest,
-                "privacy_policy_version_invalid",
-                "The current privacy policy must be accepted.");
-        }
-
-        var passwordResult = _passwordPolicy.Validate(request.NewPassword);
-        if (!passwordResult.IsValid)
-        {
-            return ApiProblem(
-                StatusCodes.Status400BadRequest,
-                passwordResult.ErrorCode!,
-                "The password does not meet the security policy.");
-        }
-
         var user = await _userManager.FindByIdAsync(request.UserId.ToString());
         if (user is null || user.EmailConfirmed)
         {
             return InvalidToken();
+        }
+
+        // Legacy accounts created before password-at-registration existed have
+        // no PasswordHash. Refuse to confirm them so they cannot become active
+        // without a credential; the cleanup job will remove them once expired
+        // and the owner can re-register.
+        if (string.IsNullOrEmpty(user.PasswordHash))
+        {
+            return ApiProblem(
+                StatusCodes.Status409Conflict,
+                "confirmation_password_missing",
+                "This account cannot be confirmed. Please register again.");
         }
 
         var validToken = await _userManager.VerifyUserTokenAsync(
@@ -761,10 +753,9 @@ public sealed class AuthController : ApiControllerBase
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        // The password was set atomically at registration; confirmation only
+        // finalizes the account. Never rehash from the confirmation payload.
         user.EmailConfirmed = true;
-        user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
-        user.PrivacyPolicyVersion = request.PrivacyPolicyVersion;
-        user.PrivacyPolicyAcceptedAtUtc = now;
         user.PendingDemoWorkspaceId = null;
         user.PendingDemoSessionId = null;
         user.PendingDemoExpiresAtUtc = null;

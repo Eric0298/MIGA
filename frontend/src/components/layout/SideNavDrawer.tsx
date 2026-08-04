@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { NavLink, useLocation } from 'react-router'
-import { X } from 'lucide-react'
+import { LogOut, X } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useT } from '@/i18n/i18n-context'
+import { useAuth } from '@/features/auth/AuthProvider'
+import { authCopyByLanguage } from '@/features/auth/auth-copy'
+import { useLogoutFlow } from '@/features/auth/use-logout'
 import { estudioSubItems, mainNavItems } from './nav-items'
 
 type Props = {
@@ -11,8 +14,11 @@ type Props = {
 }
 
 function SideNavDrawer({ open, onClose }: Props) {
-  const { t } = useT()
+  const { t, lang } = useT()
+  const copy = authCopyByLanguage[lang]
   const location = useLocation()
+  const auth = useAuth()
+  const { logout, busy: logoutBusy } = useLogoutFlow()
   const panelRef = useRef<HTMLDivElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
@@ -74,6 +80,8 @@ function SideNavDrawer({ open, onClose }: Props) {
     }
   }, [open])
 
+  const showLogout = auth.session.authenticated
+
   return (
     <div
       id="side-nav-drawer"
@@ -128,9 +136,7 @@ function SideNavDrawer({ open, onClose }: Props) {
                   className={({ isActive }) =>
                     clsx(
                       'flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-peach/60 text-charcoal'
-                        : 'text-charcoal hover:bg-peach/30',
+                      isActive ? 'bg-peach/60 text-charcoal' : 'text-charcoal hover:bg-peach/30',
                     )
                   }
                 >
@@ -163,6 +169,21 @@ function SideNavDrawer({ open, onClose }: Props) {
             ))}
           </ul>
         </nav>
+
+        {showLogout && (
+          <footer className="border-t border-[color:var(--color-border)] px-3 py-3">
+            <button
+              type="button"
+              onClick={() => void logout()}
+              disabled={logoutBusy}
+              aria-busy={logoutBusy}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-charcoal transition-colors hover:bg-peach/40 disabled:opacity-60"
+            >
+              <LogOut size={18} aria-hidden="true" />
+              <span>{logoutBusy ? copy.nav.logoutBusy : copy.nav.logout}</span>
+            </button>
+          </footer>
+        )}
       </aside>
     </div>
   )

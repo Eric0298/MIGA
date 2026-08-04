@@ -34,8 +34,6 @@ public sealed record ResetPasswordRequest(
 public sealed record ConfirmEmailRequest(
     Guid UserId,
     [Required, MaxLength(4096)] string Token,
-    [Required, MinLength(12), MaxLength(128)] string NewPassword,
-    [Required, MaxLength(32)] string PrivacyPolicyVersion,
     bool ImportDemoData = false,
     bool ContinueWithoutDemoData = false);
 

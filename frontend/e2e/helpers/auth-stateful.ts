@@ -14,6 +14,7 @@ type Account = Required<AccountFixture>
 type PendingRegistration = {
   email: string
   userId: string
+  password: string
   demoWorkspaceId: string | null
 }
 
@@ -165,11 +166,13 @@ export async function installStatefulAuthApi(
     if (url.pathname === '/api/auth/register' && method === 'POST') {
       const body = request.postDataJSON() as {
         email: string
+        password: string
         importDemoData: boolean
       }
       pending = {
         email: body.email,
         userId: randomUUID(),
+        password: body.password,
         demoWorkspaceId: actor?.kind === 'demo' ? actor.workspaceId : null,
       }
       await route.fulfill({ status: 202, body: '' })
@@ -179,15 +182,12 @@ export async function installStatefulAuthApi(
     if (url.pathname === '/api/auth/confirm-email' && method === 'POST') {
       const body = request.postDataJSON() as {
         userId: string
-        newPassword: string
-        privacyPolicyVersion: string
         importDemoData: boolean
         continueWithoutDemoData: boolean
       }
       if (
         !pending ||
         pending.userId !== body.userId ||
-        body.privacyPolicyVersion !== '2026-07-23' ||
         (body.importDemoData && body.continueWithoutDemoData)
       ) {
         await problem(route, 400, 'confirmation_invalid')
@@ -213,7 +213,7 @@ export async function installStatefulAuthApi(
       }
       const account: Account = {
         email: pending.email,
-        password: body.newPassword,
+        password: pending.password,
         workspaceId,
         userId: pending.userId,
         emailConfirmed: true,

@@ -13,11 +13,9 @@ import {
 } from './AuthLayout'
 import { useAuth } from './AuthProvider'
 import { consumeAuthLinkParameters } from './auth-link'
-import {
-  clearDemoImportPreference,
-  readDemoImportPreference,
-  rememberDemoImportPreference,
-} from './demo-import-preference'
+import { clearDemoImportPreference, readDemoImportPreference } from './demo-import-preference'
+
+type ConfirmationPhase = 'idle' | 'verifying' | 'success' | 'failed'
 
 function VerifyEmailPage() {
   const auth = useAuth()
@@ -45,20 +43,12 @@ function VerifyEmailPage() {
   const isDemo = demoWorkspaceId !== null
   const sessionEmail = auth.session.authenticated ? auth.session.email : undefined
   const [email, setEmail] = useState(sessionEmail ?? stateEmail ?? '')
-  const [password, setPassword] = useState('')
-  const [confirmation, setConfirmation] = useState('')
-  const [accepted, setAccepted] = useState(false)
-  const [importDemoData, setImportDemoData] = useState(() =>
-    navigationImportDemoData !== null
-      ? navigationImportDemoData
-      : demoWorkspaceId
-        ? readDemoImportPreference(demoWorkspaceId)
-        : false,
-  )
-  const initializedDemoWorkspaceRef = useRef<string | null>(demoWorkspaceId)
-  const [busy, setBusy] = useState<'confirm' | 'resend' | null>(null)
+  const [phase, setPhase] = useState<ConfirmationPhase>(canConfirm ? 'verifying' : 'idle')
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [resendBusy, setResendBusy] = useState(false)
+  const [resendMessage, setResendMessage] = useState<string | null>(null)
+  const successHeadingRef = useRef<HTMLHeadingElement | null>(null)
+  const confirmationStartedRef = useRef(false)
 
   useEffect(() => {
     if (link.containedSensitiveParameters) {
@@ -71,167 +61,121 @@ function VerifyEmailPage() {
   }, [link, location.pathname])
 
   useEffect(() => {
-    if (!demoWorkspaceId || initializedDemoWorkspaceRef.current === demoWorkspaceId) return
-    initializedDemoWorkspaceRef.current = demoWorkspaceId
-    setImportDemoData(navigationImportDemoData ?? readDemoImportPreference(demoWorkspaceId))
-  }, [demoWorkspaceId, navigationImportDemoData])
-
-  const confirm = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (busy || !canConfirm || auth.status === 'loading') return
-    if (password !== confirmation) {
-      setError(copy.common.passwordsMismatch)
-      return
-    }
-    setBusy('confirm')
-    setError(null)
-    try {
-      const input = {
-        userId,
-        token,
-        newPassword: password,
-        privacyPolicyVersion: '2026-07-23',
-        importDemoData: isDemo && importDemoData,
-        continueWithoutDemoData: isDemo && !importDemoData,
-      } as const
+    if (!canConfirm || confirmationStartedRef.current) return
+    if (auth.status === 'loading') return
+    // React StrictMode invokes effects twice in development; the ref guards
+    // against a second submission consuming the single-use token.
+    confirmationStartedRef.current = true
+    const importDemoData = isDemo
+      ? navigationImportDemoData !== null
+        ? navigationImportDemoData
+        : readDemoImportPreference(demoWorkspaceId)
+      : false
+    const base = { userId, token } as const
+    void (async () => {
       try {
-        await auth.confirmEmail(input)
-      } catch (cause) {
-        if (
-          !(cause instanceof ApiError) ||
-          cause.status !== 409 ||
-          cause.problem?.code !== 'demo_conversion_unavailable'
-        ) {
-          throw cause
+        try {
+          await auth.confirmEmail({
+            ...base,
+            importDemoData,
+            continueWithoutDemoData: isDemo && !importDemoData,
+          })
+        } catch (cause) {
+          if (
+            !(cause instanceof ApiError) ||
+            cause.status !== 409 ||
+            cause.problem?.code !== 'demo_conversion_unavailable'
+          ) {
+            throw cause
+          }
+          await auth.confirmEmail({
+            ...base,
+            importDemoData: false,
+            continueWithoutDemoData: true,
+          })
         }
-        if (!window.confirm(copy.verify.continueWithoutDemoDataConfirm)) {
-          setError(copy.verify.demoDataPreserved)
-          return
-        }
-        setImportDemoData(false)
         clearDemoImportPreference()
-        await auth.confirmEmail({
-          ...input,
-          importDemoData: false,
-          continueWithoutDemoData: true,
-        })
+        setPhase('success')
+      } catch {
+        setPhase('failed')
+        setError(copy.verify.failed)
       }
-      clearDemoImportPreference()
-      setSuccess(copy.verify.success)
-      navigate('/login', { replace: true })
-    } catch {
-      setError(copy.common.genericError)
-    } finally {
-      setBusy(null)
-    }
-  }
+    })()
+  }, [
+    auth,
+    auth.status,
+    canConfirm,
+    copy.verify.failed,
+    demoWorkspaceId,
+    isDemo,
+    navigationImportDemoData,
+    token,
+    userId,
+  ])
+
+  useEffect(() => {
+    if (phase === 'success') successHeadingRef.current?.focus()
+  }, [phase])
 
   const resend = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (busy || !email.trim()) return
-    setBusy('resend')
+    if (resendBusy || !email.trim()) return
+    setResendBusy(true)
     setError(null)
+    setResendMessage(null)
     try {
       await auth.resendConfirmation(email.trim())
-      setSuccess(copy.verify.sent)
+      setResendMessage(copy.verify.sent)
     } catch {
       setError(copy.common.genericError)
     } finally {
-      setBusy(null)
+      setResendBusy(false)
     }
+  }
+
+  if (canConfirm && phase !== 'failed') {
+    return (
+      <AuthLayout title={copy.verify.title} subtitle={copy.verify.subtitle}>
+        <div className="flex flex-col gap-4">
+          {phase === 'verifying' && (
+            <p role="status" aria-live="polite" className="text-sm text-charcoal">
+              {copy.verify.verifying}
+            </p>
+          )}
+          {phase === 'success' && (
+            <>
+              <AuthSuccess message={copy.verify.success} />
+              <h2
+                ref={successHeadingRef}
+                tabIndex={-1}
+                className="text-lg font-semibold text-charcoal"
+              >
+                {copy.verify.successHeading}
+              </h2>
+              <p className="text-sm text-[color:var(--color-text-muted)]">
+                {copy.verify.successBody}
+              </p>
+              <button
+                type="button"
+                className={authPrimaryButtonClass}
+                onClick={() => navigate('/login', { replace: true })}
+              >
+                {copy.login.title}
+              </button>
+            </>
+          )}
+        </div>
+      </AuthLayout>
+    )
   }
 
   return (
     <AuthLayout title={copy.verify.title} subtitle={copy.verify.subtitle}>
       <div className="flex flex-col gap-4">
         <AuthError message={error} />
-        <AuthSuccess message={success} />
-        {canConfirm && (
-          <form className="flex flex-col gap-4" onSubmit={confirm}>
-            <label className="flex flex-col gap-1.5 text-sm font-semibold text-charcoal">
-              {copy.common.newPassword}
-              <input
-                className={authFieldClass}
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={12}
-                maxLength={128}
-                disabled={busy !== null || auth.status === 'loading'}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-              <span className="font-normal text-[color:var(--color-text-muted)]">
-                {copy.common.passwordHint}
-              </span>
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm font-semibold text-charcoal">
-              {copy.common.confirmPassword}
-              <input
-                className={authFieldClass}
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={12}
-                maxLength={128}
-                disabled={busy !== null || auth.status === 'loading'}
-                value={confirmation}
-                onChange={(event) => setConfirmation(event.target.value)}
-              />
-            </label>
-            <label className="flex items-start gap-3 rounded-2xl bg-white p-4 text-sm text-charcoal">
-              <input
-                className="mt-1 h-4 w-4 accent-apricot"
-                type="checkbox"
-                required
-                disabled={busy !== null || auth.status === 'loading'}
-                checked={accepted}
-                onChange={(event) => setAccepted(event.target.checked)}
-              />
-              <span>
-                {copy.register.acceptPrivacy}{' '}
-                <Link className="font-semibold text-apricot underline" to="/privacidad">
-                  {copy.common.privacy}
-                </Link>
-              </span>
-            </label>
-            {isDemo && (
-              <label className="flex items-start gap-3 rounded-2xl bg-peach/60 p-4 text-sm text-charcoal">
-                <input
-                  className="mt-1 h-4 w-4 accent-apricot"
-                  type="checkbox"
-                  disabled={busy !== null || auth.status === 'loading'}
-                  checked={importDemoData}
-                  onChange={(event) => {
-                    const checked = event.target.checked
-                    setImportDemoData(checked)
-                    if (demoWorkspaceId) {
-                      rememberDemoImportPreference(demoWorkspaceId, checked)
-                    }
-                  }}
-                />
-                <span>
-                  <span className="block font-semibold">{copy.register.importDemo}</span>
-                  <span className="mt-1 block text-xs text-[color:var(--color-text-muted)]">
-                    {copy.register.importDemoHint}
-                  </span>
-                </span>
-              </label>
-            )}
-            <button
-              className={authPrimaryButtonClass}
-              type="submit"
-              disabled={busy !== null || auth.status === 'loading' || !accepted}
-            >
-              {copy.verify.confirm}
-            </button>
-          </form>
-        )}
+        <AuthSuccess message={resendMessage} />
         {!canConfirm && <AuthError message={copy.verify.invalidLink} />}
-        <form
-          className="flex flex-col gap-3 border-t border-[color:var(--color-border)] pt-5"
-          onSubmit={resend}
-        >
+        <form className="flex flex-col gap-3" onSubmit={resend}>
           <label className="flex flex-col gap-1.5 text-sm font-semibold text-charcoal">
             {copy.common.email}
             <input
@@ -245,7 +189,12 @@ function VerifyEmailPage() {
               onChange={(event) => setEmail(event.target.value)}
             />
           </label>
-          <button className={authSecondaryButtonClass} type="submit" disabled={busy !== null}>
+          <button
+            className={authSecondaryButtonClass}
+            type="submit"
+            disabled={resendBusy}
+            aria-busy={resendBusy}
+          >
             {copy.verify.resend}
           </button>
         </form>

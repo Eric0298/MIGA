@@ -46,8 +46,6 @@ export type ResetPasswordInput = {
 export type ConfirmEmailInput = {
   userId: string
   token: string
-  newPassword: string
-  privacyPolicyVersion: '2026-07-23'
   importDemoData: boolean
   continueWithoutDemoData: boolean
 }
