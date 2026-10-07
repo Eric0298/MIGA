@@ -17,6 +17,7 @@ export type AuthCopy = {
   login: {
     title: string
     subtitle: string
+    sessionEnded: string
     submit: string
     forgot: string
     noAccount: string
@@ -147,6 +148,8 @@ const es: AuthCopy = {
   login: {
     title: 'Iniciar sesión',
     subtitle: 'Accede a tus datos guardados de MIGA.',
+    sessionEnded:
+      'Se ha cerrado el acceso a tu cuenta. Tus datos locales se conservan en este navegador. Vuelve a entrar para continuar.',
     submit: 'Entrar',
     forgot: 'He olvidado mi contraseña',
     noAccount: '¿Todavía no tienes cuenta?',
@@ -283,6 +286,8 @@ const en: AuthCopy = {
   login: {
     title: 'Sign in',
     subtitle: 'Access your saved MIGA data.',
+    sessionEnded:
+      'Your account session has ended. Your local data is still saved in this browser. Sign in again to continue.',
     submit: 'Sign in',
     forgot: 'I forgot my password',
     noAccount: 'Do not have an account yet?',
@@ -419,6 +424,8 @@ const va: AuthCopy = {
   login: {
     title: 'Iniciar sessió',
     subtitle: 'Accedix a les teues dades guardades de MIGA.',
+    sessionEnded:
+      'S’ha tancat l’accés al teu compte. Les teues dades locals es conserven en este navegador. Torna a entrar per a continuar.',
     submit: 'Entrar',
     forgot: 'He oblidat la contrasenya',
     noAccount: 'Encara no tens compte?',

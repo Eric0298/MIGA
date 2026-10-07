@@ -36,6 +36,7 @@ import {
   deactivateScopedDatabase,
   deleteLocalDatabaseForScope,
   getActiveDatabaseScope,
+  isActiveDatabase,
 } from '@/lib/db/miga-db'
 import { abortActiveWorkspaceSync } from '@/lib/sync/WorkspaceSyncProvider'
 import {
@@ -51,6 +52,7 @@ type AuthState = {
   status: AuthStatus
   session: AuthSession
   workspace: WorkspaceBootstrapResult | null
+  requiresLogin: boolean
   error: Error | null
 }
 
@@ -89,12 +91,15 @@ const INITIAL_STATE: AuthState = {
   status: 'loading',
   session: EMPTY_SESSION,
   workspace: null,
+  requiresLogin: false,
   error: null,
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 const AUTH_CHANNEL_NAME = 'miga-auth-state-v1'
 const SCOPE_PATTERN = /^[a-f0-9]{24,64}$/
+const SESSION_RENEWAL_LEAD_MS = 60_000
+const SESSION_RENEWAL_RETRY_MS = 5_000
 const SESSION_BOUND_AUTH_PATHS = new Set([
   '/api/auth/logout',
   '/api/auth/change-password',
@@ -140,6 +145,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authorizationRevalidationRef = useRef<{
     retainAuthenticatedOnFailure: boolean
   } | null>(null)
+  const expiryRefreshAttemptsRef = useRef<{
+    scopeKey: string
+    beforeExpiry: number | null
+    afterExpiry: number | null
+  } | null>(null)
 
   const commitState = useCallback((next: AuthState) => {
     if (next.status === 'ready') {
@@ -160,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status: 'loading',
       session: EMPTY_SESSION,
       workspace: null,
+      requiresLogin: false,
       error: null,
     })
     return { generation, previous }
@@ -172,6 +183,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fallbackOverride?: AuthState,
     ): Promise<AuthSession> => {
       const fallback = fallbackOverride ?? stateRef.current
+      const requiresLoginOnLoss =
+        fallback.requiresLogin || lastReadyAuthenticatedStateRef.current !== null
       const generation = ++requestGeneration.current
       sessionAbortRef.current?.abort()
       const controller = new AbortController()
@@ -188,7 +201,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           abortActiveWorkspaceSync()
           await deactivateScopedDatabase()
           if (generation !== requestGeneration.current) throw abortError()
-          commitState({ status: 'ready', session, workspace: null, error: null })
+          commitState({
+            status: 'ready',
+            session,
+            workspace: null,
+            requiresLogin: requiresLoginOnLoss,
+            error: null,
+          })
           return session
         }
 
@@ -203,6 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             status: 'ready',
             session,
             workspace: current.workspace,
+            requiresLogin: false,
             error: null,
           })
           return session
@@ -213,7 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const workspace = await bootstrapAuthenticatedWorkspace(session, controller.signal)
         if (generation !== requestGeneration.current) throw abortError()
-        commitState({ status: 'ready', session, workspace, error: null })
+        commitState({ status: 'ready', session, workspace, requiresLogin: false, error: null })
         return session
       } catch (cause) {
         if (generation !== requestGeneration.current || controller.signal.aborted) throw cause
@@ -222,7 +242,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
           abortActiveWorkspaceSync()
           await deactivateScopedDatabase()
-          commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error })
+          commitState({
+            status: 'ready',
+            session: EMPTY_SESSION,
+            workspace: null,
+            requiresLogin: requiresLoginOnLoss,
+            error,
+          })
           return EMPTY_SESSION
         }
 
@@ -239,7 +265,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         abortActiveWorkspaceSync()
         await deactivateScopedDatabase()
-        commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error })
+        commitState({
+          status: 'ready',
+          session: EMPTY_SESSION,
+          workspace: null,
+          requiresLogin: requiresLoginOnLoss,
+          error,
+        })
         return EMPTY_SESSION
       } finally {
         if (sessionAbortRef.current === controller) sessionAbortRef.current = null
@@ -297,6 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         status: 'loading',
         session: EMPTY_SESSION,
         workspace: null,
+        requiresLogin: false,
         error: null,
       })
 
@@ -307,7 +340,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await deactivateScopedDatabase()
       }
       if (generation !== requestGeneration.current) return
-      commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error: null })
+      commitState({
+        status: 'ready',
+        session: EMPTY_SESSION,
+        workspace: null,
+        requiresLogin: false,
+        error: null,
+      })
     },
     [commitState],
   )
@@ -321,7 +360,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!message) return
       void applyInvalidation(message).catch((cause) => {
         const error = cause instanceof Error ? cause : new Error('Could not update local data')
-        commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error })
+        commitState({
+          status: 'ready',
+          session: EMPTY_SESSION,
+          workspace: null,
+          requiresLogin: false,
+          error,
+        })
       })
     }
     return () => {
@@ -342,14 +387,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (state.status !== 'ready' || !state.session.authenticated || !state.session.expiresAtUtc) {
+      if (!state.session.authenticated) expiryRefreshAttemptsRef.current = null
       return
     }
+    const workspace = state.workspace
+    if (!workspace) return
     const expiresAt = Date.parse(state.session.expiresAtUtc)
     if (!Number.isFinite(expiresAt)) return
-    const delay = Math.max(1_000, Math.min(expiresAt - Date.now() + 1_000, 2_147_000_000))
-    const timer = window.setTimeout(() => void refreshSession().catch(() => undefined), delay)
-    return () => window.clearTimeout(timer)
-  }, [state.status, state.session, refreshSession])
+    let attempts = expiryRefreshAttemptsRef.current
+    if (!attempts || attempts.scopeKey !== workspace.scopeKey) {
+      attempts = { scopeKey: workspace.scopeKey, beforeExpiry: null, afterExpiry: null }
+      expiryRefreshAttemptsRef.current = attempts
+    }
+    if (attempts.afterExpiry === expiresAt) return
+
+    // Renew before the server's idle deadline. An unchanged deadline may be
+    // the absolute session limit, so validate once after it instead of polling.
+    const renewBeforeExpiry = attempts.beforeExpiry !== expiresAt && expiresAt > Date.now()
+    const retryBeforeExpiry =
+      attempts.beforeExpiry === expiresAt &&
+      state.error !== null &&
+      expiresAt - Date.now() > SESSION_RENEWAL_RETRY_MS
+    let refreshAt = expiresAt + 1_000
+    if (renewBeforeExpiry) refreshAt = expiresAt - SESSION_RENEWAL_LEAD_MS
+    else if (retryBeforeExpiry) refreshAt = Date.now() + SESSION_RENEWAL_RETRY_MS
+    const delay = Math.max(1_000, Math.min(refreshAt - Date.now(), 2_147_000_000))
+    let cancelled = false
+    const renewSession = async () => {
+      if (cancelled || !isActiveDatabase(workspace.database, workspace.scopeKey)) return
+      if (document.visibilityState !== 'visible') {
+        const running = await workspace.database.sessions
+          .where('status')
+          .equals('running')
+          .first()
+          .catch(() => undefined)
+        if (!running) return
+      }
+      if (
+        cancelled ||
+        !isActiveDatabase(workspace.database, workspace.scopeKey) ||
+        !stateRef.current.session.authenticated ||
+        stateRef.current.workspace?.scopeKey !== workspace.scopeKey
+      ) {
+        return
+      }
+      if (Date.now() < expiresAt) attempts.beforeExpiry = expiresAt
+      else attempts.afterExpiry = expiresAt
+      await refreshSession().catch(() => undefined)
+    }
+    const timer = window.setTimeout(() => void renewSession(), delay)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [state, refreshSession])
 
   const refreshAfter = useCallback(
     async (operation: () => Promise<void>, forceWorkspace = true) => {
@@ -394,7 +485,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       channelRef.current?.postMessage(message)
       await deactivateScopedDatabase()
-      commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error: null })
+      commitState({
+        status: 'ready',
+        session: EMPTY_SESSION,
+        workspace: null,
+        requiresLogin: false,
+        error: null,
+      })
     } catch (cause) {
       if (generation === requestGeneration.current) {
         commitState({ ...previous, status: 'ready', error: cause as Error })
@@ -421,7 +518,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await deactivateScopedDatabase()
       await deleteLocalDatabaseForScope(scopeKey)
       await deactivateScopedDatabase()
-      commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error: null })
+      commitState({
+        status: 'ready',
+        session: EMPTY_SESSION,
+        workspace: null,
+        requiresLogin: false,
+        error: null,
+      })
     } catch (cause) {
       if (generation === requestGeneration.current) {
         commitState({ ...previous, status: 'ready', error: cause as Error })
@@ -452,7 +555,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await deactivateScopedDatabase()
         await deleteLocalDatabaseForScope(scopeKey)
         await deactivateScopedDatabase()
-        commitState({ status: 'ready', session: EMPTY_SESSION, workspace: null, error: null })
+        commitState({
+          status: 'ready',
+          session: EMPTY_SESSION,
+          workspace: null,
+          requiresLogin: false,
+          error: null,
+        })
       } catch (cause) {
         if (generation === requestGeneration.current) {
           commitState({ ...previous, status: 'ready', error: cause as Error })

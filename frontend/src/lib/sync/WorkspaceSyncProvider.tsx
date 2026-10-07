@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 import { ApiError } from '@/lib/api/http'
-import { getSnapshot, putSnapshot } from '@/lib/api/snapshot-api'
+import { getSnapshot, putSnapshot, type SnapshotEnvelope } from '@/lib/api/snapshot-api'
 import { SnapshotSizeLimitError } from '@/lib/db/data-limits'
 import {
   buildExportPayload,
@@ -161,7 +161,29 @@ export function WorkspaceSyncProvider({
           }
 
           const baseRevision = metadata?.revision ?? revisionRef.current
-          const saved = await putSnapshot(workspaceId, baseRevision, data, signal)
+          let saved: SnapshotEnvelope
+          try {
+            saved = await putSnapshot(workspaceId, baseRevision, data, signal)
+          } catch (cause) {
+            if (
+              !(cause instanceof ApiError) ||
+              cause.status !== 409 ||
+              cause.problem?.code !== 'snapshot_revision_conflict'
+            ) {
+              throw cause
+            }
+            // A previous PUT can succeed even when its response is lost. Only
+            // acknowledge that save if the server has exactly the sent data.
+            const remote = await getSnapshot(signal)
+            if (!hasActiveScope(database, scopeKey, signal)) return false
+            if (
+              remote.revision < baseRevision ||
+              (await workspaceContentHash(remote.data)) !== contentHash
+            ) {
+              throw cause
+            }
+            saved = remote
+          }
           if (!hasActiveScope(database, scopeKey, signal)) return false
 
           updateRevision(saved.revision, saved.updatedAtUtc)
@@ -239,9 +261,12 @@ export function WorkspaceSyncProvider({
     if (statusRef.current === 'conflict' || abortControllerRef.current.signal.aborted) return
     dirtyRef.current = true
     updateStatus('pending')
-    void getWorkspaceSyncMetadata(database)
-      .then((metadata) =>
-        putWorkspaceSyncMetadata(
+    // Read and mark dirty in one transaction so a late mutation notification
+    // cannot overwrite the revision committed by a concurrent save.
+    void database
+      .transaction('rw', database.syncMetadata, async () => {
+        const metadata = await getWorkspaceSyncMetadata(database)
+        await putWorkspaceSyncMetadata(
           {
             revision: metadata?.revision ?? revisionRef.current,
             updatedAtUtc: metadata?.updatedAtUtc ?? lastSyncedAtUtcRef.current,
@@ -249,8 +274,8 @@ export function WorkspaceSyncProvider({
             contentHash: metadata?.contentHash,
           },
           database,
-        ),
-      )
+        )
+      })
       .catch(() => updateStatus('error'))
     clearTimer()
     timerRef.current = window.setTimeout(() => void syncNow(), DEBOUNCE_MS)

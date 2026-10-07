@@ -146,6 +146,23 @@ async function runBootstrap(
   }
   throwIfAborted(signal)
 
+  if (
+    localSyncMetadata &&
+    snapshot.revision >= localSyncMetadata.revision &&
+    localHash === remoteHash
+  ) {
+    // A server save can complete even if its response or the local metadata
+    // write is interrupted. Identical content already acknowledges that save.
+    const metadata = {
+      revision: snapshot.revision,
+      updatedAtUtc: snapshot.updatedAtUtc,
+      dirty: false,
+      contentHash: remoteHash,
+    }
+    await putWorkspaceSyncMetadata(metadata, database)
+    return result(session, scopeKey, database, metadata, 'synced')
+  }
+
   if (localSyncMetadata?.dirty) {
     return result(
       session,
@@ -182,16 +199,6 @@ async function runBootstrap(
   }
 
   if (localSyncMetadata && snapshot.revision === localSyncMetadata.revision) {
-    if (localHash === remoteHash) {
-      const metadata = {
-        revision: snapshot.revision,
-        updatedAtUtc: snapshot.updatedAtUtc,
-        dirty: false,
-        contentHash: remoteHash,
-      }
-      await putWorkspaceSyncMetadata(metadata, database)
-      return result(session, scopeKey, database, metadata, 'synced')
-    }
     return preserveLocal(
       session,
       scopeKey,

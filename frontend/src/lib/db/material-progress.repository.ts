@@ -1,4 +1,4 @@
-import { db } from './miga-db'
+import { db, type MigaDatabase } from './miga-db'
 import type { MaterialKind, MaterialProgress, VideoRange } from './schema'
 
 export type CreateMaterialProgressInput = {
@@ -16,6 +16,7 @@ export type CreateMaterialProgressInput = {
 
 export async function createMaterialProgress(
   input: CreateMaterialProgressInput,
+  database: MigaDatabase = db,
 ): Promise<MaterialProgress> {
   const now = Date.now()
   const record: MaterialProgress = {
@@ -24,7 +25,7 @@ export async function createMaterialProgress(
     createdAt: now,
     updatedAt: now,
   }
-  await db.materialProgress.add(record)
+  await database.materialProgress.add(record)
   return record
 }
 

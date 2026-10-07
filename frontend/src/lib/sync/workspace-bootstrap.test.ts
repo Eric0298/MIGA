@@ -1,5 +1,6 @@
 import Dexie from 'dexie'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { parseImportPayload } from '@/lib/db/import-export'
 import {
   activateScopedDatabase,
   db,
@@ -239,6 +240,93 @@ describe('workspace bootstrap scoping', () => {
     const conflicted = await bootstrapAuthenticatedWorkspace(session)
     expect(conflicted.initialSyncStatus).toBe('conflict')
     expect(await db.goals.get(localGoalId)).toBeDefined()
+  })
+
+  it.each([3, 4])(
+    'clears interrupted upload metadata when remote revision %i already has the running session',
+    async (remoteRevision) => {
+      const sessionId = '55555555-5555-4555-8555-555555555555'
+      const blobId = '44444444-4444-4444-8444-444444444444'
+      snapshotState.revision = 3
+      snapshotState.data = parseImportPayload({
+        version: 7,
+        exportedAt: 1,
+        goals: [],
+        sessions: [
+          {
+            id: sessionId,
+            goalId: null,
+            materialIds: [],
+            startedAt: 1,
+            pausedAt: null,
+            endedAt: null,
+            totalPausedMs: 0,
+            status: 'running',
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+        materials: [],
+        materialGoalLinks: [],
+        materialProgress: [],
+        notes: [],
+        questions: [],
+        examAttempts: [],
+      })
+      const session = {
+        authenticated: true as const,
+        accountType: 'registered' as const,
+        workspaceId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        userId: '11111111-1111-4111-8111-111111111111',
+        email: 'student@example.test',
+        emailConfirmed: true,
+      }
+      const first = await bootstrapAuthenticatedWorkspace(session)
+      await first.database.syncMetadata.update('workspace', { dirty: true })
+      await first.database.materialBlobs.put({
+        id: blobId,
+        materialId: null,
+        mimeType: 'application/pdf',
+        size: 4,
+        blob: new Blob(['test'], { type: 'application/pdf' }),
+        createdAt: 1,
+      })
+      snapshotState.revision = remoteRevision
+
+      const recovered = await bootstrapAuthenticatedWorkspace(session)
+
+      expect(recovered.initialSyncStatus).toBe('synced')
+      expect(recovered.revision).toBe(remoteRevision)
+      expect((await recovered.database.syncMetadata.get('workspace'))?.dirty).toBe(false)
+      expect(await recovered.database.sessions.get(sessionId)).toMatchObject({
+        startedAt: 1,
+        status: 'running',
+        endedAt: null,
+        totalPausedMs: 0,
+      })
+      expect(await recovered.database.materialBlobs.get(blobId)).toBeDefined()
+    },
+  )
+
+  it('keeps a conflict when identical remote content has an older revision', async () => {
+    const session = {
+      authenticated: true as const,
+      accountType: 'registered' as const,
+      workspaceId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      userId: '11111111-1111-4111-8111-111111111111',
+      email: 'student@example.test',
+      emailConfirmed: true,
+    }
+    snapshotState.revision = 4
+    const first = await bootstrapAuthenticatedWorkspace(session)
+    await first.database.syncMetadata.update('workspace', { dirty: true })
+    snapshotState.revision = 3
+
+    const recovered = await bootstrapAuthenticatedWorkspace(session)
+
+    expect(recovered.initialSyncStatus).toBe('conflict')
+    expect(recovered.revision).toBe(4)
+    expect((await recovered.database.syncMetadata.get('workspace'))?.dirty).toBe(true)
   })
 
   it('serializes different identities and writes each snapshot only to its captured database', async () => {

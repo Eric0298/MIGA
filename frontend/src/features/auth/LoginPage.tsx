@@ -11,6 +11,9 @@ function LoginPage() {
   const copy = authCopyByLanguage[lang]
   const navigate = useNavigate()
   const location = useLocation()
+  const requested = (location.state as { from?: unknown } | null)?.from
+  const returnTo =
+    typeof requested === 'string' && /^\/app(?:[/?#]|$)/.test(requested) ? requested : '/app'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -18,7 +21,7 @@ function LoginPage() {
   const authLoading = auth.status === 'loading'
 
   if (auth.status === 'ready' && auth.session.authenticated) {
-    return <Navigate to="/app" replace />
+    return <Navigate to={returnTo} replace />
   }
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -28,8 +31,7 @@ function LoginPage() {
     setError(null)
     try {
       await auth.login(email.trim(), password)
-      const requested = (location.state as { from?: string } | null)?.from
-      navigate(requested?.startsWith('/app') ? requested : '/app', { replace: true })
+      navigate(returnTo, { replace: true })
     } catch {
       setError(copy.common.genericError)
     } finally {
@@ -40,6 +42,11 @@ function LoginPage() {
   return (
     <AuthLayout title={copy.login.title} subtitle={copy.login.subtitle}>
       <form className="flex flex-col gap-4" onSubmit={submit}>
+        {auth.requiresLogin && (
+          <p role="status" className="text-sm text-[color:var(--color-text-muted)]">
+            {copy.login.sessionEnded}
+          </p>
+        )}
         <AuthError message={error} />
         <label className="flex flex-col gap-1.5 text-sm font-semibold text-charcoal">
           {copy.common.email}

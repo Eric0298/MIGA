@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { db } from './miga-db'
+import {
+  activateScopedDatabase,
+  db,
+  deactivateScopedDatabase,
+  deleteAllScopedDatabases,
+} from './miga-db'
 import {
   createMaterialProgress,
   deleteProgress,
@@ -11,7 +16,9 @@ import {
 } from './material-progress.repository'
 
 afterEach(async () => {
+  await deactivateScopedDatabase()
   await db.materialProgress.clear()
+  await deleteAllScopedDatabases()
 })
 
 describe('material progress repository', () => {
@@ -31,6 +38,36 @@ describe('material progress repository', () => {
     expect(created.createdAt).toBeGreaterThan(0)
     expect(created.totalWatchedMs).toBe(5_000)
   })
+
+  it.each(['guest', 'other-account'] as const)(
+    'does not save a former account cleanup into %s after the active database changes',
+    async (nextScope) => {
+      const capturedDatabase = activateScopedDatabase('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+      await capturedDatabase.open()
+      if (nextScope === 'guest') {
+        await deactivateScopedDatabase()
+      } else {
+        activateScopedDatabase('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
+      }
+
+      await expect(
+        createMaterialProgress(
+          {
+            materialId: 'former-account-material',
+            goalId: null,
+            sessionId: 'former-account-session',
+            kind: 'pdf',
+            totalWatchedMs: 3_000,
+            pagesRead: [1],
+            startedAt: 1,
+            endedAt: 3_001,
+          },
+          capturedDatabase,
+        ),
+      ).rejects.toMatchObject({ name: 'DatabaseClosedError' })
+      expect(await db.materialProgress.count()).toBe(0)
+    },
+  )
 
   it('lists progress rows by material id', async () => {
     const base = Date.now()

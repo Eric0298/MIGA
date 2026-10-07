@@ -1,5 +1,5 @@
 import Dexie from 'dexie'
-import { render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, resetApiClientForTests } from '@/lib/api/http'
@@ -66,6 +66,11 @@ function StatusProbe() {
   return (
     <>
       <span>{auth.status}</span>
+      <span data-testid="authenticated">{String(auth.session.authenticated)}</span>
+      <span data-testid="requires-login">{String(auth.requiresLogin)}</span>
+      <span data-testid="session-expiry">
+        {auth.session.authenticated ? auth.session.expiresAtUtc : ''}
+      </span>
       <button type="button" onClick={() => void auth.refreshSession()}>
         refresh
       </button>
@@ -114,6 +119,8 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
   await deleteAllScopedDatabases()
   await clearAllData()
@@ -154,6 +161,7 @@ describe('AuthProvider local retention', () => {
 
     expect(await screen.findByText('ready')).toBeVisible()
     expect(getActiveDatabaseScope()).toBeNull()
+    expect(screen.getByTestId('requires-login')).toHaveTextContent('false')
     expect(await Dexie.exists(retainedName)).toBe(true)
   })
 
@@ -180,13 +188,14 @@ describe('AuthProvider local retention', () => {
     await vi.waitFor(() => expect(getActiveDatabaseScope()).toBeNull())
 
     expect(authApi.logout).toHaveBeenCalledOnce()
+    expect(screen.getByTestId('requires-login')).toHaveTextContent('false')
     expect(await Dexie.exists(retainedName)).toBe(true)
     const retained = new MigaDatabase(retainedName)
     expect(await retained.materialBlobs.count()).toBe(1)
     retained.close()
   })
 
-  it('retains the scope and falls back to local mode after a 401 refresh', async () => {
+  it('preserves scoped data and requires login after a 401 refresh', async () => {
     authApi.getAuthSession
       .mockResolvedValueOnce(AUTHENTICATED_SESSION)
       .mockRejectedValueOnce(new ApiError(401, { code: 'session_expired' }))
@@ -210,6 +219,7 @@ describe('AuthProvider local retention', () => {
     await user.click(screen.getByRole('button', { name: 'refresh' }))
     await vi.waitFor(() => expect(getActiveDatabaseScope()).toBeNull())
 
+    expect(screen.getByTestId('requires-login')).toHaveTextContent('true')
     expect(await Dexie.exists(retainedName)).toBe(true)
     const retained = new MigaDatabase(retainedName)
     expect(await retained.materialBlobs.count()).toBe(1)
@@ -265,6 +275,7 @@ describe('AuthProvider local retention', () => {
     await vi.waitFor(() => expect(getActiveDatabaseScope()).toBeNull())
 
     expect(authApi.getAuthSession).toHaveBeenCalledTimes(2)
+    expect(screen.getByTestId('requires-login')).toHaveTextContent('true')
     expect(await Dexie.exists(retainedName)).toBe(true)
     const retained = new MigaDatabase(retainedName)
     expect(await retained.syncMetadata.get('workspace')).toMatchObject({ dirty: true })
@@ -440,6 +451,30 @@ describe('AuthProvider local retention', () => {
     expect(await screen.findByText('ready')).toBeVisible()
     expect(getActiveDatabaseName()).toBe(LEGACY_DATABASE_NAME)
     expect(await db.goals.count()).toBe(1)
+    expect(screen.getByTestId('requires-login')).toHaveTextContent('false')
+  })
+
+  it('requires login after losing an authenticated workspace and clears it on recovery', async () => {
+    authApi.getAuthSession
+      .mockResolvedValueOnce(AUTHENTICATED_SESSION)
+      .mockResolvedValueOnce({ authenticated: false, accountType: null })
+      .mockResolvedValueOnce({ authenticated: false, accountType: null })
+      .mockResolvedValueOnce(AUTHENTICATED_SESSION)
+    const user = userEvent.setup()
+    render(
+      <AuthProvider>
+        <StatusProbe />
+      </AuthProvider>,
+    )
+    expect(await screen.findByText('ready')).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: 'refresh' }))
+    await vi.waitFor(() => expect(screen.getByTestId('requires-login')).toHaveTextContent('true'))
+    await user.click(screen.getByRole('button', { name: 'refresh' }))
+    expect(screen.getByTestId('requires-login')).toHaveTextContent('true')
+    await user.click(screen.getByRole('button', { name: 'refresh' }))
+    await vi.waitFor(() => expect(screen.getByTestId('authenticated')).toHaveTextContent('true'))
+    expect(screen.getByTestId('requires-login')).toHaveTextContent('false')
   })
 
   it('deletes only after the explicit local-data action and signs out first', async () => {
@@ -470,5 +505,212 @@ describe('AuthProvider local retention', () => {
     expect(await Dexie.exists(deletedName)).toBe(false)
     expect(getActiveDatabaseName()).toBe(LEGACY_DATABASE_NAME)
     expect(localStorage.length).toBe(0)
+  })
+})
+
+describe('AuthProvider idle deadline renewal', () => {
+  const START = Date.parse('2026-10-07T10:00:00.000Z')
+  const IDLE_TIMEOUT_MS = 30 * 60_000
+  const LEAD_MS = 60_000
+
+  async function renderWithDeadline() {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    vi.setSystemTime(START)
+    const rendered = render(
+      <AuthProvider>
+        <StatusProbe />
+      </AuthProvider>,
+    )
+    await vi.waitFor(() => expect(screen.getByText('ready')).toBeVisible())
+    return rendered
+  }
+
+  function sessionAt(expiresAt: number) {
+    return { ...AUTHENTICATED_SESSION, expiresAtUtc: new Date(expiresAt).toISOString() }
+  }
+
+  async function advanceTo(time: number) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(time - Date.now())
+    })
+  }
+
+  it('renews repeatedly before the idle deadline while preserving the study timer', async () => {
+    const firstExpiry = START + IDLE_TIMEOUT_MS
+    const secondExpiry = firstExpiry - LEAD_MS + IDLE_TIMEOUT_MS
+    authApi.getAuthSession
+      .mockResolvedValueOnce(sessionAt(firstExpiry))
+      .mockResolvedValueOnce(sessionAt(secondExpiry))
+      .mockResolvedValueOnce(sessionAt(secondExpiry - LEAD_MS + IDLE_TIMEOUT_MS))
+    await renderWithDeadline()
+    const scopeKey = getActiveDatabaseScope()
+    const studySession = {
+      id: '99999999-9999-4999-8999-999999999999',
+      goalId: null,
+      materialIds: [],
+      startedAt: START,
+      pausedAt: null,
+      endedAt: null,
+      totalPausedMs: 0,
+      status: 'running' as const,
+      createdAt: START,
+      updatedAt: START,
+    }
+    await db.sessions.put(studySession)
+
+    await advanceTo(firstExpiry - LEAD_MS - 1)
+    expect(authApi.getAuthSession).toHaveBeenCalledOnce()
+    await advanceTo(firstExpiry - LEAD_MS)
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('session-expiry')).toHaveTextContent(
+        new Date(secondExpiry).toISOString(),
+      ),
+    )
+    await advanceTo(secondExpiry - LEAD_MS)
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('session-expiry')).toHaveTextContent(
+        new Date(secondExpiry - LEAD_MS + IDLE_TIMEOUT_MS).toISOString(),
+      ),
+    )
+    expect(authApi.getAuthSession).toHaveBeenCalledTimes(3)
+
+    expect(getActiveDatabaseScope()).toBe(scopeKey)
+    expect(await db.sessions.get(studySession.id)).toEqual(studySession)
+    expect(screen.getByTestId('requires-login')).toHaveTextContent('false')
+  })
+
+  it('keeps a running study session authenticated while the tab is hidden', async () => {
+    const firstExpiry = START + IDLE_TIMEOUT_MS
+    authApi.getAuthSession
+      .mockResolvedValueOnce(sessionAt(firstExpiry))
+      .mockResolvedValueOnce(sessionAt(firstExpiry - LEAD_MS + IDLE_TIMEOUT_MS))
+    await renderWithDeadline()
+    await db.sessions.put({
+      id: '88888888-8888-4888-8888-888888888888',
+      goalId: null,
+      materialIds: [],
+      startedAt: START,
+      pausedAt: null,
+      endedAt: null,
+      totalPausedMs: 0,
+      status: 'running',
+      createdAt: START,
+      updatedAt: START,
+    })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    await advanceTo(firstExpiry - LEAD_MS)
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('session-expiry')).toHaveTextContent(
+        new Date(firstExpiry - LEAD_MS + IDLE_TIMEOUT_MS).toISOString(),
+      ),
+    )
+    expect(screen.getByTestId('authenticated')).toHaveTextContent('true')
+  })
+
+  it('lets an inactive hidden account expire and requires login when it becomes visible', async () => {
+    const firstExpiry = START + IDLE_TIMEOUT_MS
+    authApi.getAuthSession
+      .mockResolvedValueOnce(sessionAt(firstExpiry))
+      .mockResolvedValueOnce({ authenticated: false, accountType: null })
+    await renderWithDeadline()
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    await advanceTo(firstExpiry + 5_000)
+    expect(authApi.getAuthSession).toHaveBeenCalledOnce()
+    visibility.mockReturnValue('visible')
+    await act(async () => fireEvent(document, new Event('visibilitychange')))
+    await vi.waitFor(() => expect(screen.getByTestId('requires-login')).toHaveTextContent('true'))
+    expect(getActiveDatabaseScope()).toBeNull()
+  })
+
+  it('does not renew a paused study session while the tab is hidden', async () => {
+    const firstExpiry = START + IDLE_TIMEOUT_MS
+    authApi.getAuthSession.mockResolvedValue(sessionAt(firstExpiry))
+    await renderWithDeadline()
+    await db.sessions.put({
+      id: '77777777-7777-4777-8777-777777777777',
+      goalId: null,
+      materialIds: [],
+      startedAt: START,
+      pausedAt: START + 1_000,
+      endedAt: null,
+      totalPausedMs: 0,
+      status: 'paused',
+      createdAt: START,
+      updatedAt: START + 1_000,
+    })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    await advanceTo(firstExpiry + 5_000)
+
+    expect(authApi.getAuthSession).toHaveBeenCalledOnce()
+  })
+
+  it('validates an unchanged absolute deadline once and preserves expiry enforcement', async () => {
+    const absoluteExpiry = START + IDLE_TIMEOUT_MS
+    authApi.getAuthSession
+      .mockResolvedValueOnce(sessionAt(absoluteExpiry))
+      .mockResolvedValueOnce(sessionAt(absoluteExpiry))
+      .mockResolvedValueOnce({ authenticated: false, accountType: null })
+    await renderWithDeadline()
+
+    await advanceTo(absoluteExpiry - LEAD_MS)
+    await vi.waitFor(() => expect(authApi.getAuthSession).toHaveBeenCalledTimes(2))
+    await advanceTo(absoluteExpiry - 1)
+    expect(authApi.getAuthSession).toHaveBeenCalledTimes(2)
+    await advanceTo(absoluteExpiry + 1_000)
+    await vi.waitFor(() => expect(screen.getByTestId('requires-login')).toHaveTextContent('true'))
+    await advanceTo(absoluteExpiry + 5 * 60_000)
+    expect(authApi.getAuthSession).toHaveBeenCalledTimes(3)
+  })
+
+  it('recovers a brief network failure before the idle deadline', async () => {
+    const firstExpiry = START + IDLE_TIMEOUT_MS
+    const recoveredExpiry = firstExpiry - LEAD_MS + 5_000 + IDLE_TIMEOUT_MS
+    authApi.getAuthSession
+      .mockResolvedValueOnce(sessionAt(firstExpiry))
+      .mockRejectedValueOnce(new TypeError('Temporary network failure'))
+      .mockResolvedValueOnce(sessionAt(recoveredExpiry))
+    await renderWithDeadline()
+    const scopeKey = getActiveDatabaseScope()
+
+    await advanceTo(firstExpiry - LEAD_MS)
+    await vi.waitFor(() => expect(authApi.getAuthSession).toHaveBeenCalledTimes(2))
+    await advanceTo(firstExpiry - LEAD_MS + 5_000)
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('session-expiry')).toHaveTextContent(
+        new Date(recoveredExpiry).toISOString(),
+      ),
+    )
+    await advanceTo(firstExpiry + 5_000)
+
+    expect(authApi.getAuthSession).toHaveBeenCalledTimes(3)
+    expect(getActiveDatabaseScope()).toBe(scopeKey)
+    expect(screen.getByTestId('requires-login')).toHaveTextContent('false')
+  })
+
+  it('retains local work on transient renewal failures without polling after expiry', async () => {
+    const firstExpiry = START + IDLE_TIMEOUT_MS
+    authApi.getAuthSession
+      .mockResolvedValueOnce(sessionAt(firstExpiry))
+      .mockRejectedValue(new TypeError('Network unavailable'))
+    await renderWithDeadline()
+    const scopeKey = getActiveDatabaseScope()
+
+    await advanceTo(firstExpiry - LEAD_MS)
+    await vi.waitFor(() => expect(authApi.getAuthSession).toHaveBeenCalledTimes(2))
+    await advanceTo(firstExpiry - LEAD_MS + 5_000)
+    await vi.waitFor(() => expect(authApi.getAuthSession).toHaveBeenCalledTimes(3))
+    await advanceTo(firstExpiry + 1_000)
+    await advanceTo(firstExpiry + 5_000)
+    const attemptsAtExpiry = authApi.getAuthSession.mock.calls.length
+    expect(attemptsAtExpiry).toBeGreaterThan(3)
+    await advanceTo(firstExpiry + 5 * 60_000)
+
+    expect(authApi.getAuthSession).toHaveBeenCalledTimes(attemptsAtExpiry)
+    expect(getActiveDatabaseScope()).toBe(scopeKey)
+    expect(screen.getByTestId('authenticated')).toHaveTextContent('true')
+    expect(screen.getByTestId('requires-login')).toHaveTextContent('false')
   })
 })

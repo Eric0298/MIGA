@@ -2,6 +2,25 @@ import { describe, expect, it } from 'vitest'
 import { getAppGuardDecision } from './ProtectedAppRoute'
 
 describe('app guard', () => {
+  it('asks for login after account access ends instead of showing an empty local workspace', () => {
+    expect(
+      getAppGuardDecision({
+        status: 'ready',
+        authenticated: false,
+        hasWorkspace: false,
+        requiresLogin: true,
+      }),
+    ).toBe('login')
+    expect(
+      getAppGuardDecision({
+        status: 'loading',
+        authenticated: false,
+        hasWorkspace: false,
+        requiresLogin: true,
+      }),
+    ).toBe('loading')
+  })
+
   it('allows the legacy local workspace without authentication', () => {
     expect(
       getAppGuardDecision({
